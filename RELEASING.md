@@ -19,10 +19,12 @@ review), on the exact commit that gets tagged. Nothing is published until both p
    - `main` (admin may bypass, again only when merging a pull request): CI checks `build`, `newest-jdk`, `killbill-consumer`,
      `workflow-lint` and `codeql` must pass on the up-to-date branch; no high CodeQL alerts; linear
      history; no force pushes; no deletion.
-   - Release tags `v*`: only the admin can create, move or delete them.
+   - Release tags `v*`: only the admin can create them; nobody (admin included) can move or delete
+     them. GitHub releases are immutable once published.
+   - `main` accepts only signed commits (GitHub signs squash merges itself).
    - Secret scanning with push protection, Dependabot alerts and security updates, private
      vulnerability reporting.
-   - Actions: GitHub-owned actions and `gradle/actions` only, pinned to full commit SHAs; read-only
+   - Actions: GitHub-owned actions, `gradle/actions` and `ossf/scorecard-action` only, pinned to full commit SHAs; read-only
      `GITHUB_TOKEN` by default; workflows from outside contributors need approval.
    - Environments `maven-central` (only `v*` tags may deploy) and `monobank-test`, both requiring
      the admin's approval for every run.

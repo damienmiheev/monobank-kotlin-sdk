@@ -3,6 +3,7 @@
 [![CI](https://github.com/damienmiheev/monobank-kotlin-sdk/actions/workflows/ci.yml/badge.svg)](https://github.com/damienmiheev/monobank-kotlin-sdk/actions/workflows/ci.yml)
 [![Maven Central](https://img.shields.io/maven-central/v/io.github.damienmiheev/monobank-acquiring)](https://central.sonatype.com/namespace/io.github.damienmiheev)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/damienmiheev/monobank-kotlin-sdk/badge)](https://scorecard.dev/viewer/?uri=github.com/damienmiheev/monobank-kotlin-sdk)
 
 Kotlin and Java clients for monobank's public APIs:
 

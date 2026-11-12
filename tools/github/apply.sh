@@ -42,12 +42,15 @@ api -X PUT "repos/$repo/vulnerability-alerts" --silent
 api -X PUT "repos/$repo/automated-security-fixes" --silent
 api -X PUT "repos/$repo/private-vulnerability-reporting" --silent
 
+echo "== Immutable releases"
+api -X PUT "repos/$repo/immutable-releases" --silent
+
 echo "== Actions policy"
 api -X PUT "repos/$repo/actions/permissions" --silent --input - <<'JSON'
 { "enabled": true, "allowed_actions": "selected", "sha_pinning_required": true }
 JSON
 api -X PUT "repos/$repo/actions/permissions/selected-actions" --silent --input - <<'JSON'
-{ "github_owned_allowed": true, "verified_allowed": false, "patterns_allowed": ["gradle/actions/*"] }
+{ "github_owned_allowed": true, "verified_allowed": false, "patterns_allowed": ["gradle/actions/*", "ossf/scorecard-action@*"] }
 JSON
 api -X PUT "repos/$repo/actions/permissions/workflow" --silent --input - <<'JSON'
 { "default_workflow_permissions": "read", "can_approve_pull_request_reviews": false }
@@ -73,6 +76,9 @@ api -X PUT "repos/$repo/environments/monobank-test" --silent --input - <<JSON
 JSON
 
 echo "== Rulesets"
+# Rulesets renamed since the first version of this script.
+old="$(api "repos/$repo/rulesets" --jq '.[] | select(.name == "release tags") | .id')"
+if [ -n "$old" ]; then api -X DELETE "repos/$repo/rulesets/$old" --silent; echo "removed old: release tags"; fi
 for file in "$dir"/ruleset-*.json; do
   name="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["name"])' "$file")"
   id="$(api "repos/$repo/rulesets" --jq ".[] | select(.name == \"$name\") | .id")"
