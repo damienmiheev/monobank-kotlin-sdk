@@ -64,6 +64,10 @@ On a clean checkout of the release commit:
 6. `api/*.api` diff against the previous release contains only additions (after 1.0.0).
 7. README examples compile (they mirror `src/test` code) and the CHANGELOG entry is complete.
 8. A fresh-eyes review of the full diff since the previous release found nothing to fix.
+9. Consumers pass on the exact release commit before anything is published: the Kill Bill
+   monobank plugin builds against this commit (installed with `./gradlew publishToMavenLocal`,
+   version `X.Y.Z-SNAPSHOT`) and its unit, integration (against `monobank-testkit`) and live tests
+   pass. Anything it finds is fixed in the SDK first, then this checklist starts over.
 
 ## Release
 
