@@ -1,0 +1,19 @@
+{
+  "invoiceId": "p2_9ZgpZVsl3",
+  "amount": 4200,
+  "items": [
+    {
+      "name": "Табуретка",
+      "qty": 2,
+      "sum": 2100,
+      "code": "d21da1c47f3c45fca10a10c32518bdeb",
+      "barcode": "3b2a558cc6e44e218cdce301d80a1779",
+      "header": "Хідер",
+      "footer": "Футер",
+      "tax": [
+        0
+      ],
+      "uktzed": "uktzedcode"
+    }
+  ]
+}

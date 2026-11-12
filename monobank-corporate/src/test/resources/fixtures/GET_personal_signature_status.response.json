@@ -1,0 +1,25 @@
+{
+  "requestId": "sGtN4FnxYORZQU5Me1HbYhQ",
+  "documents": [
+    {
+      "status": "signed",
+      "name": "Договір на поставку товарів",
+      "hash": "A421FD4D4AB19BE76EC02A0F84AC2379822943FE85EB6ED7F22B30F73CB9CAF9",
+      "hashType": "Gost",
+      "type": "pdf",
+      "link": "https://example.com/agreement.pdf",
+      "signers": [
+        {
+          "name": "Шевченко Роман Петрович",
+          "tin": "1234567890",
+          "certSerial": "382367105294AF970400000058B38300BAE33C02",
+          "signature": "MIIJQwIBADANBgkqhkiG9w0BAQEFAASCCS0wggkpAgEAAoICAQD...",
+          "date": "2025-01-21T18:15:00.000Z",
+          "edrpou": "12345678",
+          "company": "ТОВ \"Сорока\"",
+          "post": "Директор"
+        }
+      ]
+    }
+  ]
+}

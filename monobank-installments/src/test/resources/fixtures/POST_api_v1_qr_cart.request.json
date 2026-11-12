@@ -1,0 +1,12 @@
+{
+  "qr_id": "qr-abc-123",
+  "store_order_id": "fa4a8249-336e-4e6d-9b85-79bc8be62377",
+  "products": [
+    {
+      "name": "Телевізор Samsung 55\"",
+      "count": 2,
+      "sum": 9999.99
+    }
+  ],
+  "result_callback": "https://shop.example.com/callback"
+}

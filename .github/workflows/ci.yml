@@ -1,0 +1,110 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# Least privilege: nothing by default, each job asks for what it needs.
+permissions: {}
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Job names are the required status checks in the branch ruleset (tools/github/): keep them stable.
+  check:
+    name: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          distribution: temurin
+          # JDK 11 is the oldest supported runtime (testJdk11); the build runs on 21.
+          java-version: |
+            11
+            21
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+      - name: Check
+        run: ./gradlew check --continue --console=plain
+      - name: Javadoc and publication dry run
+        run: ./gradlew publishToMavenLocal -x :relocation:publishToMavenLocal --console=plain
+      - name: Test reports
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: test-reports
+          path: '**/build/reports/'
+          retention-days: 7
+
+  newest-jdk:
+    name: newest-jdk
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          distribution: temurin
+          java-version: |
+            21
+            25
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+      - name: Test on JDK 25
+        run: ./gradlew test -PtestJavaVersion=25 --console=plain
+
+  kill-bill-consumer:
+    name: killbill-consumer
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          distribution: temurin
+          java-version: |
+            11
+            21
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+      - name: Install the SDK into the local Maven repository
+        run: ./gradlew publishToMavenLocal -x :relocation:publishToMavenLocal --console=plain
+      - name: Build and test the consumer on JDK 11
+        working-directory: consumer-tests/killbill-maven
+        run: |
+          export JAVA_HOME="$JAVA_HOME_11_X64"
+          mvn -B -ntp verify -Dmonobank.sdk.version="$(grep '^VERSION_NAME=' ../../gradle.properties | cut -d= -f2)"
+
+  workflow-lint:
+    name: workflow-lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # Built from source with the Go toolchain: the repository's Actions policy allows only a short
+      # list of actions (no Docker images), and Go's checksum database verifies the pinned version.
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: stable
+          cache: false
+      - name: actionlint
+        run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 -color

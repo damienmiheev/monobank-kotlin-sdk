@@ -1,0 +1,17 @@
+{
+  "total_sum": 2499.99,
+  "source": "INTERNET",
+  "invoice_number": "INV-001234",
+  "invoice_date": "2024-01-23",
+  "point_id": "STORE-001",
+  "store_order_id": "ORD-2024-001234",
+  "create_timestamp": "2024-01-16T16:49:51",
+  "reverse_list": [
+    {
+      "sum": 500,
+      "timestamp": "2024-01-16T16:49:51"
+    }
+  ],
+  "maskedCard": "5375 41** **** 1234",
+  "iban": "UA123456789012345678901234567"
+}

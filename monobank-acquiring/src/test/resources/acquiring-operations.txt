@@ -1,0 +1,37 @@
+# Every operation of the monobank acquiring OpenAPI spec v2412, plus the legacy (v2410) employee list.
+# Format: METHOD path. SpecCoverageTest fails when a line has no SDK method.
+POST /api/merchant/invoice/create
+GET /api/merchant/invoice/status
+POST /api/merchant/invoice/cancel
+POST /api/merchant/invoice/remove
+GET /api/merchant/pubkey
+POST /api/merchant/invoice/finalize
+GET /api/merchant/qr/details
+POST /api/merchant/qr/reset-amount
+GET /api/merchant/qr/list
+GET /api/merchant/details
+GET /api/merchant/statement
+DELETE /api/merchant/wallet/card
+GET /api/merchant/wallet
+POST /api/merchant/wallet/payment
+POST /api/merchant/invoice/payment-direct
+GET /api/merchant/submerchant/list
+GET /api/merchant/invoice/receipt
+GET /api/merchant/invoice/fiscal-checks
+POST /api/merchant/invoice/sync-payment
+GET /api/merchant/split-receiver/list
+GET /api/merchant/split-receiver/get-by-id
+GET /api/merchant/t2p/terminal/list
+GET /api/merchant/t2p/terminal/payment/external/status
+POST /api/merchant/pos-transaction-cancel
+GET /api/merchant/pos-transaction-cancel/status
+POST /api/merchant/subscription/create
+GET /api/merchant/subscription/status
+GET /api/merchant/subscription/payments
+GET /api/merchant/subscription/list
+POST /api/merchant/subscription/remove
+POST /api/merchant/subscription/edit
+POST /api/merchant/monopay/pubkey-import
+POST /api/merchant/monopay/pubkey-delete
+GET /api/merchant/monopay/pubkey-list
+GET /api/merchant/employee/list

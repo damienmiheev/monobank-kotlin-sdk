@@ -1,0 +1,19 @@
+{
+  "bank": "АТ Універсал Банк",
+  "terminal": "MT507582",
+  "paymentType": "purchase",
+  "amount": 3500,
+  "ccy": "UAH",
+  "status": "success",
+  "dataTime": "2026-04-21 23:01:54",
+  "internalPaymentId": "f2224275-ba0a-4f58-b6f7-bd00df63b01c",
+  "externalPaymentId": "18247112-4eac-4465-aa3c-c42c18f601eb",
+  "transactionId": "23417832268",
+  "maskedPan": "44179274******76",
+  "cardMask": "visa",
+  "approvalCode": "125261",
+  "rrn": "448571901425",
+  "responseCode": "1",
+  "errorMessage": "string",
+  "countryCard": "804"
+}

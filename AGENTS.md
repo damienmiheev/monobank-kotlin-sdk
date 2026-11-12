@@ -1,84 +1,73 @@
-# AGENTS.md — Monobank Kotlin SDK
+# AGENTS.md — monobank Kotlin SDK
 
-## Project Overview
+Instructions for coding agents and contributors working in this repository.
 
-Kotlin SDK for the Monobank Acquiring API. Provides typed clients for all merchant endpoints with blocking HTTP, Jackson JSON, and ECDSA webhook verification.
+## What this is
 
-## Architecture
+Open-source Kotlin/Java SDK for monobank's public APIs, published to Maven Central as
+`io.github.damienmiheev:monobank-*`. Main consumers: payment plugins (a Kill Bill plugin on JDK 11)
+and backend services. The first official release is 1.0.0; releases must not need a follow-up fix
+release — see RELEASING.md (every check is done twice before publishing; only the owner publishes).
 
+## Layout
+
+| Module | Package | Notes |
+|---|---|---|
+| `monobank-core` | `io.github.damienmiheev.monobank.core` | `MonobankHttp` transport, `MonobankJson`, sealed exceptions with `RequestOutcome`, `RetryPolicy`, `MinorUnits`, `Redaction` |
+| `monobank-acquiring` | `...monobank.acquiring` | merchant acquiring API + webhooks; `src/test/resources/acquiring-operations.txt` lists every documented operation |
+| `monobank-personal` | `...monobank.personal` | personal API, statement paging, optional rate limiter |
+| `monobank-corporate` | `...monobank.corporate` | providers API, secp256k1 signing (BouncyCastle lightweight API), `@ExperimentalMonobankApi` |
+| `monobank-installments` | `...monobank.installments` | "Покупка частинами", HMAC signing, BigDecimal hryvnias, snake_case |
+| `monobank-testkit` | `...monobank.testkit` | webhook signer + fake monobank acquiring server (JDK HttpServer) |
+| `monobank-bom` | — | version alignment |
+| `relocation` | — | one-off relocation POM for the old `app.spilki:monobank-acquiring-sdk` |
+| `consumer-tests/killbill-maven` | — | Maven project on Kill Bill's parent POM (Jackson 2.13, JDK 11), run in CI |
+| `tools/fixtures_from_openapi.py` | — | builds test fixtures from monobank's OpenAPI specs |
+
+## Hard rules
+
+1. **Runtime compatibility:** Java 11 bytecode and JDK 11 API only (`-Xjdk-release=11`); Jackson
+   databind APIs that exist in 2.13; SLF4J 1.7 API; no `jackson-module-kotlin`, no JSR-310 module,
+   no `kotlin-reflect`, no `ServiceLoader`. `check` runs the tests on JDK 11 and against Jackson 2.13.
+2. **Models:** explicit `@JsonProperty` names. Responses: `@ConsistentCopyVisibility data class` with an
+   `internal` `@JsonCreator` constructor; only ids/status/amount/currency non-null; enums from
+   responses have `UNKNOWN` (and keep the raw value where it matters). Requests: builders.
+   New model fields go LAST in the constructor (`componentN()` is public API). Model constructors
+   are Java-visible but not API: never document them for use.
+3. **Money:** minor units as `Long` (acquiring/personal/corporate), `BigDecimal` hryvnias (installments).
+   Never `Double`. KDoc states the unit on every amount.
+4. **Retries:** mark each operation `idempotent` honestly. Payments, refunds, creates, deletes and
+   anything that sends something are not idempotent. The transport never retries those after an
+   `UNKNOWN` outcome.
+5. **Secrets:** tokens, keys, secrets, card tokens, PAN/CVV/exp, wallet tokens and cryptograms never
+   appear in `toString()`, logs or exception messages. Logs carry method + path (no query), status,
+   error code.
+6. **Public API:** `explicitApi()`; after changing it run `./gradlew apiDump` and commit `api/*.api`.
+   After 1.0.0 only additive changes.
+7. **Tests:** MockWebServer per endpoint (request and response), fixtures from the docs, edge cases,
+   a Java interop test per API module, real key pairs for crypto. Live tests are tagged `live` and only
+   run by hand (`./gradlew liveTest` with env vars, see CONTRIBUTING.md) or via the manual
+   `live.yml` workflow. Never commit credentials.
+
+## Commands
+
+```bash
+./gradlew check            # everything CI runs for the build (needs JDK 21+ to run Gradle)
+./gradlew ktlintFormat
+./gradlew apiDump
+./gradlew publishToMavenLocal -x :relocation:publishToMavenLocal
 ```
-app.spilki.monobank.acquiring/
-├── MonobankAcquiring.kt           — Main facade, entry point
-├── MonobankAcquiringConfig.kt     — Configuration (token, URLs, timeouts)
-├── exception/                     — Sealed exception hierarchy
-│   ├── MonobankException.kt       — Base sealed class
-│   ├── MonobankApiException.kt    — HTTP 400 / generic API errors
-│   ├── MonobankAuthException.kt   — HTTP 403
-│   ├── MonobankRateLimitException — HTTP 429
-│   └── MonobankNetworkException   — Connection / timeout failures
-├── internal/                      — Internal implementation (not public API)
-│   ├── HttpTransport.kt           — java.net.http wrapper
-│   └── JsonCodec.kt               — Jackson ObjectMapper singleton
-├── model/                         — Request/response data classes
-│   ├── common/                    — Shared types (enums, PaymentInfo, BasketItem...)
-│   ├── invoice/                   — Invoice create/status/cancel/finalize DTOs
-│   ├── merchant/                  — Merchant details, statement, public key
-│   ├── subscription/              — Recurring payment DTOs
-│   ├── qr/                        — QR cash register DTOs
-│   ├── wallet/                    — Card tokenization DTOs
-│   ├── split/                     — Split receiver DTOs
-│   ├── monopay/                   — Monopay button DTOs
-│   ├── submerchant/               — Submerchant DTOs
-│   └── terminal/                  — T2P terminal DTOs
-├── api/                           — API client classes (one per domain)
-│   ├── InvoiceApi.kt
-│   ├── MerchantApi.kt
-│   ├── SubscriptionApi.kt
-│   ├── QrApi.kt
-│   ├── WalletApi.kt
-│   ├── SplitApi.kt
-│   ├── MonopayApi.kt
-│   ├── SubmerchantApi.kt
-│   └── TerminalApi.kt
-└── webhook/
-    └── WebhookVerifier.kt         — ECDSA signature verification
-```
 
-## Key Design Decisions
+## API reference
 
-1. **Blocking HTTP** — Uses `java.net.http.HttpClient` synchronously. No coroutines. Keeps the SDK simple and compatible with any JVM framework.
-2. **JVM 11 bytecode target** — Compiled on JVM 21 but targets JVM 11 for maximum compatibility (KillBill plugins, older services).
-3. **Jackson for JSON** — Widely used, no extra dependency for most JVM projects. Kotlin module registered for data class support.
-4. **Sealed exception hierarchy** — `MonobankException` is sealed. Consumers can use exhaustive `when` blocks.
-5. **Internal transport** — `HttpTransport` and `JsonCodec` are `internal`. Users interact only with `MonobankAcquiring` facade and API classes.
-6. **No BouncyCastle** — Webhook ECDSA verification uses standard JDK `java.security` APIs.
+- Acquiring: https://monobank.ua/api-docs/acquiring (spec version at the time of 1.0.0: v2412)
+- Personal: https://api.monobank.ua/docs/ (v250818)
+- Corporate/providers: https://api.monobank.ua/docs/corporate.html (v260831)
+- Installments: https://monobank.ua/api-docs/chast
 
-## API Reference
+## How to add or change an endpoint
 
-All endpoints documented at: https://monobank.ua/api-docs/acquiring/methods/
-
-Base URL: `https://api.monobank.ua`
-Auth: `X-Token` header with merchant token from https://web.monobank.ua/
-
-## Testing
-
-- 54 unit tests using JUnit 5 + MockWebServer + AssertJ
-- Run: `./gradlew test`
-- All HTTP interactions are mocked — no real API calls in tests
-
-## Code Quality
-
-- **detekt** — Static analysis (`./gradlew detekt`)
-- **ktlint** — Code formatting (`./gradlew ktlintCheck`)
-- Config: `detekt.yml`, `.editorconfig`
-
-## How to Add a New Endpoint
-
-1. Create request/response data classes in `model/{domain}/`
-2. Add method to the appropriate `api/{Domain}Api.kt`
-3. Add test in `test/.../api/{Domain}ApiTest.kt`
-4. Run `./gradlew build` to verify
-
-## Reference Implementation
-
-The existing `spilki-monobank-plugin` at `../spilki-monobank-plugin/` is a Java KillBill payment plugin that uses a subset of these APIs. This SDK is a superset of that plugin's Monobank client.
+1. Model request/response in the module's domain package, following the rules above.
+2. Add the method to the domain API class with KDoc (HTTP method + path, idempotency, units).
+3. Tests: request + response + error case; add the operation to the coverage list if the module has one.
+4. `./gradlew check apiDump`, update CHANGELOG.md.

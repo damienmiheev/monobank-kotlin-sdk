@@ -1,15 +1,17 @@
-build:
-  maxIssues: 0
+config:
+  validation: true
+  warningsAsErrors: false
 
 complexity:
   LongMethod:
-    threshold: 30
+    allowedLines: 40
+    excludes: ['**/src/test/**']
   LongParameterList:
-    functionThreshold: 8
-    constructorThreshold: 12
+    # Response models mirror monobank's JSON one-to-one and have many fields.
+    active: false
   TooManyFunctions:
-    thresholdInFiles: 20
-    thresholdInClasses: 15
+    allowedFunctionsPerFile: 25
+    allowedFunctionsPerClass: 25
 
 style:
   MaxLineLength:
@@ -20,12 +22,8 @@ style:
     active: false
   ReturnCount:
     max: 4
-
-naming:
-  FunctionNaming:
-    functionPattern: '[a-z][a-zA-Z0-9]*'
-  TopLevelPropertyNaming:
-    constantPattern: '[A-Z][A-Z_0-9]*'
+  ThrowsCount:
+    max: 4
 
 exceptions:
   TooGenericExceptionCaught:

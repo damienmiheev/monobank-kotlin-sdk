@@ -1,0 +1,9 @@
+{
+  "amount": 4200,
+  "cancelRef": "1234567890",
+  "createTime": "2026-10-01T10:30:00Z",
+  "modifyTime": "2026-10-01T11:30:00Z",
+  "originalTranId": "acq123456789",
+  "rrn": "060189181768",
+  "status": "new"
+}

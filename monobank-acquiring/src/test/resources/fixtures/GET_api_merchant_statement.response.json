@@ -1,0 +1,42 @@
+{
+  "list": [
+    {
+      "invoiceId": "2205175v4MfatvmUL2oR",
+      "status": "success",
+      "maskedPan": "444403******1902",
+      "date": "2024-05-01T12:30:00+03:00",
+      "paymentScheme": "bnpl_later_30",
+      "amount": 4200,
+      "profitAmount": 4100,
+      "agentFee": 500,
+      "ccy": 980,
+      "approvalCode": "662476",
+      "rrn": "060189181768",
+      "reference": "84d0070ee4e44667b31371d8f8813947",
+      "shortQrId": "OBJE",
+      "destination": "Покупка щастя",
+      "cancelList": [
+        {
+          "amount": 4200,
+          "ccy": 980,
+          "date": "2024-05-01T12:30:00+03:00",
+          "approvalCode": "662476",
+          "rrn": "060189181768",
+          "maskedPan": "444403******1902"
+        }
+      ],
+      "splitReceiverList": [
+        {
+          "splitReceiverId": "sr_aB3dC5eF7g",
+          "amount": 4200,
+          "profit": 4100,
+          "agentFee": 500
+        }
+      ],
+      "metadata": {
+        "key1": "value1",
+        "key2": "value2"
+      }
+    }
+  ]
+}

@@ -1,0 +1,45 @@
+name: Live tests (monobank test mode)
+
+# Manual only: never runs on pull requests, so forks can't reach the secrets.
+# The `monobank-test` environment holds the test credentials and should require a reviewer.
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: live-tests
+  cancel-in-progress: false
+
+jobs:
+  live:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 30
+    environment: monobank-test
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+        with:
+          cache-read-only: true
+      - name: Live tests
+        env:
+          MONOBANK_ACQUIRING_TEST_TOKEN: ${{ secrets.MONOBANK_ACQUIRING_TEST_TOKEN }}
+          MONOBANK_PERSONAL_TOKEN: ${{ secrets.MONOBANK_PERSONAL_TOKEN }}
+          MONOBANK_CORP_PRIVATE_KEY_PEM: ${{ secrets.MONOBANK_CORP_PRIVATE_KEY_PEM }}
+          MONOBANK_CORP_REQUEST_ID: ${{ secrets.MONOBANK_CORP_REQUEST_ID }}
+          MONOBANK_CHAST_STORE_ID: ${{ secrets.MONOBANK_CHAST_STORE_ID }}
+          MONOBANK_CHAST_STORE_SECRET: ${{ secrets.MONOBANK_CHAST_STORE_SECRET }}
+        run: |
+          if [ -z "$MONOBANK_ACQUIRING_TEST_TOKEN" ]; then
+            echo "MONOBANK_ACQUIRING_TEST_TOKEN is not set in the monobank-test environment"; exit 1
+          fi
+          # Modules without credentials skip their live tests.
+          ./gradlew liveTest --continue --console=plain

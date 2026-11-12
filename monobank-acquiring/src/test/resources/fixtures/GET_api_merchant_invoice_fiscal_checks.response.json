@@ -1,0 +1,13 @@
+{
+  "checks": [
+    {
+      "id": "a2fd4aef-cdb8-4e25-9b36-b6d4672c554d",
+      "type": "sale",
+      "status": "done",
+      "statusDescription": "",
+      "taxUrl": "https://cabinet.tax.gov.ua/cashregs/check",
+      "file": "JVBERi0xLjQKJW1vbm9iYW5rIHRlc3QgcmVjZWlwdAolJUVPRgo=",
+      "fiscalizationSource": "monopay"
+    }
+  ]
+}

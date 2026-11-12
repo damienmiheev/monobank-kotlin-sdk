@@ -1,0 +1,69 @@
+{
+  "header": {
+    "request_id": "fa4a8249-336e-4e6d-9b85-79bc8be62377",
+    "answer_datetime": "2018-01-25T12:36:01",
+    "from_organization": "Монобанк",
+    "organization_id": "21133352"
+  },
+  "expansion": {
+    "customer": {
+      "first_name": "Олександр",
+      "last_name": "Сідоренко",
+      "middle_name": "Ігорович",
+      "inn": "AA123456",
+      "document": {
+        "passport": {
+          "number": "123456",
+          "issued": "1234",
+          "date_of_issue": "1901-01-29",
+          "series": "AA"
+        },
+        "id_card": {
+          "number": "123456",
+          "issued": "1234",
+          "date_of_issue": "1901-01-29",
+          "valid_until": "2025-01-25",
+          "registry_number": "12345678-12345"
+        },
+        "residence_permit": {
+          "number": "123456",
+          "issued": "1234",
+          "date_of_issue": "1901-01-29",
+          "series": "AA"
+        },
+        "international_passport": {
+          "number": "123456",
+          "date_of_issue": "1901-01-29",
+          "series": "FV",
+          "valid_until": "2025-01-25"
+        }
+      }
+    },
+    "invoice": {
+      "invoice_number": "1234-1234-1234",
+      "invoice_date": "2018-01-25",
+      "invoice_amount": 1234.56
+    },
+    "payment_destination": {
+      "dest_id": "12345678",
+      "dest_name": "any super company",
+      "dest_mfo": "123456",
+      "dest_bank_name": "any bank",
+      "dest_acc_number": "1234567890123"
+    },
+    "bank": {
+      "agreement": "123-123-1234",
+      "agreement_date": "2020-01-25",
+      "credit_amount": 1234.56,
+      "customer_pay_amount": 123.35,
+      "product_types": "payment_installments",
+      "bank_id": "12345678",
+      "bank_name": "any bank",
+      "bank_executive": "Сідоренко Олександр Ігорович",
+      "available_parts_count": 12,
+      "credit_product": "MONO 234"
+    },
+    "sign": "12E0F76458C6D1E4",
+    "stamp": "1199A0F5E7C4A212"
+  }
+}

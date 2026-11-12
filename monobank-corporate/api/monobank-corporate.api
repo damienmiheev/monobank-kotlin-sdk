@@ -1,0 +1,510 @@
+public final class io/github/damienmiheev/monobank/corporate/CorporateConfig {
+	public static final field Companion Lio/github/damienmiheev/monobank/corporate/CorporateConfig$Companion;
+	public synthetic fun <init> (Lio/github/damienmiheev/monobank/corporate/CorporateSigner;Ljava/lang/String;Lio/github/damienmiheev/monobank/corporate/SignatureEncoding;ZLjava/time/Clock;Lio/github/damienmiheev/monobank/core/MonobankClientOptions;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public static final fun builder (Lio/github/damienmiheev/monobank/corporate/CorporateSigner;)Lio/github/damienmiheev/monobank/corporate/CorporateConfig$Builder;
+	public static final fun builder (Ljava/lang/String;)Lio/github/damienmiheev/monobank/corporate/CorporateConfig$Builder;
+	public final fun getClock ()Ljava/time/Clock;
+	public final fun getKeyId ()Ljava/lang/String;
+	public final fun getOptions ()Lio/github/damienmiheev/monobank/core/MonobankClientOptions;
+	public final fun getSignQueryString ()Z
+	public final fun getSignatureEncoding ()Lio/github/damienmiheev/monobank/corporate/SignatureEncoding;
+	public final fun getSigner ()Lio/github/damienmiheev/monobank/corporate/CorporateSigner;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/damienmiheev/monobank/corporate/CorporateConfig$Builder {
+	public final fun build ()Lio/github/damienmiheev/monobank/corporate/CorporateConfig;
+	public final fun clock (Ljava/time/Clock;)Lio/github/damienmiheev/monobank/corporate/CorporateConfig$Builder;
+	public final fun keyId (Ljava/lang/String;)Lio/github/damienmiheev/monobank/corporate/CorporateConfig$Builder;
+	public final fun options (Lio/github/damienmiheev/monobank/core/MonobankClientOptions;)Lio/github/damienmiheev/monobank/corporate/CorporateConfig$Builder;
+	public final fun signQueryString (Z)Lio/github/damienmiheev/monobank/corporate/CorporateConfig$Builder;
+	public final fun signatureEncoding (Lio/github/damienmiheev/monobank/corporate/SignatureEncoding;)Lio/github/damienmiheev/monobank/corporate/CorporateConfig$Builder;
+}
+
+public final class io/github/damienmiheev/monobank/corporate/CorporateConfig$Companion {
+	public final fun builder (Lio/github/damienmiheev/monobank/corporate/CorporateSigner;)Lio/github/damienmiheev/monobank/corporate/CorporateConfig$Builder;
+	public final fun builder (Ljava/lang/String;)Lio/github/damienmiheev/monobank/corporate/CorporateConfig$Builder;
+}
+
+public final class io/github/damienmiheev/monobank/corporate/CorporateKey : io/github/damienmiheev/monobank/corporate/CorporateSigner {
+	public static final field Companion Lio/github/damienmiheev/monobank/corporate/CorporateKey$Companion;
+	public synthetic fun <init> (Ljava/math/BigInteger;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public static final fun fromPem (Ljava/lang/String;)Lio/github/damienmiheev/monobank/corporate/CorporateKey;
+	public fun getKeyId ()Ljava/lang/String;
+	public final fun getPublicKey ()Lio/github/damienmiheev/monobank/corporate/CorporatePublicKey;
+	public fun sign ([B)[B
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/damienmiheev/monobank/corporate/CorporateKey$Companion {
+	public final fun fromPem (Ljava/lang/String;)Lio/github/damienmiheev/monobank/corporate/CorporateKey;
+}
+
+public final class io/github/damienmiheev/monobank/corporate/CorporatePublicKey {
+	public static final field Companion Lio/github/damienmiheev/monobank/corporate/CorporatePublicKey$Companion;
+	public fun equals (Ljava/lang/Object;)Z
+	public static final fun fromPem (Ljava/lang/String;)Lio/github/damienmiheev/monobank/corporate/CorporatePublicKey;
+	public static final fun fromPoint ([B)Lio/github/damienmiheev/monobank/corporate/CorporatePublicKey;
+	public static final fun fromSpkiDer ([B)Lio/github/damienmiheev/monobank/corporate/CorporatePublicKey;
+	public final fun getKeyId ()Ljava/lang/String;
+	public final fun getPublicKeyPem ()Ljava/lang/String;
+	public final fun getPublicKeyPemBase64 ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+	public final fun uncompressed ()[B
+	public final fun verify ([B[B)Z
+}
+
+public final class io/github/damienmiheev/monobank/corporate/CorporatePublicKey$Companion {
+	public final fun fromPem (Ljava/lang/String;)Lio/github/damienmiheev/monobank/corporate/CorporatePublicKey;
+	public final fun fromPoint ([B)Lio/github/damienmiheev/monobank/corporate/CorporatePublicKey;
+	public final fun fromSpkiDer ([B)Lio/github/damienmiheev/monobank/corporate/CorporatePublicKey;
+}
+
+public abstract interface class io/github/damienmiheev/monobank/corporate/CorporateSigner {
+	public abstract fun getKeyId ()Ljava/lang/String;
+	public abstract fun sign ([B)[B
+}
+
+public final class io/github/damienmiheev/monobank/corporate/MonobankCorporate {
+	public static final field Companion Lio/github/damienmiheev/monobank/corporate/MonobankCorporate$Companion;
+	public fun <init> (Lio/github/damienmiheev/monobank/corporate/CorporateConfig;)V
+	public final fun client (Ljava/lang/String;)Lio/github/damienmiheev/monobank/corporate/client/ClientApi;
+	public static final fun create (Ljava/lang/String;)Lio/github/damienmiheev/monobank/corporate/MonobankCorporate;
+	public final fun getAccess ()Lio/github/damienmiheev/monobank/corporate/access/AccessApi;
+	public final fun getCompany ()Lio/github/damienmiheev/monobank/corporate/company/CompanyApi;
+	public final fun getConfig ()Lio/github/damienmiheev/monobank/corporate/CorporateConfig;
+	public final fun getSignatures ()Lio/github/damienmiheev/monobank/corporate/signature/SignatureApi;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/damienmiheev/monobank/corporate/MonobankCorporate$Companion {
+	public final fun create (Ljava/lang/String;)Lio/github/damienmiheev/monobank/corporate/MonobankCorporate;
+}
+
+public final class io/github/damienmiheev/monobank/corporate/SignatureEncoding : java/lang/Enum {
+	public static final field DER Lio/github/damienmiheev/monobank/corporate/SignatureEncoding;
+	public static final field P1363 Lio/github/damienmiheev/monobank/corporate/SignatureEncoding;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/damienmiheev/monobank/corporate/SignatureEncoding;
+	public static fun values ()[Lio/github/damienmiheev/monobank/corporate/SignatureEncoding;
+}
+
+public final class io/github/damienmiheev/monobank/corporate/access/AccessApi {
+	public final fun request ()Lio/github/damienmiheev/monobank/corporate/access/AccessRequest;
+	public final fun request (Ljava/lang/String;)Lio/github/damienmiheev/monobank/corporate/access/AccessRequest;
+	public static synthetic fun request$default (Lio/github/damienmiheev/monobank/corporate/access/AccessApi;Ljava/lang/String;ILjava/lang/Object;)Lio/github/damienmiheev/monobank/corporate/access/AccessRequest;
+	public final fun status (Ljava/lang/String;)Lio/github/damienmiheev/monobank/corporate/access/AccessRequestStatus;
+}
+
+public final class io/github/damienmiheev/monobank/corporate/access/AccessRequest {
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAcceptUrl ()Ljava/lang/String;
+	public final fun getTokenRequestId ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/damienmiheev/monobank/corporate/access/AccessRequestStatus : java/lang/Enum {
+	public static final field APPROVED Lio/github/damienmiheev/monobank/corporate/access/AccessRequestStatus;
+	public static final field NOT_FOUND Lio/github/damienmiheev/monobank/corporate/access/AccessRequestStatus;
+	public static final field PENDING Lio/github/damienmiheev/monobank/corporate/access/AccessRequestStatus;
+	public static final field UNKNOWN Lio/github/damienmiheev/monobank/corporate/access/AccessRequestStatus;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/damienmiheev/monobank/corporate/access/AccessRequestStatus;
+	public static fun values ()[Lio/github/damienmiheev/monobank/corporate/access/AccessRequestStatus;
+}
+
+public final class io/github/damienmiheev/monobank/corporate/client/Account {
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()J
+	public final fun component4 ()Ljava/lang/Long;
+	public final fun component5 ()Lio/github/damienmiheev/monobank/corporate/client/AccountType;
+	public final fun component6 ()I
+	public final fun component7 ()Lio/github/damienmiheev/monobank/corporate/client/CashbackType;
+	public final fun component8 ()Ljava/util/List;
+	public final fun component9 ()Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBalance ()J
+	public final fun getCashbackType ()Lio/github/damienmiheev/monobank/corporate/client/CashbackType;
+	public final fun getCreditLimit ()Ljava/lang/Long;
+	public final fun getCurrencyCode ()I
+	public final fun getIban ()Ljava/lang/String;
+	public final fun getId ()Ljava/lang/String;
+	public final fun getMaskedPan ()Ljava/util/List;
+	public final fun getSendId ()Ljava/lang/String;
+	public final fun getType ()Lio/github/damienmiheev/monobank/corporate/client/AccountType;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/damienmiheev/monobank/corporate/client/AccountType : java/lang/Enum {
+	public static final field BLACK Lio/github/damienmiheev/monobank/corporate/client/AccountType;
+	public static final field E_AID Lio/github/damienmiheev/monobank/corporate/client/AccountType;
+	public static final field FOP Lio/github/damienmiheev/monobank/corporate/client/AccountType;
+	public static final field IRON Lio/github/damienmiheev/monobank/corporate/client/AccountType;
+	public static final field PLATINUM Lio/github/damienmiheev/monobank/corporate/client/AccountType;
+	public static final field UNKNOWN Lio/github/damienmiheev/monobank/corporate/client/AccountType;
+	public static final field WHITE Lio/github/damienmiheev/monobank/corporate/client/AccountType;
+	public static final field YELLOW Lio/github/damienmiheev/monobank/corporate/client/AccountType;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public final fun getValue ()Ljava/lang/String;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/damienmiheev/monobank/corporate/client/AccountType;
+	public static fun values ()[Lio/github/damienmiheev/monobank/corporate/client/AccountType;
+}
+
+public final class io/github/damienmiheev/monobank/corporate/client/CashbackType : java/lang/Enum {
+	public static final field MILES Lio/github/damienmiheev/monobank/corporate/client/CashbackType;
+	public static final field NONE Lio/github/damienmiheev/monobank/corporate/client/CashbackType;
+	public static final field UAH Lio/github/damienmiheev/monobank/corporate/client/CashbackType;
+	public static final field UNKNOWN Lio/github/damienmiheev/monobank/corporate/client/CashbackType;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public final fun getValue ()Ljava/lang/String;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/damienmiheev/monobank/corporate/client/CashbackType;
+	public static fun values ()[Lio/github/damienmiheev/monobank/corporate/client/CashbackType;
+}
+
+public final class io/github/damienmiheev/monobank/corporate/client/ClientApi {
+	public static final field Companion Lio/github/damienmiheev/monobank/corporate/client/ClientApi$Companion;
+	public static final field DEFAULT_ACCOUNT Ljava/lang/String;
+	public static final field MAX_RANGE_SECONDS J
+	public final fun getRequestId ()Ljava/lang/String;
+	public final fun info ()Lio/github/damienmiheev/monobank/corporate/client/ClientInfo;
+	public final fun statement (Ljava/lang/String;Ljava/time/Instant;)Ljava/util/List;
+	public final fun statement (Ljava/lang/String;Ljava/time/Instant;Ljava/time/Instant;)Ljava/util/List;
+	public static synthetic fun statement$default (Lio/github/damienmiheev/monobank/corporate/client/ClientApi;Ljava/lang/String;Ljava/time/Instant;Ljava/time/Instant;ILjava/lang/Object;)Ljava/util/List;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/damienmiheev/monobank/corporate/client/ClientApi$Companion {
+}
+
+public final class io/github/damienmiheev/monobank/corporate/client/ClientInfo {
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun component5 ()Ljava/util/List;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAccounts ()Ljava/util/List;
+	public final fun getClientId ()Ljava/lang/String;
+	public final fun getName ()Ljava/lang/String;
+	public final fun getPermissions ()Ljava/lang/String;
+	public final fun getWebHookUrl ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/damienmiheev/monobank/corporate/client/StatementItem {
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component10 ()Ljava/lang/Long;
+	public final fun component11 ()Ljava/lang/Long;
+	public final fun component12 ()Ljava/lang/Long;
+	public final fun component13 ()Ljava/lang/String;
+	public final fun component14 ()Ljava/lang/String;
+	public final fun component15 ()Ljava/lang/String;
+	public final fun component16 ()Ljava/lang/String;
+	public final fun component17 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/time/Instant;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ljava/lang/Integer;
+	public final fun component5 ()Ljava/lang/Integer;
+	public final fun component6 ()Ljava/lang/Boolean;
+	public final fun component7 ()J
+	public final fun component8 ()Ljava/lang/Long;
+	public final fun component9 ()I
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAmount ()J
+	public final fun getBalance ()Ljava/lang/Long;
+	public final fun getCashbackAmount ()Ljava/lang/Long;
+	public final fun getComment ()Ljava/lang/String;
+	public final fun getCommissionRate ()Ljava/lang/Long;
+	public final fun getCounterEdrpou ()Ljava/lang/String;
+	public final fun getCounterIban ()Ljava/lang/String;
+	public final fun getCounterName ()Ljava/lang/String;
+	public final fun getCurrencyCode ()I
+	public final fun getDescription ()Ljava/lang/String;
+	public final fun getHold ()Ljava/lang/Boolean;
+	public final fun getId ()Ljava/lang/String;
+	public final fun getMcc ()Ljava/lang/Integer;
+	public final fun getOperationAmount ()Ljava/lang/Long;
+	public final fun getOriginalMcc ()Ljava/lang/Integer;
+	public final fun getReceiptId ()Ljava/lang/String;
+	public final fun getTime ()Ljava/time/Instant;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/damienmiheev/monobank/corporate/company/CompanyApi {
+	public final fun register (Lio/github/damienmiheev/monobank/corporate/company/RegistrationRequest;)Lio/github/damienmiheev/monobank/corporate/company/RegistrationResponse;
+	public final fun registrationStatus (Lio/github/damienmiheev/monobank/corporate/CorporatePublicKey;)Lio/github/damienmiheev/monobank/corporate/company/RegistrationStatusResponse;
+	public final fun registrationStatus (Ljava/lang/String;)Lio/github/damienmiheev/monobank/corporate/company/RegistrationStatusResponse;
+	public final fun setWebhook (Ljava/lang/String;)V
+	public final fun setWebhook (Ljava/lang/String;Ljava/lang/String;)V
+	public static synthetic fun setWebhook$default (Lio/github/damienmiheev/monobank/corporate/company/CompanyApi;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)V
+	public final fun settings ()Lio/github/damienmiheev/monobank/corporate/company/CompanySettings;
+	public final fun settings (Ljava/lang/String;)Lio/github/damienmiheev/monobank/corporate/company/CompanySettings;
+	public static synthetic fun settings$default (Lio/github/damienmiheev/monobank/corporate/company/CompanyApi;Ljava/lang/String;ILjava/lang/Object;)Lio/github/damienmiheev/monobank/corporate/company/CompanySettings;
+}
+
+public final class io/github/damienmiheev/monobank/corporate/company/CompanySettings {
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun component5 ()Ljava/lang/String;
+	public final fun component6 ()Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getId ()Ljava/lang/String;
+	public final fun getLogo ()Ljava/lang/String;
+	public final fun getName ()Ljava/lang/String;
+	public final fun getPermission ()Ljava/lang/String;
+	public final fun getPubkey ()Ljava/lang/String;
+	public final fun getWebhook ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/damienmiheev/monobank/corporate/company/RegistrationRequest {
+	public static final field Companion Lio/github/damienmiheev/monobank/corporate/company/RegistrationRequest$Companion;
+	public static final fun builder ()Lio/github/damienmiheev/monobank/corporate/company/RegistrationRequest$Builder;
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun component5 ()Ljava/lang/String;
+	public final fun component6 ()Ljava/lang/String;
+	public final fun component7 ()Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getContactPerson ()Ljava/lang/String;
+	public final fun getDescription ()Ljava/lang/String;
+	public final fun getEmail ()Ljava/lang/String;
+	public final fun getLogo ()Ljava/lang/String;
+	public final fun getName ()Ljava/lang/String;
+	public final fun getPhone ()Ljava/lang/String;
+	public final fun getPubkey ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/damienmiheev/monobank/corporate/company/RegistrationRequest$Builder {
+	public final fun build ()Lio/github/damienmiheev/monobank/corporate/company/RegistrationRequest;
+	public final fun contactPerson (Ljava/lang/String;)Lio/github/damienmiheev/monobank/corporate/company/RegistrationRequest$Builder;
+	public final fun description (Ljava/lang/String;)Lio/github/damienmiheev/monobank/corporate/company/RegistrationRequest$Builder;
+	public final fun email (Ljava/lang/String;)Lio/github/damienmiheev/monobank/corporate/company/RegistrationRequest$Builder;
+	public final fun logo (Ljava/lang/String;)Lio/github/damienmiheev/monobank/corporate/company/RegistrationRequest$Builder;
+	public final fun logo ([B)Lio/github/damienmiheev/monobank/corporate/company/RegistrationRequest$Builder;
+	public final fun name (Ljava/lang/String;)Lio/github/damienmiheev/monobank/corporate/company/RegistrationRequest$Builder;
+	public final fun phone (Ljava/lang/String;)Lio/github/damienmiheev/monobank/corporate/company/RegistrationRequest$Builder;
+	public final fun pubkey (Lio/github/damienmiheev/monobank/corporate/CorporatePublicKey;)Lio/github/damienmiheev/monobank/corporate/company/RegistrationRequest$Builder;
+	public final fun pubkey (Ljava/lang/String;)Lio/github/damienmiheev/monobank/corporate/company/RegistrationRequest$Builder;
+}
+
+public final class io/github/damienmiheev/monobank/corporate/company/RegistrationRequest$Companion {
+	public final fun builder ()Lio/github/damienmiheev/monobank/corporate/company/RegistrationRequest$Builder;
+}
+
+public final class io/github/damienmiheev/monobank/corporate/company/RegistrationResponse {
+	public final fun component1 ()Lio/github/damienmiheev/monobank/corporate/company/RegistrationStatus;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getStatus ()Lio/github/damienmiheev/monobank/corporate/company/RegistrationStatus;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/damienmiheev/monobank/corporate/company/RegistrationStatus : java/lang/Enum {
+	public static final field APPROVED Lio/github/damienmiheev/monobank/corporate/company/RegistrationStatus;
+	public static final field DECLINED Lio/github/damienmiheev/monobank/corporate/company/RegistrationStatus;
+	public static final field NEW Lio/github/damienmiheev/monobank/corporate/company/RegistrationStatus;
+	public static final field UNKNOWN Lio/github/damienmiheev/monobank/corporate/company/RegistrationStatus;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public final fun getValue ()Ljava/lang/String;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/damienmiheev/monobank/corporate/company/RegistrationStatus;
+	public static fun values ()[Lio/github/damienmiheev/monobank/corporate/company/RegistrationStatus;
+}
+
+public final class io/github/damienmiheev/monobank/corporate/company/RegistrationStatusResponse {
+	public final fun component1 ()Lio/github/damienmiheev/monobank/corporate/company/RegistrationStatus;
+	public final fun component2 ()Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getKeyId ()Ljava/lang/String;
+	public final fun getStatus ()Lio/github/damienmiheev/monobank/corporate/company/RegistrationStatus;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/damienmiheev/monobank/corporate/signature/CreateSignatureRequest {
+	public static final field Companion Lio/github/damienmiheev/monobank/corporate/signature/CreateSignatureRequest$Companion;
+	public static final field MAX_DOCUMENTS I
+	public static final fun builder (Ljava/util/List;)Lio/github/damienmiheev/monobank/corporate/signature/CreateSignatureRequest$Builder;
+	public final fun component1 ()Ljava/util/List;
+	public final fun component2 ()Ljava/lang/Boolean;
+	public final fun component3 ()Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCallbackUrl ()Ljava/lang/String;
+	public final fun getDocuments ()Ljava/util/List;
+	public final fun getOneSigner ()Ljava/lang/Boolean;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/damienmiheev/monobank/corporate/signature/CreateSignatureRequest$Builder {
+	public final fun build ()Lio/github/damienmiheev/monobank/corporate/signature/CreateSignatureRequest;
+	public final fun callbackUrl (Ljava/lang/String;)Lio/github/damienmiheev/monobank/corporate/signature/CreateSignatureRequest$Builder;
+	public final fun oneSigner (Ljava/lang/Boolean;)Lio/github/damienmiheev/monobank/corporate/signature/CreateSignatureRequest$Builder;
+}
+
+public final class io/github/damienmiheev/monobank/corporate/signature/CreateSignatureRequest$Companion {
+	public final fun builder (Ljava/util/List;)Lio/github/damienmiheev/monobank/corporate/signature/CreateSignatureRequest$Builder;
+}
+
+public final class io/github/damienmiheev/monobank/corporate/signature/CreateSignatureResponse {
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDeeplink ()Ljava/lang/String;
+	public final fun getRequestId ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/damienmiheev/monobank/corporate/signature/DocumentStatus {
+	public final fun component1 ()Lio/github/damienmiheev/monobank/corporate/signature/SigningStatus;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Lio/github/damienmiheev/monobank/corporate/signature/HashType;
+	public final fun component5 ()Lio/github/damienmiheev/monobank/corporate/signature/DocumentType;
+	public final fun component6 ()Ljava/lang/String;
+	public final fun component7 ()Ljava/util/List;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getHash ()Ljava/lang/String;
+	public final fun getHashType ()Lio/github/damienmiheev/monobank/corporate/signature/HashType;
+	public final fun getLink ()Ljava/lang/String;
+	public final fun getName ()Ljava/lang/String;
+	public final fun getSigners ()Ljava/util/List;
+	public final fun getStatus ()Lio/github/damienmiheev/monobank/corporate/signature/SigningStatus;
+	public final fun getType ()Lio/github/damienmiheev/monobank/corporate/signature/DocumentType;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/damienmiheev/monobank/corporate/signature/DocumentType : java/lang/Enum {
+	public static final field DOC Lio/github/damienmiheev/monobank/corporate/signature/DocumentType;
+	public static final field DOCX Lio/github/damienmiheev/monobank/corporate/signature/DocumentType;
+	public static final field HTML Lio/github/damienmiheev/monobank/corporate/signature/DocumentType;
+	public static final field JPEG Lio/github/damienmiheev/monobank/corporate/signature/DocumentType;
+	public static final field JPG Lio/github/damienmiheev/monobank/corporate/signature/DocumentType;
+	public static final field JSON Lio/github/damienmiheev/monobank/corporate/signature/DocumentType;
+	public static final field ODT Lio/github/damienmiheev/monobank/corporate/signature/DocumentType;
+	public static final field OTHER Lio/github/damienmiheev/monobank/corporate/signature/DocumentType;
+	public static final field PDF Lio/github/damienmiheev/monobank/corporate/signature/DocumentType;
+	public static final field PNG Lio/github/damienmiheev/monobank/corporate/signature/DocumentType;
+	public static final field UNKNOWN Lio/github/damienmiheev/monobank/corporate/signature/DocumentType;
+	public static final field XML Lio/github/damienmiheev/monobank/corporate/signature/DocumentType;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public final fun getValue ()Ljava/lang/String;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/damienmiheev/monobank/corporate/signature/DocumentType;
+	public static fun values ()[Lio/github/damienmiheev/monobank/corporate/signature/DocumentType;
+}
+
+public final class io/github/damienmiheev/monobank/corporate/signature/HashType : java/lang/Enum {
+	public static final field DSTU256 Lio/github/damienmiheev/monobank/corporate/signature/HashType;
+	public static final field GOST Lio/github/damienmiheev/monobank/corporate/signature/HashType;
+	public static final field UNKNOWN Lio/github/damienmiheev/monobank/corporate/signature/HashType;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public final fun getValue ()Ljava/lang/String;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/damienmiheev/monobank/corporate/signature/HashType;
+	public static fun values ()[Lio/github/damienmiheev/monobank/corporate/signature/HashType;
+}
+
+public final class io/github/damienmiheev/monobank/corporate/signature/SignDocument {
+	public static final field Companion Lio/github/damienmiheev/monobank/corporate/signature/SignDocument$Companion;
+	public static final fun builder (Ljava/lang/String;Ljava/lang/String;)Lio/github/damienmiheev/monobank/corporate/signature/SignDocument$Builder;
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Lio/github/damienmiheev/monobank/corporate/signature/HashType;
+	public final fun component4 ()Lio/github/damienmiheev/monobank/corporate/signature/DocumentType;
+	public final fun component5 ()Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getHash ()Ljava/lang/String;
+	public final fun getHashType ()Lio/github/damienmiheev/monobank/corporate/signature/HashType;
+	public final fun getLink ()Ljava/lang/String;
+	public final fun getName ()Ljava/lang/String;
+	public final fun getType ()Lio/github/damienmiheev/monobank/corporate/signature/DocumentType;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/damienmiheev/monobank/corporate/signature/SignDocument$Builder {
+	public final fun build ()Lio/github/damienmiheev/monobank/corporate/signature/SignDocument;
+	public final fun hashType (Lio/github/damienmiheev/monobank/corporate/signature/HashType;)Lio/github/damienmiheev/monobank/corporate/signature/SignDocument$Builder;
+	public final fun link (Ljava/lang/String;)Lio/github/damienmiheev/monobank/corporate/signature/SignDocument$Builder;
+	public final fun type (Lio/github/damienmiheev/monobank/corporate/signature/DocumentType;)Lio/github/damienmiheev/monobank/corporate/signature/SignDocument$Builder;
+}
+
+public final class io/github/damienmiheev/monobank/corporate/signature/SignDocument$Companion {
+	public final fun builder (Ljava/lang/String;Ljava/lang/String;)Lio/github/damienmiheev/monobank/corporate/signature/SignDocument$Builder;
+}
+
+public final class io/github/damienmiheev/monobank/corporate/signature/SignatureApi {
+	public final fun cancel (Ljava/lang/String;)V
+	public final fun create (Lio/github/damienmiheev/monobank/corporate/signature/CreateSignatureRequest;)Lio/github/damienmiheev/monobank/corporate/signature/CreateSignatureResponse;
+	public final fun status (Ljava/lang/String;)Lio/github/damienmiheev/monobank/corporate/signature/SignatureStatus;
+}
+
+public final class io/github/damienmiheev/monobank/corporate/signature/SignatureStatus {
+	public static final field Companion Lio/github/damienmiheev/monobank/corporate/signature/SignatureStatus$Companion;
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/util/List;
+	public fun equals (Ljava/lang/Object;)Z
+	public static final fun fromJson (Ljava/lang/String;)Lio/github/damienmiheev/monobank/corporate/signature/SignatureStatus;
+	public static final fun fromJson ([B)Lio/github/damienmiheev/monobank/corporate/signature/SignatureStatus;
+	public final fun getDocuments ()Ljava/util/List;
+	public final fun getRequestId ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/damienmiheev/monobank/corporate/signature/SignatureStatus$Companion {
+	public final fun fromJson (Ljava/lang/String;)Lio/github/damienmiheev/monobank/corporate/signature/SignatureStatus;
+	public final fun fromJson ([B)Lio/github/damienmiheev/monobank/corporate/signature/SignatureStatus;
+}
+
+public final class io/github/damienmiheev/monobank/corporate/signature/Signer {
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun component5 ()Ljava/time/OffsetDateTime;
+	public final fun component6 ()Ljava/lang/String;
+	public final fun component7 ()Ljava/lang/String;
+	public final fun component8 ()Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCertSerial ()Ljava/lang/String;
+	public final fun getCompany ()Ljava/lang/String;
+	public final fun getDate ()Ljava/time/OffsetDateTime;
+	public final fun getEdrpou ()Ljava/lang/String;
+	public final fun getName ()Ljava/lang/String;
+	public final fun getPost ()Ljava/lang/String;
+	public final fun getSignature ()Ljava/lang/String;
+	public final fun getTin ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/damienmiheev/monobank/corporate/signature/SigningStatus : java/lang/Enum {
+	public static final field CANCELED Lio/github/damienmiheev/monobank/corporate/signature/SigningStatus;
+	public static final field EXPIRED Lio/github/damienmiheev/monobank/corporate/signature/SigningStatus;
+	public static final field PENDING Lio/github/damienmiheev/monobank/corporate/signature/SigningStatus;
+	public static final field SIGNED Lio/github/damienmiheev/monobank/corporate/signature/SigningStatus;
+	public static final field UNKNOWN Lio/github/damienmiheev/monobank/corporate/signature/SigningStatus;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public final fun getValue ()Ljava/lang/String;
+	public final fun isFinal ()Z
+	public static fun valueOf (Ljava/lang/String;)Lio/github/damienmiheev/monobank/corporate/signature/SigningStatus;
+	public static fun values ()[Lio/github/damienmiheev/monobank/corporate/signature/SigningStatus;
+}
+
