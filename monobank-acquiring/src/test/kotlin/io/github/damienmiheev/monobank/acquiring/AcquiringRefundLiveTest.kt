@@ -59,4 +59,19 @@ class AcquiringRefundLiveTest {
                 log("statement cancelList=${it.cancelList?.map { c -> "${c.amount}/${c.ccy}" }}")
             }
     }
+
+    /** Read-only: `invoices.status(id, statementFrom)` on an invoice whose status endpoint is broken. */
+    @Test
+    fun `status falls back to the statement`() {
+        val token = System.getenv("MONOBANK_ACQUIRING_TEST_TOKEN")
+        val invoiceId = System.getenv("MONOBANK_LIVE_FALLBACK_INVOICE_ID")
+        assumeTrue(!token.isNullOrBlank() && !invoiceId.isNullOrBlank(), "token or invoice id not set")
+        val s = MonobankAcquiring.create(token!!).invoices.status(invoiceId!!, Instant.now().minusSeconds(86_400))
+        log("fallback: reconstructed=${s.isReconstructedFromStatement} status=${s.statusRaw} amount=${s.amount}")
+        log(
+            "fallback: ccy=${s.ccy} finalAmount=${s.finalAmount} cancelList=${s.cancelList?.map {
+                "${it.amount}/${it.ccy}"
+            }}",
+        )
+    }
 }

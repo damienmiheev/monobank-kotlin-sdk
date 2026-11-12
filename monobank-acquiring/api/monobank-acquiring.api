@@ -747,6 +747,7 @@ public final class io/github/damienmiheev/monobank/acquiring/invoice/InvoiceApi 
 	public final fun remove (Ljava/lang/String;)V
 	public final fun sendReceipt (Ljava/lang/String;Ljava/lang/String;)[B
 	public final fun status (Ljava/lang/String;)Lio/github/damienmiheev/monobank/acquiring/invoice/InvoiceStatusResponse;
+	public final fun status (Ljava/lang/String;Ljava/time/Instant;)Lio/github/damienmiheev/monobank/acquiring/invoice/InvoiceStatusResponse;
 	public final fun syncPayment (Lio/github/damienmiheev/monobank/acquiring/invoice/SyncPaymentRequest;)Lio/github/damienmiheev/monobank/acquiring/invoice/InvoiceStatusResponse;
 }
 
@@ -789,6 +790,7 @@ public final class io/github/damienmiheev/monobank/acquiring/invoice/InvoiceStat
 	public fun hashCode ()I
 	public final fun isNewerThan (Lio/github/damienmiheev/monobank/acquiring/invoice/InvoiceStatusResponse;)Z
 	public final fun isOlderThan (Lio/github/damienmiheev/monobank/acquiring/invoice/InvoiceStatusResponse;)Z
+	public final fun isReconstructedFromStatement ()Z
 	public fun toString ()Ljava/lang/String;
 }
 

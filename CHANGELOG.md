@@ -24,6 +24,9 @@ see the README's migration section.
 - `merchant.statementEntries(...)`: reads the statement entry by entry and returns unreadable
   entries raw; `findByReference` uses it and never reports an unreadable matching payment as missing.
 - `MonobankClientOptions.maxResponseBytes` (default 20 MB).
+- `invoices.status(invoiceId, statementFrom)`: when monobank's `invoice/status` fails with 500
+  `INTERNAL_ERROR` (seen live for USD/EUR payments after a refund), the state is rebuilt from the
+  merchant statement (`isReconstructedFromStatement`).
 - `MonobankClientOptions.allowPlainHttp` (tests only): plain http to a non-loopback host such as a
   fake monobank reached from a container; `FakeMonobankAcquiring.containerClientOptionsBuilder()`.
 

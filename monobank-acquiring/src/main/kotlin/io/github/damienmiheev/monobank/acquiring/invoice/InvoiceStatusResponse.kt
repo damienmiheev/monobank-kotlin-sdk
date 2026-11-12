@@ -64,6 +64,18 @@ public data class InvoiceStatusResponse
         @param:JsonProperty("tipsInfo") public val tipsInfo: TipsInfo?,
         @param:JsonProperty("payMethod") public val payMethod: String?,
     ) {
+        /** Set only by the SDK's statement fallback; never read from JSON. */
+        @get:com.fasterxml.jackson.annotation.JsonIgnore
+        internal var reconstructedFlag: Boolean = false
+
+        /**
+         * `true` when monobank's `invoice/status` failed and this state was rebuilt from the merchant
+         * statement by [InvoiceApi.status] with a statement window. Such a state has no `walletData`,
+         * fewer `paymentInfo` details, and refunds without `extRef` (match them by amount).
+         */
+        public val isReconstructedFromStatement: Boolean
+            get() = reconstructedFlag
+
         /** Typed status; [InvoiceStatus.UNKNOWN] for a value this SDK version does not know (see [statusRaw]). */
         public val status: InvoiceStatus
             get() = InvoiceStatus.fromValue(statusRaw)

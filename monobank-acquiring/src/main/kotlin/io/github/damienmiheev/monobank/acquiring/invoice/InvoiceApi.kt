@@ -1,8 +1,12 @@
 package io.github.damienmiheev.monobank.acquiring.invoice
 
+import io.github.damienmiheev.monobank.acquiring.common.AcquiringErrorCodes
 import io.github.damienmiheev.monobank.acquiring.internal.AcquiringHttp
+import io.github.damienmiheev.monobank.acquiring.merchant.MerchantApi
 import io.github.damienmiheev.monobank.core.MonobankSerializationException
+import io.github.damienmiheev.monobank.core.MonobankServerException
 import io.github.damienmiheev.monobank.core.RequestOutcome
+import java.time.Instant
 
 /**
  * Invoices: create, check, refund, hold/finalize, direct and synchronous payments, receipts.
@@ -15,6 +19,8 @@ import io.github.damienmiheev.monobank.core.RequestOutcome
 public class InvoiceApi internal constructor(
     private val http: AcquiringHttp,
 ) {
+    private val merchant = MerchantApi(http)
+
     /**
      * Creates an invoice and returns the payment page URL.
      *
@@ -43,6 +49,29 @@ public class InvoiceApi internal constructor(
         requireId(invoiceId, "invoiceId")
         return http.get(INVOICE + "status", InvoiceStatusResponse::class.java, query = listOf("invoiceId" to invoiceId))
     }
+
+    /**
+     * Like [status], but when monobank's `invoice/status` fails with 500 `INTERNAL_ERROR` (seen
+     * live, permanently, for USD/EUR payments after a refund), rebuilds the state from the merchant
+     * statement entry of this invoice, searched from [statementFrom] (the payment date or a little
+     * earlier). The result then has [InvoiceStatusResponse.isReconstructedFromStatement] = `true`:
+     * status, amounts (in UAH for converted payments), dates and refunds are there; refunds carry
+     * no `extRef` (statement data has none), so match them by amount.
+     *
+     * If the statement has no entry for the invoice either, the original error is thrown. Safe to retry.
+     */
+    public fun status(
+        invoiceId: String,
+        statementFrom: Instant,
+    ): InvoiceStatusResponse =
+        try {
+            status(invoiceId)
+        } catch (e: MonobankServerException) {
+            if (e.errorCode != AcquiringErrorCodes.INTERNAL_ERROR) throw e
+            val entry =
+                merchant.statementEntries(statementFrom).items.firstOrNull { it.invoiceId == invoiceId } ?: throw e
+            StatementFallback.toStatus(entry)
+        }
 
     /**
      * Refunds a successful payment (fully, or partly with `amount`), or releases a hold.
