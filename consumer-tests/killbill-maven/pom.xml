@@ -4,9 +4,7 @@
   (2.13.x) and slf4j versions, and Kill Bill 0.24 runs on Java 11. CI installs the SDK into
   ~/.m2 (./gradlew publishToMavenLocal) and runs `mvn verify` here on JDK 11.
 -->
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
@@ -21,21 +19,21 @@
     <packaging>jar</packaging>
 
     <properties>
-        <monobank.sdk.version>1.0.0-SNAPSHOT</monobank.sdk.version>
-        <project.build.targetJdk>11</project.build.targetJdk>
-        <!-- This is a test harness, not a Kill Bill module: skip the parent's code-quality gates. -->
-        <check.skip-enforcer>true</check.skip-enforcer>
-        <check.skip-spotbugs>true</check.skip-spotbugs>
+        <check.skip-checkstyle>true</check.skip-checkstyle>
         <check.skip-dependency>true</check.skip-dependency>
         <check.skip-dependency-scope>true</check.skip-dependency-scope>
         <check.skip-dependency-versions>true</check.skip-dependency-versions>
         <check.skip-duplicate-finder>true</check.skip-duplicate-finder>
-        <check.skip-rat>true</check.skip-rat>
+        <!-- This is a test harness, not a Kill Bill module: skip the parent's code-quality gates. -->
+        <check.skip-enforcer>true</check.skip-enforcer>
         <check.skip-jacoco>true</check.skip-jacoco>
-        <check.skip-pmd>true</check.skip-pmd>
-        <check.skip-checkstyle>true</check.skip-checkstyle>
-        <check.skip-license>true</check.skip-license>
         <check.skip-javadoc>true</check.skip-javadoc>
+        <check.skip-license>true</check.skip-license>
+        <check.skip-pmd>true</check.skip-pmd>
+        <check.skip-rat>true</check.skip-rat>
+        <check.skip-spotbugs>true</check.skip-spotbugs>
+        <monobank.sdk.version>1.0.0-SNAPSHOT</monobank.sdk.version>
+        <project.build.targetJdk>11</project.build.targetJdk>
     </properties>
 
     <dependencies>
@@ -45,14 +43,14 @@
             <version>${monobank.sdk.version}</version>
         </dependency>
         <dependency>
-            <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-simple</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
             <version>5.14.4</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-simple</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>

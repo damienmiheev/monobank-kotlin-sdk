@@ -10,6 +10,7 @@ import io.github.damienmiheev.monobank.acquiring.MonobankAcquiring;
 import io.github.damienmiheev.monobank.acquiring.common.InvoiceStatus;
 import io.github.damienmiheev.monobank.acquiring.common.MerchantPaymInfo;
 import io.github.damienmiheev.monobank.acquiring.common.SaveCardData;
+import io.github.damienmiheev.monobank.acquiring.invoice.CancelInvoiceRequest;
 import io.github.damienmiheev.monobank.acquiring.invoice.CreateInvoiceRequest;
 import io.github.damienmiheev.monobank.acquiring.invoice.CreateInvoiceResponse;
 import io.github.damienmiheev.monobank.acquiring.invoice.InvoiceStatusResponse;
@@ -112,26 +113,10 @@ class KillBillConsumerTest {
     }
 
     @Test
-    void serverErrorOnARefundHasAnUnknownOutcome() {
-        MonobankServerException e = assertThrows(MonobankServerException.class, () -> {
-            throw (RuntimeException) cancelViaReflection();
-        });
+    void serverErrorOnARefundHasAnUnknownOutcomeAndIsNotRetried() {
+        MonobankServerException e = assertThrows(MonobankServerException.class, () ->
+                mono.getInvoices().cancel(CancelInvoiceRequest.builder("inv-1").amount(100L).extRef("refund-1").build()));
         assertEquals(RequestOutcome.UNKNOWN, e.getOutcome());
-    }
-
-    /** Calls invoices.cancel; kept reflective so this file compiles before the cancel API lands. */
-    private Object cancelViaReflection() {
-        try {
-            Object invoices = mono.getInvoices();
-            Class<?> requestClass = Class.forName("io.github.damienmiheev.monobank.acquiring.invoice.CancelInvoiceRequest");
-            Object builder = requestClass.getMethod("builder", String.class).invoke(null, "inv-1");
-            Object request = builder.getClass().getMethod("build").invoke(builder);
-            invoices.getClass().getMethod("cancel", requestClass).invoke(invoices, request);
-            return new AssertionError("cancel did not fail");
-        } catch (java.lang.reflect.InvocationTargetException e) {
-            return e.getCause();
-        } catch (ReflectiveOperationException e) {
-            return new AssertionError("cancel API missing", e);
-        }
+        assertEquals("INTERNAL_ERROR", e.getErrorCode());
     }
 }
