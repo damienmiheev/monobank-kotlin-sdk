@@ -207,33 +207,37 @@ public class MonobankHttp(
         val error = runCatching { errorDecoder.decode(response.body) }.getOrElse { ApiError(null, null) }
         logger.debug("monobank error: status={}, errorCode={}", response.statusCode, error.code)
         val status = response.statusCode
-        return when {
-            status == 401 || status == 403 -> {
-                MonobankAuthException(status, error.code, error.text, bodyText)
-            }
+        val exception =
+            when {
+                status == 401 || status == 403 -> {
+                    MonobankAuthException(status, error.code, error.text, bodyText)
+                }
 
-            status == 404 -> {
-                MonobankNotFoundException(error.code, error.text, bodyText)
-            }
+                status == 404 -> {
+                    MonobankNotFoundException(error.code, error.text, bodyText)
+                }
 
-            status == 429 -> {
-                MonobankRateLimitException(error.code, error.text, bodyText, retryAfter(response))
-            }
+                status == 429 -> {
+                    MonobankRateLimitException(error.code, error.text, bodyText, retryAfter(response))
+                }
 
-            status >= 500 -> {
-                MonobankServerException(
-                    status,
-                    error.code,
-                    error.text,
-                    bodyText,
-                    errorDecoder.serverErrorOutcome(error.code),
-                )
-            }
+                status >= 500 -> {
+                    MonobankServerException(
+                        status,
+                        error.code,
+                        error.text,
+                        bodyText,
+                        errorDecoder.serverErrorOutcome(error.code),
+                    )
+                }
 
-            else -> {
-                MonobankBadRequestException(status, error.code, error.text, bodyText)
+                else -> {
+                    MonobankBadRequestException(status, error.code, error.text, bodyText)
+                }
             }
-        }
+        exception.traceId =
+            listOf("trace-id", "x-trace-id", "X-Request-Id", "request_trace_id").firstNotNullOfOrNull(response::header)
+        return exception
     }
 
     private fun retryAfter(response: ApiResponse): Duration? {

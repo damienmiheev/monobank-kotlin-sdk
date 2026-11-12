@@ -135,6 +135,14 @@ class MonobankHttpTest {
     }
 
     @Test
+    fun `trace id from the response headers is kept on API exceptions`() {
+        server.enqueue(MockResponse().setResponseCode(400).setHeader("trace-id", "abc-123").setBody("{}"))
+        assertThatThrownBy { http().execute(post()) }.isInstanceOfSatisfying(MonobankBadRequestException::class.java) {
+            assertThat(it.traceId).isEqualTo("abc-123")
+        }
+    }
+
+    @Test
     fun `accepted non-2xx statuses are returned`() {
         server.enqueue(MockResponse().setResponseCode(404).setBody("{}"))
         val response =

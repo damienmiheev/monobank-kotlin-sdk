@@ -23,6 +23,8 @@ public sealed class MonobankException(
  * @property errorText monobank's human-readable error text, if any.
  * @property responseBody Raw response body. It never contains card data, but may contain
  *   personal data from your own request; do not log it blindly.
+ * @property traceId monobank's request trace id from the response headers (`trace-id`,
+ *   `X-Request-Id`), when sent. Quote it to monobank support.
  */
 public sealed class MonobankApiException(
     public val statusCode: Int,
@@ -35,6 +37,9 @@ public sealed class MonobankApiException(
         cause = null,
         outcome = outcome,
     ) {
+    public var traceId: String? = null
+        internal set
+
     private companion object {
         fun buildMessage(
             statusCode: Int,

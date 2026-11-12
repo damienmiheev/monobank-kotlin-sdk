@@ -1,6 +1,6 @@
 {
   "order_id": "fa4a8249-336e-4e6d-9b85-79bc8be62377",
   "state": "SUCCESS",
-  "order_sub_state": "SUCCESS",
-  "message": "string"
+  "order_sub_state": "ACTIVE",
+  "message": "Заявка підтверджена"
 }
