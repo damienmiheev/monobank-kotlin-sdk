@@ -100,6 +100,10 @@ CreateInvoiceResponse invoice = mono.getInvoices().create(
 
 Create one client per merchant token and reuse it; it is thread-safe.
 
+If your merchant has fiscal receipts (Checkbox) or split payments enabled, monobank rejects invoices
+without `merchantPaymInfo.basketOrder` (`INVALID_MERCHANT_PAYM_INFO`), and with split payments every
+`BasketItem` needs a `splitReceiverId` (from `mono.split.receivers()`).
+
 ## Money
 
 The acquiring, personal and corporate APIs use **minor units** (kopiyky, cents) for every amount:

@@ -1,5 +1,6 @@
 package io.github.damienmiheev.monobank.acquiring
 
+import io.github.damienmiheev.monobank.acquiring.common.BasketItem
 import io.github.damienmiheev.monobank.acquiring.common.InvoiceStatus
 import io.github.damienmiheev.monobank.acquiring.common.MerchantPaymInfo
 import io.github.damienmiheev.monobank.acquiring.invoice.CreateInvoiceRequest
@@ -13,6 +14,7 @@ import org.junit.jupiter.api.Assumptions.assumeTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
+import java.math.BigDecimal
 import java.time.Duration
 import java.time.Instant
 import java.time.OffsetDateTime
@@ -55,6 +57,12 @@ class AcquiringLiveTest {
     @Test
     fun `create, check and remove a small invoice`() {
         val reference = "sdk-live-" + UUID.randomUUID()
+        // Merchants with split payments must name a receiver on every basket item.
+        val splitReceiverId =
+            mono.split
+                .receivers()
+                .firstOrNull()
+                ?.id
         val created =
             mono.invoices.create(
                 CreateInvoiceRequest
@@ -66,7 +74,15 @@ class AcquiringLiveTest {
                             .builder()
                             .reference(reference)
                             .destination("SDK live test")
-                            .build(),
+                            // Required when the merchant has fiscal receipts (Checkbox) enabled.
+                            .basketOrder(
+                                listOf(
+                                    BasketItem
+                                        .builder("SDK live test item", BigDecimal.ONE, 100, "SDK-LIVE-1")
+                                        .splitReceiverId(splitReceiverId)
+                                        .build(),
+                                ),
+                            ).build(),
                     ).build(),
             )
         assertThat(created.pageUrl).startsWith("https://")
