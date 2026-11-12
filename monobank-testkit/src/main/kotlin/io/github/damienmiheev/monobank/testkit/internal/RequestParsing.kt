@@ -108,7 +108,8 @@ internal object RequestParsing {
             cardToken = cardToken,
             amount = amount,
             ccy = ccy,
-            paymentType = paymentType(json, WALLET_TYPES, ccy),
+            // monobank documents no currency limit for wallet holds; the fake accepts them (unverified).
+            paymentType = paymentType(json, WALLET_TYPES, ccy, uahOnlyHold = false),
             order = order(json, amount, rules),
             webHookUrl = webHookUrl(json),
             redirectUrl = Fields.string(json, "redirectUrl")?.takeIf { it.isNotBlank() },
@@ -119,10 +120,14 @@ internal object RequestParsing {
         json: JsonNode,
         allowed: Set<String>,
         ccy: Int,
+        uahOnlyHold: Boolean = true,
     ): String {
         val paymentType = Fields.string(json, "paymentType") ?: "debit"
         badRequestUnless(paymentType in allowed) { "invalid 'paymentType'" }
-        badRequestUnless(paymentType != "hold" || ccy == UAH) { "hold is available only for ccy 980" }
+        // Verified on monobank's test merchant for invoice/create (EUR hold).
+        if (uahOnlyHold && paymentType == "hold" && ccy != UAH) {
+            throw ApiError(400, "1001", "hold payments are allowed only for UAH")
+        }
         return paymentType
     }
 

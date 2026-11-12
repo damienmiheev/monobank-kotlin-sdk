@@ -568,22 +568,15 @@ class InvoiceOperationsTest : AcquiringTestSupport() {
             assertThatThrownBy { SyncCardData.builder("4242", SyncCardType.FPAN, exp, "02") }
                 .isInstanceOf(IllegalArgumentException::class.java)
         }
-        assertThatThrownBy {
+        // Hold currencies are not checked locally: monobank answers 400 1001 for a non-UAH invoice hold.
+        assertThat(
             CreateInvoiceRequest
                 .builder(100)
                 .ccy(978)
                 .paymentType(PaymentType.HOLD)
                 .build()
-        }.isInstanceOf(IllegalArgumentException::class.java)
-        assertThatThrownBy {
-            PaymentDirectRequest
-                .builder(
-                    1,
-                    CardData.of("4242", "1230", "1"),
-                ).ccy(840)
-                .paymentType(PaymentType.HOLD)
-                .build()
-        }.isInstanceOf(IllegalArgumentException::class.java)
+                .ccy,
+        ).isEqualTo(978)
         assertThat(
             CreateInvoiceRequest
                 .builder(100)

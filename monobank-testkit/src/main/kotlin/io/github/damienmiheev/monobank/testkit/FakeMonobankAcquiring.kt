@@ -57,6 +57,9 @@ import java.util.function.Predicate
  *   `finalAmount` drops with refunds. Only payments that reached `processing` appear in the statement.
  *
  * ### Where the fake invents behaviour (monobank does not document it)
+ * - `wallet/payment` holds are accepted in any currency (monobank documents no limit there);
+ *   `invoice/create` holds outside UAH get 400 `1001` "hold payments are allowed only for UAH",
+ *   as verified on monobank's test merchant.
  * - A paying customer produces a `processing` webhook before the final one
  *   ([Builder.sendProcessingWebhooks] turns it off).
  * - The card webhook (`walletData` `new` → `created`/`failed`) is separate and keeps the invoice's

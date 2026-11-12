@@ -6,7 +6,6 @@ import io.github.damienmiheev.monobank.acquiring.common.InitiationKind
 import io.github.damienmiheev.monobank.acquiring.common.MerchantPaymInfo
 import io.github.damienmiheev.monobank.acquiring.common.PaymentType
 import io.github.damienmiheev.monobank.acquiring.invoice.requireDebitOrHold
-import io.github.damienmiheev.monobank.acquiring.invoice.requireHoldCurrency
 import io.github.damienmiheev.monobank.core.ExperimentalMonobankApi
 import io.github.damienmiheev.monobank.core.Redaction
 
@@ -76,7 +75,6 @@ public data class WalletPaymentRequest internal constructor(
         public fun build(): WalletPaymentRequest {
             require(amount > 0) { "amount must be positive (minor units)" }
             requireDebitOrHold(paymentType)
-            requireHoldCurrency(paymentType, ccy)
             if (cardToken != null) requireNotNull(initiationKind) { "initiationKind is required for card tokens" }
             return WalletPaymentRequest(
                 cardToken,

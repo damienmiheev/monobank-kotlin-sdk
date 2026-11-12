@@ -116,7 +116,6 @@ public data class PaymentDirectRequest internal constructor(
         public fun build(): PaymentDirectRequest {
             require(amount > 0) { "amount must be positive (minor units)" }
             requireDebitOrHold(paymentType)
-            requireHoldCurrency(paymentType, ccy)
             return PaymentDirectRequest(
                 amount,
                 ccy,
@@ -154,16 +153,6 @@ public data class PaymentDirectRequest internal constructor(
 internal fun requireExpiry(exp: String) {
     require(exp.length == 4 && exp.all { it in '0'..'9' } && exp.substring(0, 2).toInt() in 1..12) {
         "exp must be MMYY"
-    }
-}
-
-/** Holds work only in UAH (980), per monobank's docs; `null` means monobank's default, UAH. */
-internal fun requireHoldCurrency(
-    paymentType: PaymentType?,
-    ccy: Int?,
-) {
-    require(paymentType != PaymentType.HOLD || ccy == null || ccy == CurrencyCodes.UAH) {
-        "paymentType HOLD works only with ccy 980 (UAH)"
     }
 }
 

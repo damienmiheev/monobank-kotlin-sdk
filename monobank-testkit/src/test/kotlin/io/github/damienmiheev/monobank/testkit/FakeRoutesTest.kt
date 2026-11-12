@@ -111,11 +111,11 @@ class FakeRoutesTest {
 
     @Test
     fun `create validates like monobank`() {
-        // the SDK refuses this one itself; the fake refuses it too
+        // monobank's live answer for a non-UAH invoice hold
         val holdInUsd =
             rawCall(fake, "POST", MonobankPaths.INVOICE_CREATE, """{"amount":100,"ccy":840,"paymentType":"hold"}""")
         assertThat(holdInUsd.statusCode()).isEqualTo(400)
-        assertThat(json.readTree(holdInUsd.body()).path("errCode").asText()).isEqualTo("BAD_REQUEST")
+        assertThat(json.readTree(holdInUsd.body()).path("errCode").asText()).isEqualTo("1001")
 
         val negativeValidity =
             apiError { create { merchantPaymInfo(MerchantPaymInfo.builder().reference("r").build()).validity(-5) } }

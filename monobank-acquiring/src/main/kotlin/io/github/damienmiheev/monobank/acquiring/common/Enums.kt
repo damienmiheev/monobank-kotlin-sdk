@@ -62,7 +62,12 @@ public enum class PaymentType(
     /**
      * Hold (authorise) the amount for up to 9 days; then finalize it with `InvoiceApi.finalize` or
      * release it with `InvoiceApi.cancel`. A hold that is not finalized within 9 days is cancelled
-     * automatically. Works only with UAH (`ccy` 980).
+     * automatically.
+     *
+     * Currency: on `invoice/create`, monobank documents and enforces UAH only (`ccy` 980; other
+     * currencies get 400 `1001` "hold payments are allowed only for UAH", verified). For
+     * `wallet/payment` and `payment-direct` monobank documents no currency limit; the SDK does not
+     * check the currency itself, so monobank's answer decides.
      */
     HOLD("hold"),
 

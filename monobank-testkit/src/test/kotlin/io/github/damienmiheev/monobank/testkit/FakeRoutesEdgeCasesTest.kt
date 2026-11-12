@@ -199,3 +199,40 @@ class FakeRoutesEdgeCasesTest {
         assertThat(request.headers.values).noneMatch { it.contains(fake.token) }
     }
 }
+
+class HoldCurrencyTest {
+    @org.junit.jupiter.api.Test
+    fun `a non-UAH invoice hold gets monobank's live answer`() {
+        FakeMonobankAcquiring().start().use { fake ->
+            val mono = clientFor(fake)
+            org.assertj.core.api.Assertions
+                .assertThatThrownBy {
+                    mono.invoices.create(
+                        io.github.damienmiheev.monobank.acquiring.invoice.CreateInvoiceRequest
+                            .builder(100)
+                            .ccy(978)
+                            .paymentType(io.github.damienmiheev.monobank.acquiring.common.PaymentType.HOLD)
+                            .build(),
+                    )
+                }.isInstanceOfSatisfying(io.github.damienmiheev.monobank.core.MonobankBadRequestException::class.java) {
+                    org.assertj.core.api.Assertions
+                        .assertThat(it.errorCode)
+                        .isEqualTo("1001")
+                    org.assertj.core.api.Assertions
+                        .assertThat(
+                            it.errorText,
+                        ).isEqualTo("hold payments are allowed only for UAH")
+                }
+            val eurDebit =
+                mono.invoices.create(
+                    io.github.damienmiheev.monobank.acquiring.invoice.CreateInvoiceRequest
+                        .builder(100)
+                        .ccy(978)
+                        .build(),
+                )
+            org.assertj.core.api.Assertions
+                .assertThat(mono.invoices.status(eurDebit.invoiceId).ccy)
+                .isEqualTo(978)
+        }
+    }
+}

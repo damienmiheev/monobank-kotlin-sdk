@@ -203,10 +203,14 @@ class WalletApiTest : AcquiringTestSupport() {
     }
 
     @Test
-    fun `hold works only in UAH`() {
-        assertThatThrownBy {
-            WalletPaymentRequest.builder("t", 1, 840, InitiationKind.CLIENT).paymentType(PaymentType.HOLD).build()
-        }.isInstanceOf(IllegalArgumentException::class.java)
+    fun `the SDK does not limit hold currencies itself - monobank's answer decides`() {
+        assertThat(
+            WalletPaymentRequest
+                .builder("t", 1, 978, InitiationKind.CLIENT)
+                .paymentType(PaymentType.HOLD)
+                .build()
+                .ccy,
+        ).isEqualTo(978)
         assertThat(
             WalletPaymentRequest
                 .builder("t", 1, 980, InitiationKind.CLIENT)
