@@ -26,7 +26,11 @@ public enum class InvoiceStatus(
     /** Payment failed. */
     FAILURE("failure"),
 
-    /** Payment was fully refunded or the hold was released. */
+    /**
+     * A refund was made or the hold was released. Also after a PARTIAL refund (verified live:
+     * a 0.50 refund of a 1.50 payment gives `reversed` with `finalAmount` 100), so it does not
+     * mean "fully refunded": read `finalAmount` for what is still paid, and `cancelList` for the refunds.
+     */
     REVERSED("reversed"),
 
     /** Invoice expired unpaid. */
@@ -37,7 +41,10 @@ public enum class InvoiceStatus(
     UNKNOWN("unknown"),
     ;
 
-    /** `true` when the status can no longer change except through a refund ([SUCCESS] → [REVERSED]). */
+    /**
+     * `true` when the status can no longer change except through refunds ([SUCCESS] → [REVERSED],
+     * and further refunds of a [REVERSED] invoice while `finalAmount` is above 0).
+     */
     public val isFinal: Boolean
         get() = this == SUCCESS || this == FAILURE || this == REVERSED || this == EXPIRED
 

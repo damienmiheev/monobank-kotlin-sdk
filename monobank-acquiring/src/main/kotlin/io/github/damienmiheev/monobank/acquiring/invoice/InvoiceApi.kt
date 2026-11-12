@@ -40,8 +40,14 @@ public class InvoiceApi internal constructor(
     /**
      * Refunds a successful payment (fully, or partly with `amount`), or releases a hold.
      *
-     * Merchants with fiscal receipts or split payments should send `items` (the refunded products,
-     * with `splitReceiverId` for split payments) with a partial refund; see [finalize].
+     * Merchants with fiscal receipts or split payments should send `items` with a partial refund,
+     * built like [finalize]'s: the paid basket lines with a smaller `qty` (verified: 0.50 of a
+     * 2.00 line as `qty` 0.25, `sum` 200).
+     *
+     * Verified live: a refund while the invoice is still `processing` after a finalize is refused
+     * with 404 `1004` "order not finished" (nothing was refunded; retry once the status is
+     * `success`). After ANY successful refund, partial included, the invoice status becomes
+     * `reversed`; `finalAmount` holds what is still paid.
      *
      * `POST /api/merchant/invoice/cancel`. Not retried after an unknown outcome. The refund is
      * usually [io.github.damienmiheev.monobank.acquiring.common.OperationStatus.PROCESSING]: follow
@@ -77,8 +83,13 @@ public class InvoiceApi internal constructor(
      *
      * Each item must repeat a line of the hold's basket exactly — same `name`, `code`, unit price
      * `sum` and `splitReceiverId` — with only `qty` changed so that the items add up to the captured
-     * amount (e.g. capture 1.50 of a 1 × 2.00 line as `qty` 0.75, `sum` 200). An item that does not
-     * match gets 400 `1001` "finalization basket contains item not found in hold: ..." (verified).
+     * amount (e.g. capture 1.50 of a 1 × 2.00 line as `qty` 0.75, `sum` 200; fractional `qty` is
+     * accepted). An item that does not match gets 400 `1001` "finalization basket contains item not
+     * found in hold: ..." (verified).
+     *
+     * The answer `success` means monobank accepted the capture; the invoice then stays `processing`
+     * (with `finalAmount` already set) for a while — over 30 s on the test merchant — before it turns
+     * `success`. Refunds are refused until then (see [cancel]).
      *
      * `POST /api/merchant/invoice/finalize`. Not retried after an unknown outcome (including a
      * 5xx `EXTERNAL_ERROR`: the capture may have happened); check

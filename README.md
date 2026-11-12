@@ -193,7 +193,9 @@ are **never** retried after an unknown outcome.
 4. **Holds**: `paymentType(PaymentType.HOLD)`, then `invoices.finalize(FinalizeInvoiceRequest.of(invoiceId, amount))`
    within 9 days, or `invoices.cancel(...)` to release.
 5. **Refunds**: `invoices.cancel(CancelInvoiceRequest.builder(invoiceId).amount(partial).extRef(refundId).build())`.
-   Match the result in `cancelList` by `extRef` (`status.cancelFor(refundId)`).
+   Match the result in `cancelList` by `extRef` (`status.cancelFor(refundId)`). After any refund, even a
+   partial one, the invoice status is `reversed`: use `finalAmount` for what is still paid. A refund right
+   after a capture is refused with 404 `1004` "order not finished" until the capture settles (`success`).
 6. **Missed webhooks**: poll `invoices.status(invoiceId)`.
 7. **Unknown outcome on create or payment**: you may not have an `invoiceId`. Look the payment up by
    its reference before doing anything else: `mono.merchant.findByReference(reference, from)`.

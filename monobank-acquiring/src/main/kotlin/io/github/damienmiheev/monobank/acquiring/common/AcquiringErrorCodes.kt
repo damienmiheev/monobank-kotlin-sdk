@@ -42,7 +42,11 @@ public object AcquiringErrorCodes {
     /** 404: nothing was found for one of the parameters. */
     public const val NOT_FOUND: String = "NOT_FOUND"
 
-    /** 404: nothing was found for one of the parameters (numeric form). */
+    /**
+     * 404: nothing was found for one of the parameters (numeric form). Also (verified live) the
+     * answer "order not finished" to a refund of an invoice whose capture is still `processing`:
+     * wait until `status(invoiceId)` is `success`, then refund. The refund was not made.
+     */
     public const val NOT_FOUND_NUMERIC: String = "1004"
 
     /** 405: wrong HTTP method. */
