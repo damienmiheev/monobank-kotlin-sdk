@@ -1,6 +1,7 @@
 package io.github.damienmiheev.monobank.personal
 
 import io.github.damienmiheev.monobank.core.MonobankClientOptions
+import io.github.damienmiheev.monobank.core.Redaction
 
 /**
  * Settings for [MonobankPersonal].
@@ -13,7 +14,9 @@ import io.github.damienmiheev.monobank.core.MonobankClientOptions
  * @property options Transport settings: host override, timeouts, retries, custom HTTP client.
  * @property rateLimiter Client-side limiter for the endpoints monobank limits to one call per
  *   60 seconds (`client-info`, `statement`). `null` (the default) means no client-side limiting:
- *   a call made too early is answered with HTTP 429 (`MonobankRateLimitException`).
+ *   a call made too early fails at once with `MonobankRateLimitException` (`retryAfter` = 60 s);
+ *   monobank sends no `Retry-After`, so the SDK assumes 60 s, which is longer than any
+ *   `RetryPolicy.maxBackoff` below 60 s (the default is 10 s), so the call is not retried.
  */
 public class PersonalConfig private constructor(
     public val token: String?,
@@ -35,7 +38,7 @@ public class PersonalConfig private constructor(
 
         /**
          * Enables a client-side rate limiter (off by default). With it, calls to `client-info` and
-         * `statement` block until 60 seconds (or the limiter's interval) have passed since the
+         * `statement` block until the limiter's interval (61 s by default) has passed since the
          * previous call to the same endpoint. Share one limiter between clients of the same token.
          */
         public fun rateLimiter(rateLimiter: PersonalRateLimiter?): Builder = apply { this.rateLimiter = rateLimiter }
@@ -45,11 +48,15 @@ public class PersonalConfig private constructor(
     }
 
     public companion object {
-        /** Starts a config for a personal [token] (from https://api.monobank.ua/). */
+        /**
+         * Starts a config for a personal [token] (from https://api.monobank.ua/).
+         *
+         * @throws IllegalArgumentException when the token is empty or has characters an HTTP header
+         *   cannot carry (spaces, control characters, non-ASCII). The message never contains the token.
+         */
         @JvmStatic
         public fun builder(token: String): Builder {
-            require(token.isNotBlank()) { "token must not be blank" }
-            require(token.none { it == '\r' || it == '\n' }) { "token must be one line" }
+            Redaction.requireHeaderSafe(token, "token")
             return Builder(token)
         }
 

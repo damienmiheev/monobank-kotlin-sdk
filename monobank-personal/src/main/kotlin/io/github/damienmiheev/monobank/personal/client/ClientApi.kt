@@ -38,7 +38,12 @@ public class ClientApi internal constructor(
      * Retried after an unknown outcome: setting the same URL again is harmless (it only repeats
      * the GET check).
      *
+     * Removing the webhook is not documented by monobank, so the SDK does not offer it (an empty URL
+     * is rejected). To stop processing events, point the webhook at a URL that answers 200 and
+     * ignores them, or revoke the token at https://api.monobank.ua/.
+     *
      * @param webHookUrl Absolute `http(s)` URL.
+     * @throws IllegalArgumentException when [webHookUrl] is not an absolute http(s) URL.
      * @throws IllegalStateException when the client has no token.
      */
     public fun setWebhook(webHookUrl: String) {

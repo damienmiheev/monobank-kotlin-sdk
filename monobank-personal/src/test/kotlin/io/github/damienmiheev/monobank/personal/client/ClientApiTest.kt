@@ -3,6 +3,7 @@ package io.github.damienmiheev.monobank.personal.client
 import io.github.damienmiheev.monobank.core.MonobankAuthException
 import io.github.damienmiheev.monobank.core.MonobankBadRequestException
 import io.github.damienmiheev.monobank.core.MonobankRateLimitException
+import io.github.damienmiheev.monobank.core.MonobankSerializationException
 import io.github.damienmiheev.monobank.core.RequestOutcome
 import io.github.damienmiheev.monobank.core.RetryPolicy
 import io.github.damienmiheev.monobank.core.json.MonobankJson
@@ -215,16 +216,90 @@ class ClientApiTest : PersonalTestSupport() {
     }
 
     @Test
-    fun `429 without Retry-After is retried with backoff and then thrown`() {
-        repeat(2) { enqueueJson("""{"errorDescription":"Too many requests"}""", status = 429) }
+    fun `429 without Retry-After is not retried and asks to wait 60 seconds`() {
+        enqueueJson("""{"errorDescription":"Too many requests"}""", status = 429)
 
-        val oneRetry = client(retryPolicy = RetryPolicy.of(1, Duration.ZERO, Duration.ZERO))
-        assertThatThrownBy { oneRetry.client.info() }
+        assertThatThrownBy { client(retryPolicy = RetryPolicy.DEFAULT).client.info() }
             .isInstanceOfSatisfying(MonobankRateLimitException::class.java) {
-                assertThat(it.retryAfter).isNull()
+                assertThat(it.retryAfter).isEqualTo(Duration.ofSeconds(60))
                 assertThat(it.errorText).isEqualTo("Too many requests")
             }
-        assertThat(server.requestCount).isEqualTo(2)
+        assertThat(server.requestCount).isEqualTo(1)
+        assertThat(retryWaits).isEmpty()
+    }
+
+    @Test
+    fun `429 without Retry-After is retried after 60 s only when maxBackoff allows it`() {
+        enqueueJson("""{"errorDescription":"Too many requests"}""", status = 429)
+        enqueueFixture("GET_personal_client_info.response.json")
+
+        val patient = client(retryPolicy = RetryPolicy.of(1, Duration.ZERO, Duration.ofSeconds(60)))
+
+        assertThat(patient.client.info().clientId).isEqualTo("3MSaMMtczs")
+        assertThat(retryWaits).containsExactly(Duration.ofSeconds(60))
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["\"text\"", "[]", "{\"errorDescription\":null}", "{\"errorDescription\":5}", "<html>"])
+    fun `odd error bodies give a null errorText and never fail decoding`(body: String) {
+        enqueueJson(body, status = 400)
+
+        assertThatThrownBy { mono.client.info() }
+            .isInstanceOfSatisfying(MonobankBadRequestException::class.java) {
+                assertThat(it.errorText).isNull()
+                assertThat(it.errorCode).isNull()
+                assertThat(it.responseBody).isEqualTo(body)
+            }
+    }
+
+    @Test
+    fun `missing balance or currency code fails instead of reading as 0`() {
+        val bodies =
+            listOf(
+                """{"clientId":"c","accounts":[{"id":"a","currencyCode":980}]}""",
+                """{"clientId":"c","accounts":[{"id":"a","balance":null,"currencyCode":980}]}""",
+                """{"clientId":"c","accounts":[{"id":"a","balance":1}]}""",
+                """{"clientId":"c","jars":[{"id":"j","currencyCode":980}]}""",
+                """{"clientId":"c","jars":[{"id":"j","balance":1}]}""",
+                """{"clientId":"c","managedClients":[{"clientId":"m","accounts":[{"id":"a","currencyCode":980}]}]}""",
+                """{"clientId":"c","managedClients":[{"clientId":"m","accounts":[{"id":"a","balance":1}]}]}""",
+                """{"accounts":[]}""",
+            )
+        bodies.forEach { enqueueJson(it) }
+
+        bodies.forEach { body ->
+            assertThatThrownBy { mono.client.info() }
+                .`as`(body)
+                .isInstanceOfSatisfying(MonobankSerializationException::class.java) {
+                    assertThat(it.outcome).isEqualTo(RequestOutcome.UNKNOWN)
+                }
+        }
+    }
+
+    @Test
+    fun `toString hides the webhook URL secret`() {
+        enqueueFixture("GET_personal_client_info.response.json")
+        val info = mono.client.info()
+
+        assertThat(info.toString())
+            .doesNotContain("some_random_data_for_security")
+            .contains("webHookUrl=https://example.com/***")
+            .contains("clientId=3MSaMMtczs")
+    }
+
+    @ParameterizedTest
+    @CsvSource(
+        "https://user:pw@host.example:8443/secret?x=1, https://host.example:8443/***",
+        "not a url, ***",
+        "/relative/secret, ***",
+    )
+    fun `toString redacts any webhook URL shape`(
+        url: String,
+        expected: String,
+    ) {
+        enqueueJson("""{"clientId":"c","webHookUrl":"$url"}""")
+
+        assertThat(mono.client.info().toString()).contains("webHookUrl=$expected").doesNotContain("secret")
     }
 
     @Test

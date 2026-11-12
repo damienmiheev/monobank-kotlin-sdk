@@ -10,11 +10,7 @@ import okhttp3.mockwebserver.RecordedRequest
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
-import java.time.Clock
 import java.time.Duration
-import java.time.Instant
-import java.time.ZoneId
-import java.time.ZoneOffset
 import java.util.concurrent.TimeUnit
 
 /** Base class: a MockWebServer and a client pointed at it, without real sleeps between retries. */
@@ -37,7 +33,10 @@ abstract class PersonalTestSupport {
         server.shutdown()
     }
 
-    protected fun options(retryPolicy: RetryPolicy = RetryPolicy.of(2, Duration.ZERO, Duration.ofSeconds(60))) =
+    /** Paces `listAll` when the client has no rate limiter; never really sleeps. */
+    protected val pacerTime = FakeTime()
+
+    protected fun options(retryPolicy: RetryPolicy = RetryPolicy.of(2, Duration.ZERO, Duration.ofSeconds(10))) =
         MonobankClientOptions
             .builder()
             .baseUrl(server.url("/").toString())
@@ -45,13 +44,17 @@ abstract class PersonalTestSupport {
             .build()
 
     protected fun client(
-        retryPolicy: RetryPolicy = RetryPolicy.of(2, Duration.ZERO, Duration.ofSeconds(60)),
+        retryPolicy: RetryPolicy = RetryPolicy.of(2, Duration.ZERO, Duration.ofSeconds(10)),
         rateLimiter: PersonalRateLimiter? = null,
         token: String? = TOKEN,
     ): MonobankPersonal {
         val builder = if (token == null) PersonalConfig.publicBuilder() else PersonalConfig.builder(token)
         val config = builder.options(options(retryPolicy)).rateLimiter(rateLimiter).build()
-        return MonobankPersonal(config, PersonalHttp(config, MonobankHttp.Sleeper { retryWaits += it }))
+        val http =
+            PersonalHttp(config, MonobankHttp.Sleeper { retryWaits += it }) {
+                pacerTime.limiter(PersonalRateLimiter.DEFAULT_INTERVAL)
+            }
+        return MonobankPersonal(config, http)
     }
 
     protected fun enqueueJson(
@@ -77,30 +80,25 @@ abstract class PersonalTestSupport {
         return request
     }
 
-    /** A clock that only moves when [advance] is called, and a sleeper that advances it. */
+    /** A nanosecond time source that only moves when [advance] is called, and a sleeper that advances it. */
     class FakeTime(
-        start: Instant = Instant.parse("2025-01-01T00:00:00Z"),
-    ) : Clock() {
-        @Volatile
-        var now: Instant = start
-        val sleeps = mutableListOf<Duration>()
+        @Volatile var nanos: Long = 1_000_000_000_000L,
+    ) {
+        val sleeps: MutableList<Duration> = java.util.Collections.synchronizedList(mutableListOf<Duration>())
 
-        val sleeper =
+        internal val sleeper =
             PersonalRateLimiter.Sleeper {
-                synchronized(this) { sleeps += it }
-                advance(it)
+                sleeps += Duration.ofNanos(it)
+                advance(Duration.ofNanos(it))
             }
 
         @Synchronized
         fun advance(duration: Duration) {
-            now = now.plus(duration)
+            nanos += duration.toNanos()
         }
 
-        override fun instant(): Instant = now
-
-        override fun getZone(): ZoneId = ZoneOffset.UTC
-
-        override fun withZone(zone: ZoneId?): Clock = this
+        internal fun limiter(interval: Duration = Duration.ofSeconds(60)): PersonalRateLimiter =
+            PersonalRateLimiter.create(interval, { nanos }, sleeper)
     }
 
     companion object {

@@ -2,8 +2,9 @@ package io.github.damienmiheev.monobank.personal.statement
 
 import io.github.damienmiheev.monobank.core.MonobankBadRequestException
 import io.github.damienmiheev.monobank.core.MonobankRateLimitException
+import io.github.damienmiheev.monobank.core.MonobankSerializationException
+import io.github.damienmiheev.monobank.core.MonobankServerException
 import io.github.damienmiheev.monobank.core.RetryPolicy
-import io.github.damienmiheev.monobank.personal.PersonalRateLimiter
 import io.github.damienmiheev.monobank.personal.PersonalTestSupport
 import io.github.damienmiheev.monobank.personal.statement.StatementApi.Companion.MAX_RANGE_SECONDS
 import io.github.damienmiheev.monobank.personal.statement.StatementApi.Companion.PAGE_SIZE
@@ -23,7 +24,14 @@ class StatementApiTest : PersonalTestSupport() {
 
     private fun page(items: List<String>) = items.joinToString(",", "[", "]")
 
-    private fun paths(): List<String> = List(server.requestCount) { takeAuthenticatedRequest().path!! }
+    private var taken = 0
+
+    /** Paths of the requests sent since the previous call. */
+    private fun paths(): List<String> {
+        val count = server.requestCount - taken
+        taken = server.requestCount
+        return List(count) { takeAuthenticatedRequest().path!! }
+    }
 
     @Test
     fun `list reads every documented field`() {
@@ -129,19 +137,19 @@ class StatementApiTest : PersonalTestSupport() {
 
     @Test
     fun `listAll splits long ranges into windows, newest first, and merges them`() {
-        val to = from.plusSeconds(2 * MAX_RANGE_SECONDS + 100)
+        val to = from.plusSeconds(2 * W + 100)
         val t = to.epochSecond
-        enqueueJson(page(listOf(item("c", t - 5), item("b", t - MAX_RANGE_SECONDS))))
+        enqueueJson(page(listOf(item("c", t - 5), item("b", t - W))))
         // The boundary second is requested twice: the same transaction comes back again.
-        enqueueJson(page(listOf(item("b", t - MAX_RANGE_SECONDS), item("a2", t - MAX_RANGE_SECONDS - 10))))
+        enqueueJson(page(listOf(item("b", t - W), item("a2", t - W - 10))))
         enqueueJson(page(listOf(item("a1", from.epochSecond))))
 
         val items = mono.statements.listAll("acc", from, to)
 
         assertThat(paths()).containsExactly(
-            "/personal/statement/acc/${t - MAX_RANGE_SECONDS}/$t",
-            "/personal/statement/acc/${t - 2 * MAX_RANGE_SECONDS}/${t - MAX_RANGE_SECONDS}",
-            "/personal/statement/acc/${from.epochSecond}/${t - 2 * MAX_RANGE_SECONDS}",
+            "/personal/statement/acc/${t - W}/$t",
+            "/personal/statement/acc/${t - 2 * W}/${t - W}",
+            "/personal/statement/acc/${from.epochSecond}/${t - 2 * W}",
         )
         assertThat(items.map { it.id }).containsExactly("c", "b", "a2", "a1")
     }
@@ -228,26 +236,176 @@ class StatementApiTest : PersonalTestSupport() {
     }
 
     @Test
-    fun `listAll waits between requests when a rate limiter is configured`() {
+    fun `listAll uses the client's rate limiter and no private pacer`() {
         val time = FakeTime()
-        val limited = client(rateLimiter = PersonalRateLimiter.create(Duration.ofSeconds(60), time, time.sleeper))
-        val to = from.plusSeconds(MAX_RANGE_SECONDS + 1)
+        val limited = client(rateLimiter = time.limiter(Duration.ofSeconds(60)))
         enqueueJson("[]")
         enqueueJson("[]")
 
-        limited.statements.listAll("0", from, to)
+        limited.statements.listAll("0", from, from.plusSeconds(W + 1))
 
         assertThat(server.requestCount).isEqualTo(2)
         assertThat(time.sleeps).containsExactly(Duration.ofSeconds(60))
+        assertThat(pacerTime.sleeps).isEmpty()
     }
 
     @Test
-    fun `listAll without a rate limiter surfaces monobank's 429`() {
-        val noRetry = client(retryPolicy = RetryPolicy.NONE)
+    fun `listAll paces itself 61 s apart when the client has no rate limiter`() {
+        val defaultRetries = client(retryPolicy = RetryPolicy.DEFAULT)
+        enqueueJson("[]")
+        enqueueJson("[]")
+        enqueueJson("[]")
+
+        defaultRetries.statements.listAll("0", from, from.plusSeconds(2 * W + 1))
+
+        assertThat(server.requestCount).isEqualTo(3)
+        assertThat(pacerTime.sleeps).containsExactly(Duration.ofSeconds(61), Duration.ofSeconds(61))
+    }
+
+    @Test
+    fun `listAll with a 429 from another caller fails at once with retryAfter 60 s`() {
         enqueueJson("[]")
         enqueueJson("""{"errorDescription":"Too many requests"}""", status = 429)
 
-        assertThatThrownBy { noRetry.statements.listAll("0", from, from.plusSeconds(MAX_RANGE_SECONDS + 1)) }
-            .isInstanceOf(MonobankRateLimitException::class.java)
+        assertThatThrownBy {
+            client(retryPolicy = RetryPolicy.DEFAULT).statements.listAll(
+                "0",
+                from,
+                from.plusSeconds(W + 1),
+            )
+        }.isInstanceOfSatisfying(MonobankRateLimitException::class.java) {
+            assertThat(it.retryAfter).isEqualTo(Duration.ofSeconds(60))
+        }
+        assertThat(server.requestCount).isEqualTo(2)
+    }
+
+    @Test
+    fun `listAll windows are one second below the limit`() {
+        assertThat(W).isEqualTo(MAX_RANGE_SECONDS - 1)
+
+        enqueueJson("[]")
+        mono.statements.listAll("0", from, from.plusSeconds(W))
+        assertThat(paths()).containsExactly("/personal/statement/0/1700000000/${from.epochSecond + W}")
+
+        val f = from.epochSecond
+        enqueueJson("[]")
+        enqueueJson("[]")
+        mono.statements.listAll("0", from, from.plusSeconds(MAX_RANGE_SECONDS))
+        assertThat(paths()).containsExactly(
+            "/personal/statement/0/${f + 1}/${f + MAX_RANGE_SECONDS}",
+            "/personal/statement/0/$f/${f + 1}",
+        )
+
+        enqueueJson("[]")
+        enqueueJson("[]")
+        mono.statements.listAll("0", from, from.plusSeconds(W + 1))
+        assertThat(paths()).containsExactly(
+            "/personal/statement/0/${f + 1}/${f + W + 1}",
+            "/personal/statement/0/$f/${f + 1}",
+        )
+    }
+
+    @Test
+    fun `listAll handles a full page that ends exactly at a window edge`() {
+        val t = from.epochSecond + W + 10
+        val edge = t - W
+        // Window 1: a full page whose oldest item sits on the window start.
+        enqueueJson(page(List(PAGE_SIZE - 1) { item("n$it", t - it) } + item("edge1", edge)))
+        // Same window, paged at the edge second: the edge item again plus one more at that second.
+        enqueueJson(page(listOf(item("edge1", edge), item("edge2", edge))))
+        // Window 2 shares the edge second.
+        enqueueJson(page(listOf(item("edge2", edge), item("edge1", edge), item("old", from.epochSecond))))
+
+        val items = mono.statements.listAll("0", from, Instant.ofEpochSecond(t))
+
+        assertThat(paths()).containsExactly(
+            "/personal/statement/0/$edge/$t",
+            "/personal/statement/0/$edge/$edge",
+            "/personal/statement/0/${from.epochSecond}/$edge",
+        )
+        assertThat(items.map { it.id }).doesNotHaveDuplicates().contains("edge1", "edge2", "old", "n0")
+        assertThat(items).hasSize(PAGE_SIZE + 2)
+        assertThat(items.last().id).isEqualTo("old")
+    }
+
+    @Test
+    fun `listAll stops when a full page already reaches before the start`() {
+        val t = from.epochSecond + 300
+        // The server ignored "from" and returned older items too.
+        enqueueJson(page(List(PAGE_SIZE) { item("x$it", t - it) }))
+
+        assertThat(mono.statements.listAll("0", from, Instant.ofEpochSecond(t))).hasSize(PAGE_SIZE)
+        assertThat(server.requestCount).isEqualTo(1)
+    }
+
+    @Test
+    fun `listAll page consumer gets only new items and keeps them when a later call fails`() {
+        val t = from.epochSecond + 10_000
+        enqueueJson(page(List(PAGE_SIZE) { item("p$it", t - it) }))
+        enqueueJson(page(List(PAGE_SIZE) { item("q$it", t - 499 - it) }))
+        enqueueJson("""{"errorDescription":"oops"}""", status = 500)
+        val pages = mutableListOf<List<StatementItem>>()
+
+        assertThatThrownBy {
+            client(
+                retryPolicy = RetryPolicy.NONE,
+            ).statements.listAll("0", from, Instant.ofEpochSecond(t)) { pages += it }
+        }.isInstanceOf(MonobankServerException::class.java)
+
+        assertThat(pages).hasSize(2)
+        assertThat(pages[0]).hasSize(PAGE_SIZE)
+        assertThat(pages[1]).hasSize(PAGE_SIZE)
+        assertThat((pages[0] + pages[1]).map { it.id }).doesNotHaveDuplicates()
+        // Resume point: the oldest delivered transaction.
+        assertThat(pages[1].minOf { it.time }).isEqualTo(Instant.ofEpochSecond(t - 998))
+    }
+
+    @Test
+    fun `listAll without to ends now`() {
+        enqueueJson("[]")
+        val before = Instant.now().epochSecond
+
+        mono.statements.listAll("0", Instant.now().minusSeconds(3600))
+
+        val to = takeAuthenticatedRequest().path!!.substringAfterLast('/').toLong()
+        assertThat(to).isBetween(before, Instant.now().epochSecond)
+    }
+
+    @Test
+    fun `dot segments are rejected before sending`() {
+        listOf(".", "..").forEach { account ->
+            assertThatThrownBy {
+                mono.statements.list(
+                    account,
+                    from,
+                )
+            }.isInstanceOf(IllegalArgumentException::class.java)
+            assertThatThrownBy { mono.statements.listAll(account, from, from) }
+                .isInstanceOf(IllegalArgumentException::class.java)
+        }
+        assertThat(server.requestCount).isZero()
+    }
+
+    @Test
+    fun `missing required statement fields fail instead of reading as 0`() {
+        val bodies =
+            listOf(
+                """[{"id":"x","time":1700000001,"currencyCode":980}]""",
+                """[{"id":"x","time":1700000001,"amount":null,"currencyCode":980}]""",
+                """[{"id":"x","time":1700000001,"amount":1}]""",
+                """[{"id":"x","amount":1,"currencyCode":980}]""",
+                """[{"time":1700000001,"amount":1,"currencyCode":980}]""",
+            )
+        bodies.forEach { enqueueJson(it) }
+
+        bodies.forEach { body ->
+            assertThatThrownBy { mono.statements.list("0", from) }
+                .`as`(body)
+                .isInstanceOf(MonobankSerializationException::class.java)
+        }
+    }
+
+    private companion object {
+        const val W = StatementApi.WINDOW_SECONDS
     }
 }

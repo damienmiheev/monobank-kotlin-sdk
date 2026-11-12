@@ -40,8 +40,17 @@ class PersonalConfigTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = ["", "  ", "a\nb", "a\rb"])
-    fun `invalid tokens are rejected`(token: String) {
-        assertThatThrownBy { PersonalConfig.builder(token) }.isInstanceOf(IllegalArgumentException::class.java)
+    @ValueSource(
+        strings = [
+            "", "  ", "a\nb", "a\rb", "abc\u0001SECRETdef", "abc\u007FSECRET", "abc SECRET", "abc\tSECRET", "токен",
+        ],
+    )
+    fun `tokens that cannot be an HTTP header are rejected without echoing them`(token: String) {
+        assertThatThrownBy { PersonalConfig.builder(token) }
+            .isInstanceOf(IllegalArgumentException::class.java)
+            .hasMessageContaining("token")
+            .satisfies({
+                if (token.isNotBlank()) assertThat(it.message).doesNotContain("SECRET").doesNotContain(token)
+            })
     }
 }

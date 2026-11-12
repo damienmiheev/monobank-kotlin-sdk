@@ -9,8 +9,8 @@ import io.github.damienmiheev.monobank.core.http.HttpMethod
 import io.github.damienmiheev.monobank.core.http.MonobankHttp
 import io.github.damienmiheev.monobank.core.json.MonobankJson
 import io.github.damienmiheev.monobank.personal.PersonalConfig
-import java.net.URLEncoder
-import java.nio.charset.StandardCharsets
+import io.github.damienmiheev.monobank.personal.PersonalRateLimiter
+import java.time.Duration
 
 /**
  * Error body of the personal API: `{"errorDescription": "..."}`. It has no machine-readable
@@ -20,7 +20,8 @@ internal object PersonalErrorDecoder : ErrorDecoder {
     override fun decode(body: ByteArray): ApiError {
         if (body.isEmpty()) return ApiError(null, null)
         val node = MonobankJson.readTree(body)
-        return ApiError(null, node.path("errorDescription").asText(null))
+        val text = node.get("errorDescription")?.takeIf { it.isTextual }?.textValue()
+        return ApiError(null, text)
     }
 }
 
@@ -28,6 +29,7 @@ internal object PersonalErrorDecoder : ErrorDecoder {
 internal class PersonalHttp(
     private val config: PersonalConfig,
     sleeper: MonobankHttp.Sleeper = MonobankHttp.Sleeper.SYSTEM,
+    private val pacerFactory: () -> PersonalRateLimiter = { PersonalRateLimiter.create() },
 ) {
     private val http =
         MonobankHttp(
@@ -37,7 +39,14 @@ internal class PersonalHttp(
             authenticator = { request -> authHeaders(request) },
             errorDecoder = PersonalErrorDecoder,
             sleeper = sleeper,
+            defaultRetryAfter = RATE_LIMIT_WAIT,
         )
+
+    /**
+     * A limiter for one multi-request operation (`listAll`) to pace itself with, or `null` when the
+     * config already has one (which then spaces every request).
+     */
+    fun pacerIfUnlimited(): PersonalRateLimiter? = if (config.rateLimiter == null) pacerFactory() else null
 
     /** Throws when this client was built without a token. */
     fun requireToken(operation: String) {
@@ -55,19 +64,25 @@ internal class PersonalHttp(
         if (token == null || !request.path.startsWith(PERSONAL_PREFIX)) return emptyMap()
         val limiter = config.rateLimiter
         val key = rateLimitKey(request.path)
-        if (limiter != null && key != null) {
-            try {
-                limiter.acquire(key)
-            } catch (e: InterruptedException) {
-                Thread.currentThread().interrupt()
-                throw MonobankNetworkException(
-                    "Interrupted while waiting for the personal API rate limit",
-                    e,
-                    RequestOutcome.NOT_SENT,
-                )
-            }
-        }
+        if (limiter != null && key != null) awaitSlot(limiter, key)
         return mapOf("X-Token" to token)
+    }
+
+    /** Waits for [limiter]'s next slot; an interrupt becomes a NOT_SENT network exception. */
+    fun awaitSlot(
+        limiter: PersonalRateLimiter,
+        key: String,
+    ) {
+        try {
+            limiter.acquire(key)
+        } catch (e: InterruptedException) {
+            Thread.currentThread().interrupt()
+            throw MonobankNetworkException(
+                "Interrupted while waiting for the personal API rate limit",
+                e,
+                RequestOutcome.NOT_SENT,
+            )
+        }
     }
 
     fun <T> get(
@@ -102,7 +117,7 @@ internal class PersonalHttp(
                 else -> null
             }
 
-        /** Encodes one path segment. */
-        fun encodeSegment(value: String): String = URLEncoder.encode(value, StandardCharsets.UTF_8).replace("+", "%20")
+        /** monobank sends no `Retry-After`; its documented limits are one call per 60 seconds. */
+        val RATE_LIMIT_WAIT: Duration = Duration.ofSeconds(60)
     }
 }

@@ -114,6 +114,35 @@ class BankApiTest : PersonalTestSupport() {
     }
 
     @Test
+    fun `sync tolerates a missing key and time`() {
+        enqueueJson("""{"serverKeyId":"k"}""")
+
+        val sync = mono.bank.sync()
+
+        assertThat(sync.serverPubKey).isNull()
+        assertThat(sync.serverTimeMsec).isNull()
+        assertThat(sync.serverTime).isNull()
+    }
+
+    @Test
+    fun `currency pair without currency codes fails instead of reading as 0`() {
+        enqueueJson("""[{"currencyCodeB":980,"rateCross":1.5}]""")
+
+        assertThatThrownBy { mono.bank.currency() }.isInstanceOf(MonobankSerializationException::class.java)
+    }
+
+    @Test
+    fun `429 without Retry-After on a public endpoint is thrown at once with a 60 s wait`() {
+        enqueueJson("""{"errorDescription":"Too many requests"}""", status = 429)
+
+        assertThatThrownBy { mono.bank.currency() }
+            .isInstanceOfSatisfying(MonobankRateLimitException::class.java) {
+                assertThat(it.retryAfter).isEqualTo(Duration.ofSeconds(60))
+            }
+        assertThat(server.requestCount).isEqualTo(1)
+    }
+
+    @Test
     fun `429 exposes Retry-After and errorDescription`() {
         server.enqueue(
             MockResponse()

@@ -8,6 +8,9 @@ import java.time.Instant
  * One transaction, from `GET /personal/statement/...` or a webhook event.
  *
  * Amounts are signed: negative for money leaving the account, positive for money coming in.
+ * [id], [time], [amount] and [currencyCode] are required: a response or webhook without them (or
+ * with `null`) fails with `MonobankSerializationException` instead of reading as 0. The other
+ * fields are `null` when monobank does not send them.
  *
  * @property id Unique transaction id. Use it to deduplicate (webhook retries, overlapping statement pages).
  * @property time When the transaction happened (sent as Unix time in seconds).
@@ -17,9 +20,9 @@ import java.time.Instant
  * @property hold `true` while the amount is only held (authorization hold), not yet settled.
  * @property amount Amount in minor units (kopiyky, cents) of the **account** currency, signed.
  * @property operationAmount Amount in minor units of the **transaction** currency, signed.
- * @property currencyCode ISO 4217 numeric currency code. monobank's docs call it the account
- *   currency, but the API sends the currency of the transaction (of [operationAmount]); for the
- *   account currency use `Account.currencyCode`.
+ * @property currencyCode ISO 4217 numeric currency code. The docs describe it as "Код валюти
+ *   рахунку" (account currency); in practice it has been observed to be the currency of the
+ *   transaction (of [operationAmount]). For the account currency use `Account.currencyCode`.
  * @property commissionRate Commission in minor units (kopiyky, cents).
  * @property cashbackAmount Cashback in minor units (kopiyky, cents).
  * @property balance Account balance after the transaction, in minor units of the account currency.

@@ -82,12 +82,19 @@ class WebhookParserTest {
             "",
             "not json",
             "[1]",
+            "{}",
+            """{"foo":1}""",
+            """{"type":123}""",
+            """{"type":null,"data":{}}""",
+            """{"type":"StatementItem","data":null}""",
+            // No amount.
+            """{"type":"StatementItem","data":{"account":"a","statementItem":{"id":"x","time":1,"currencyCode":9}}}""",
             """{"type":"StatementItem"}""",
             """{"type":"StatementItem","data":{"account":"a"}}""",
             """{"type":"StatementItem","data":{"account":"a","statementItem":{"time":1,"amount":1}}}""",
         ],
     )
-    fun `invalid StatementItem events fail with a serialization error`(raw: String) {
+    fun `invalid events fail with a serialization error`(raw: String) {
         assertThatThrownBy { WebhookParser.parse(raw) }
             .isInstanceOfSatisfying(MonobankSerializationException::class.java) {
                 assertThat(it.outcome).isNull()

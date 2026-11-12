@@ -2,14 +2,20 @@ package io.github.damienmiheev.monobank.personal.client
 
 import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.annotation.JsonProperty
+import io.github.damienmiheev.monobank.core.Redaction
+import java.net.URI
 
 /**
  * Answer of `GET /personal/client-info`: the client, their accounts and jars, and the
  * entrepreneurs (ФОП) who gave this client accountant access.
  *
+ * Ids, balances and currency codes are required: an answer without them (or with `null`) fails
+ * with `MonobankSerializationException` instead of reading as 0. Other fields are `null` when absent.
+ *
  * @property clientId Client id (the same id as on send.monobank.ua).
  * @property name Client's name.
- * @property webHookUrl Webhook URL currently set with `ClientApi.setWebhook`, if any.
+ * @property webHookUrl Webhook URL currently set with `ClientApi.setWebhook`, if any. It should
+ *   contain a secret, so [toString] shows only its scheme and host.
  * @property permissions Permissions granted to the token, one letter per permission (e.g. `psfj`).
  * @property accounts The client's accounts (cards and ФОП accounts).
  * @property jars The client's jars (банки).
@@ -26,7 +32,23 @@ public data class ClientInfo
         @param:JsonProperty("accounts") public val accounts: List<Account>?,
         @param:JsonProperty("jars") public val jars: List<Jar>?,
         @param:JsonProperty("managedClients") public val managedClients: List<ManagedClient>?,
-    )
+    ) {
+        override fun toString(): String =
+            "ClientInfo(clientId=$clientId, name=$name, webHookUrl=${redactUrl(webHookUrl)}, " +
+                "permissions=$permissions, accounts=$accounts, jars=$jars, managedClients=$managedClients)"
+
+        private companion object {
+            /** Keeps `scheme://host[:port]` and hides the path, query and user info. */
+            fun redactUrl(url: String?): String? {
+                if (url.isNullOrEmpty()) return url
+                val uri = runCatching { URI(url) }.getOrNull()
+                val host = uri?.host
+                if (uri?.scheme == null || host == null) return Redaction.HIDDEN
+                val port = if (uri.port >= 0) ":${uri.port}" else ""
+                return "${uri.scheme}://$host$port/${Redaction.HIDDEN}"
+            }
+        }
+    }
 
 /**
  * One of the client's accounts.

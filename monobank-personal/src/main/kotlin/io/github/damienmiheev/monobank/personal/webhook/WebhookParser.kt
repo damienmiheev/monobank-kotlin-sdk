@@ -22,14 +22,21 @@ public object WebhookParser {
      * Parses a webhook body. Events of a type this SDK does not know are returned with
      * [WebhookEventType.UNKNOWN] and `null` data instead of failing.
      *
-     * @throws MonobankSerializationException when the body is not a valid event.
+     * @throws MonobankSerializationException when the body is not a JSON object with a string
+     *   `type`, or is a `StatementItem` event without `data`, `account` or the item's required
+     *   fields (`id`, `time`, `amount`, `currencyCode`).
      */
     @JvmStatic
     public fun parse(body: ByteArray): WebhookEvent {
         val tree = MonobankJson.readTree(body, outcome = null)
         if (!tree.isObject) throw MonobankSerializationException("Webhook body is not a JSON object", null, null)
-        val type = tree.path("type").asText("")
-        if (type != WebhookEventType.STATEMENT_ITEM.value) return WebhookEvent(WebhookEventType.UNKNOWN, null)
+        val typeNode = tree.get("type")
+        if (typeNode == null || !typeNode.isTextual) {
+            throw MonobankSerializationException("Webhook body has no string \"type\"", null, null)
+        }
+        if (typeNode.textValue() != WebhookEventType.STATEMENT_ITEM.value) {
+            return WebhookEvent(WebhookEventType.UNKNOWN, null)
+        }
         val event = MonobankJson.read(body, WebhookEvent::class.java, outcome = null)
         if (event.data == null) throw MonobankSerializationException("StatementItem webhook has no data", null, null)
         return event
