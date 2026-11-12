@@ -66,7 +66,10 @@ public class MerchantSetup private constructor(
          *   `INVALID_MERCHANT_PAYM_INFO` (verified live for `invoice/create`; inferred for `wallet/payment`,
          *   and the fake exempts verification invoices, which charge nothing);
          * - a partial `invoice/finalize` without `items` → 400 `1001` "wrong amount for finalization without
-         *   basket" (verified live); a partial `invoice/cancel` without `items` fails the same way (inferred).
+         *   basket" (verified live); a partial `invoice/cancel` without `items` fails the same way (inferred);
+         * - finalize and partial refund `items` must match the basket by name, code, unit `sum` and
+         *   `splitReceiverId` (verified live for finalize), not exceed its `qty` and add up to the amount
+         *   (inferred). See the class KDoc of [FakeMonobankAcquiring].
          */
         public fun fiscalization(enabled: Boolean): Builder = apply { fiscalization = enabled }
 

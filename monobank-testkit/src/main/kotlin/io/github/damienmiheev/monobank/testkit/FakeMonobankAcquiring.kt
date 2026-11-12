@@ -93,6 +93,14 @@ import java.util.function.Predicate
  *   the basket rules of `invoice/create` and the partial-finalize rule are verified against monobank's
  *   test merchant; the same rules on `wallet/payment`, the partial-`invoice/cancel` rule (400 `1001` without
  *   `items`) and the exemption of verification invoices are inferred.
+ * - On those merchants, `items` sent with `invoice/finalize` must each match a line of the hold's basket
+ *   by name, code, `sum` (unit price) and `splitReceiverId`; only `qty` may differ. A mismatch answers 400
+ *   `1001` "finalization basket contains item not found in hold: <name>_<code>_<sum>_<splitReceiverId>"
+ *   for the first unmatched item (verified live). Inferred: an item's `qty` may not exceed the hold line's
+ *   ("... item exceeds the hold: ..."), and qty × sum over the items must equal the amount ("wrong amount
+ *   for finalization"). A partial `invoice/cancel` with `items` is checked the same way against the paid
+ *   (or finalized) basket ("refund basket contains item not found in invoice: ...", "wrong amount for
+ *   refund"; all inferred). Fractional `qty` (0.75 × 200 = 150) is accepted; unverified.
  *
  * ### Faults and webhook control
  * [injectFault] (delay before or after processing, answer after webhooks, timeout, dropped

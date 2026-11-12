@@ -152,6 +152,7 @@ configure(subprojects.filter { it.name in libraryModules }) {
         classpath = sourceSets["test"].runtimeClasspath
         useJUnitPlatform { includeTags("live") }
         outputs.upToDateWhen { false }
+        testLogging { showStandardStreams = true }
     }
 
     tasks.named("check") {

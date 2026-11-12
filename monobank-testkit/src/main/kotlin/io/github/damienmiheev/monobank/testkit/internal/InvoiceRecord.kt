@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.node.ObjectNode
 import io.github.damienmiheev.monobank.testkit.FakeInvoice
 import io.github.damienmiheev.monobank.testkit.FakeRefund
+import java.math.BigDecimal
+import java.math.RoundingMode
 import java.time.Instant
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
@@ -58,7 +60,26 @@ internal class OrderInfo(
     val reference: String?,
     val destination: String?,
     val metadata: JsonNode?,
+    val basket: List<BasketLine> = emptyList(),
 )
+
+/** A basket line (`basketOrder[]`) or a finalize/refund item (`items[]`); [sum] is the unit price. */
+internal class BasketLine(
+    val name: String,
+    val code: String,
+    val sum: Long,
+    val qty: BigDecimal,
+    val splitReceiverId: String?,
+) {
+    /** monobank's item key in error texts (verified live): `<name>_<code>_<sum>_<splitReceiverId>`. */
+    val key: String get() = listOfNotNull(name, code, sum.toString(), splitReceiverId).joinToString("_")
+
+    fun sameItem(other: BasketLine): Boolean =
+        name == other.name && code == other.code && sum == other.sum && splitReceiverId == other.splitReceiverId
+
+    /** qty × sum in minor units, rounded half up. */
+    fun total(): Long = qty.multiply(BigDecimal.valueOf(sum)).setScale(0, RoundingMode.HALF_UP).toLong()
+}
 
 /** Everything the fake knows about one invoice. Guarded by the state's lock. */
 internal class InvoiceRecord(
@@ -89,6 +110,9 @@ internal class InvoiceRecord(
 
     /** The status before the invoice became `reversed` (`hold` for a released or lapsed hold). */
     var reversedFrom: String? = null
+
+    /** The basket the money stands for: the created one, replaced by the items of a finalize. */
+    var basket: List<BasketLine> = order.basket
     val cancels: MutableList<CancelRecord> = mutableListOf()
 
     /** Moves [modifiedAt] to [now], always strictly forward (monobank's `modifiedDate` only increases). */

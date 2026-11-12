@@ -151,8 +151,9 @@ internal class AcquiringRoutes(
         val invoiceId = Fields.requiredString(json, "invoiceId")
         val amount = Fields.requiredLong(json, "amount")
         if (amount <= 0) throw ApiError.badRequest("invalid 'amount'")
+        val items = RequestParsing.items(json)
         return bank.locked {
-            merchant.finalizeHold(merchant.find(invoiceId), amount, hasItems(json))
+            merchant.finalizeHold(merchant.find(invoiceId), amount, items)
             HttpResult.json(FakeJson.obj().put("status", Status.SUCCESS))
         }
     }
@@ -166,9 +167,10 @@ internal class AcquiringRoutes(
         val extRef = Fields.string(json, "extRef")
         val amount = Fields.long(json, "amount")
         if (amount != null && amount <= 0) throw ApiError.badRequest("invalid 'amount'")
+        val items = RequestParsing.items(json)
         return bank.locked {
             val invoice = merchant.find(invoiceId)
-            val refund = merchant.cancel(invoice, extRef, amount, hasItems(json))
+            val refund = merchant.cancel(invoice, extRef, amount, items)
             val settlement = merchant.settings.refundSettlement
             when (settlement) {
                 RefundSettlement.IMMEDIATE_SUCCESS -> merchant.settle(invoice, refund, true)
@@ -304,8 +306,6 @@ internal class AcquiringRoutes(
             HttpResult.json(answer)
         }
     }
-
-    private fun hasItems(json: ObjectNode): Boolean = json.get("items")?.let { it.isArray && !it.isEmpty } ?: false
 
     private fun splitReceivers(merchant: MerchantState): HttpResult {
         val answer = FakeJson.obj()

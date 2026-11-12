@@ -184,9 +184,9 @@ internal object RequestParsing {
         paymInfoUnless((destination?.length ?: 0) <= TEXT_MAX && (comment?.length ?: 0) <= TEXT_MAX) {
             "destination and comment are limited to $TEXT_MAX characters"
         }
-        if (basket != null) basket(info, basket, amount, rules)
+        val lines = if (basket != null) basket(info, basket, amount, rules) else emptyList()
         val metadata = info.get("metadata")?.takeIf { it.isObject }
-        return OrderInfo(reference, destination, metadata)
+        return OrderInfo(reference, destination, metadata, lines)
     }
 
     private fun basket(
@@ -194,7 +194,7 @@ internal object RequestParsing {
         basket: JsonNode,
         amount: Long,
         rules: BasketRules,
-    ) {
+    ): List<BasketLine> {
         paymInfoUnless(basket.isArray) { "invalid 'basketOrder'" }
         val total = basket.sumOf { basketItemTotal(it) }
         paymInfoUnless(!rules.splitRequired || basket.all { isText(it.get("splitReceiverId")) }) {
@@ -203,6 +203,23 @@ internal object RequestParsing {
         val hasDiscounts = info.hasNonNull("discounts") || basket.any { it.hasNonNull("discounts") }
         paymInfoUnless(!rules.validateTotal || hasDiscounts || total == amount) {
             "basketOrder total $total does not match amount $amount"
+        }
+        return basket.map { line(it) }
+    }
+
+    /** `items` of finalize and cancel; malformed items answer 400 `BAD_REQUEST`. */
+    fun items(json: JsonNode): List<BasketLine> {
+        val items = json.get("items")?.takeIf { !it.isNull } ?: return emptyList()
+        badRequestUnless(items.isArray) { "invalid 'items'" }
+        return items.map { item ->
+            badRequestUnless(
+                item.isObject && isText(item.get("name")) && isText(item.get("code")),
+            ) { "invalid 'items'" }
+            val qty = item.get("qty")
+            badRequestUnless(qty != null && qty.isNumber && qty.decimalValue().signum() > 0) { "invalid 'items' qty" }
+            val sum = Fields.long(item, "sum")
+            badRequestUnless(sum != null && sum >= 0) { "invalid 'items' sum" }
+            line(item)
         }
     }
 
@@ -263,3 +280,12 @@ private fun paymInfoUnless(
 private fun isText(node: JsonNode?): Boolean = node != null && node.isTextual && node.asText().isNotBlank()
 
 private fun invalidPaymInfo(text: String) = ApiError(400, "INVALID_MERCHANT_PAYM_INFO", text)
+
+private fun line(item: JsonNode): BasketLine =
+    BasketLine(
+        name = item.path("name").asText(),
+        code = item.path("code").asText(),
+        sum = item.path("sum").asLong(),
+        qty = item.path("qty").decimalValue(),
+        splitReceiverId = item.get("splitReceiverId")?.takeIf { it.isTextual }?.asText(),
+    )

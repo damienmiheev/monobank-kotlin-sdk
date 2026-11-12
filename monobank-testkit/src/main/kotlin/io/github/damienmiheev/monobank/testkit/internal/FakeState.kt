@@ -262,7 +262,7 @@ internal class MerchantState(
     fun finalizeHold(
         invoice: InvoiceRecord,
         amount: Long,
-        hasItems: Boolean,
+        items: List<BasketLine>,
     ) {
         if (invoice.status != Status.HOLD) throw ApiError.badRequest("invoice is not on hold")
         if (invoice.cancels.any { it.status == Status.PROCESSING }) {
@@ -270,7 +270,11 @@ internal class MerchantState(
         }
         if (amount > invoice.amount) throw ApiError.badRequest("invalid 'amount': more than the hold")
         // Verified live on a merchant with fiscal receipts and split payments.
-        if (info.needsBasket && amount < invoice.amount && !hasItems) throw noBasketForPartialAmount()
+        if (info.needsBasket && amount < invoice.amount && items.isEmpty()) throw noBasketForPartialAmount()
+        if (info.needsBasket && items.isNotEmpty()) {
+            matchItems(invoice.basket, items, amount, ItemTexts.FINALIZE)
+            invoice.basket = items
+        }
         invoice.status = Status.SUCCESS
         invoice.finalAmount = amount
         invoice.fee = fee(amount, settings.feePercent)
@@ -284,7 +288,7 @@ internal class MerchantState(
         invoice: InvoiceRecord,
         extRef: String?,
         amount: Long?,
-        hasItems: Boolean,
+        items: List<BasketLine>,
     ): CancelRecord {
         val refundAmount =
             when (invoice.status) {
@@ -298,7 +302,8 @@ internal class MerchantState(
                     if (requested <= 0 || requested > refundable) throw wrongCancelAmount()
                     // Inferred from the finalize rule: a partial refund needs the refunded items.
                     val partial = requested < (invoice.finalAmount ?: 0)
-                    if (info.needsBasket && partial && !hasItems) throw noBasketForPartialAmount()
+                    if (info.needsBasket && partial && items.isEmpty()) throw noBasketForPartialAmount()
+                    if (info.needsBasket && partial) matchItems(invoice.basket, items, requested, ItemTexts.REFUND)
                     requested
                 }
 
@@ -406,3 +411,38 @@ private fun holdReleaseAmount(
 
 /** monobank's answer (verified live for finalize) to a partial amount without `items` on a fiscal or split merchant. */
 private fun noBasketForPartialAmount() = ApiError(400, "1001", "wrong amount for finalization without basket")
+
+/** Error texts of the item checks: the finalize "not found" text is verified live, the rest inferred. */
+internal enum class ItemTexts(
+    val notFound: String,
+    val tooMany: String,
+    val wrongTotal: String,
+) {
+    FINALIZE(
+        "finalization basket contains item not found in hold: ",
+        "finalization basket item exceeds the hold: ",
+        "wrong amount for finalization",
+    ),
+    REFUND(
+        "refund basket contains item not found in invoice: ",
+        "refund basket item exceeds the invoice: ",
+        "wrong amount for refund",
+    ),
+}
+
+/**
+ * Matches each item to a line of [basket] by (name, code, sum = unit price, splitReceiverId): only
+ * qty may differ, and not beyond the line's qty. The items must add up to [amount].
+ */
+private fun matchItems(
+    basket: List<BasketLine>,
+    items: List<BasketLine>,
+    amount: Long,
+    texts: ItemTexts,
+) {
+    for (item in items) {
+        val line = basket.firstOrNull { it.sameItem(item) } ?: throw ApiError(400, "1001", texts.notFound + item.key)
+        if (item.qty > line.qty) throw ApiError(400, "1001", texts.tooMany + item.key)
+    }
+    if (items.sumOf { it.total() } != amount) throw ApiError(400, "1001", texts.wrongTotal)
+}

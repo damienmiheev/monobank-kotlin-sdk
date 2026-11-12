@@ -104,7 +104,9 @@ Create one client per merchant token and reuse it; it is thread-safe.
 If your merchant has fiscal receipts (Checkbox) or split payments enabled, monobank rejects invoices
 without `merchantPaymInfo.basketOrder` (`INVALID_MERCHANT_PAYM_INFO`), and with split payments every
 `BasketItem` needs a `splitReceiverId` (from `mono.split.receivers()`). Such merchants must also send `items` with a
-partial `finalize` (and, likely, a partial refund); otherwise monobank answers 400 `1001`.
+partial `finalize` (and, likely, a partial refund); otherwise monobank answers 400 `1001`. The items
+must repeat the original basket lines (same name, code, unit price and split receiver) with a smaller
+`qty`, e.g. 1.50 of a 1 × 2.00 line is `qty` 0.75 at `sum` 200.
 
 ## Money
 

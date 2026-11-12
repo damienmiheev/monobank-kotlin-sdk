@@ -167,7 +167,7 @@ class FiscalSplitMerchantTest {
         fiscal.invoices.finalize(
             FinalizeInvoiceRequest
                 .builder(partial, 150)
-                .items(listOf(FiscalizationItem.builder("Plan", BigDecimal.ONE, 150, "plan").build()))
+                .items(listOf(FiscalizationItem.builder("Plan", BigDecimal("0.75"), 200, "plan").build()))
                 .build(),
         )
         assertThat(fiscal.invoices.status(partial).finalAmount).isEqualTo(150)
@@ -197,8 +197,18 @@ class FiscalSplitMerchantTest {
             CancelInvoiceRequest
                 .builder(invoiceId)
                 .amount(50)
-                .items(listOf(FiscalizationItem.builder("Plan", BigDecimal.ONE, 50, "plan").build()))
-                .build(),
+                .items(
+                    listOf(
+                        FiscalizationItem
+                            .builder(
+                                "Plan",
+                                BigDecimal("0.25"),
+                                200,
+                                "plan",
+                            ).splitReceiverId("sr_aB3dC5eF7g")
+                            .build(),
+                    ),
+                ).build(),
         )
         assertThat(split.invoices.status(invoiceId).finalAmount).isEqualTo(150)
         // the rest, without an amount: a full refund of what is left needs no items

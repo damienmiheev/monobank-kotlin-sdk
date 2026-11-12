@@ -75,6 +75,11 @@ public class InvoiceApi internal constructor(
      * finalization without basket" (verified on monobank's test merchant). The same is likely for
      * a partial refund ([cancel]) without `items`.
      *
+     * Each item must repeat a line of the hold's basket exactly — same `name`, `code`, unit price
+     * `sum` and `splitReceiverId` — with only `qty` changed so that the items add up to the captured
+     * amount (e.g. capture 1.50 of a 1 × 2.00 line as `qty` 0.75, `sum` 200). An item that does not
+     * match gets 400 `1001` "finalization basket contains item not found in hold: ..." (verified).
+     *
      * `POST /api/merchant/invoice/finalize`. Not retried after an unknown outcome (including a
      * 5xx `EXTERNAL_ERROR`: the capture may have happened); check
      * `status(invoiceId)` before finalizing again.
