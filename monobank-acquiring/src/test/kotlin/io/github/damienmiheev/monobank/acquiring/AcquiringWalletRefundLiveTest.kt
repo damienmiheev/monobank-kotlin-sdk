@@ -163,4 +163,47 @@ class AcquiringWalletRefundLiveTest {
         }
         Thread.sleep(2_000)
     }
+
+    /** Full refund of an existing converted saved-card payment: tries the plausible forms in order. */
+    @Test
+    fun `full refund of a converted saved-card payment`() {
+        val token = System.getenv("MONOBANK_ACQUIRING_TEST_TOKEN")
+        val id = System.getenv("MONOBANK_LIVE_REFUND_INVOICE_ID")
+        assumeTrue(!token.isNullOrBlank() && !id.isNullOrBlank(), "token or invoice id not set")
+        assumeTrue(System.getenv("MONOBANK_LIVE_PAYMENTS") == "true", "MONOBANK_LIVE_PAYMENTS=true is not set")
+        val mono = MonobankAcquiring.create(token!!)
+        val receiver =
+            mono.split
+                .receivers()
+                .firstOrNull()
+                ?.id
+        val line = FiscalizationItem.builder(name, BigDecimal.ONE, 100, code).splitReceiverId(receiver).build()
+        val attempts =
+            listOf<Pair<String, (CancelInvoiceRequest.Builder) -> CancelInvoiceRequest.Builder>>(
+                "full: no amount, no items" to { it },
+                "full: no amount, items = original line (qty 1 x sum 100)" to { it.items(listOf(line)) },
+                "full: amount 5048, items = original line" to { it.amount(5048).items(listOf(line)) },
+                "full: amount 5048, no items" to { it.amount(5048) },
+            )
+        for ((what, configure) in attempts) {
+            val request =
+                configure(
+                    CancelInvoiceRequest.builder(id!!).extRef("sdk-wallet-" + UUID.randomUUID().toString().take(8)),
+                )
+            val ok =
+                try {
+                    log("$what: OK status=${mono.invoices.cancel(request.build()).statusRaw}")
+                    true
+                } catch (e: MonobankApiException) {
+                    log("$what: HTTP ${e.statusCode} ${e.errorCode} ${e.errorText}")
+                    false
+                }
+            if (ok) break
+            Thread.sleep(1_000)
+        }
+        Thread.sleep(3_000)
+        mono.merchant.statement(Instant.now().minusSeconds(86_400)).filter { it.invoiceId == id }.forEach {
+            log("statement: amount=${it.amount} ccy=${it.ccy} refunds=${it.cancelList?.map { c -> c.amount }}")
+        }
+    }
 }
