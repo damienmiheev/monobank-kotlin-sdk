@@ -82,8 +82,9 @@ public class InvoiceApi internal constructor(
      *   refunded without `items`.
      * - `items` repeat the paid basket lines (same name, code, unit `sum`, split receiver) with a
      *   smaller `qty`, and `qty × sum` must equal `amount` exactly; otherwise 400
-     *   `INVALID_MERCHANT_PAYM_INFO`. To refund arbitrary amounts, charge with a basket line in
-     *   kopiyky (`qty` = amount, `sum` 1) and refund `qty r × sum 1` (see the README).
+     *   `INVALID_MERCHANT_PAYM_INFO`. To refund arbitrary amounts, charge with one line priced per
+     *   hryvnia (`sum` 100, `qty` = amount in hryvnias, two decimals) or per kopiyka (`sum` 1,
+     *   `qty` = amount in kopiyky) and refund the same line with `qty` = the refund (see the README).
      * - after a partial refund, a refund without `amount` is refused (400 `1001` "split receiver's
      *   part of invoice has already been partially cancelled"); send the remaining amount.
      *

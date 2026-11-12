@@ -110,20 +110,29 @@ empty"). The items must repeat the original basket lines (same name, code, unit 
 receiver) with a smaller `qty`, and `qty × sum` must equal the amount exactly (no rounding).
 
 So if you will refund **arbitrary amounts** (pro-rated subscriptions, goodwill refunds) of saved-card
-payments, put the price into the basket in kopiyky: one line with `qty` = the amount and `sum` = 1.
-Any refund `r` is then the item `qty r × sum 1` — a whole number, which monobank expects. Verified on
-monobank's test merchant: a ₴450.00 charge with the line `45000 × 1` was refunded as `13742 × 1`,
-`1000 × 1`, then `30258 × 1`. With the line `1 × 45000`, a ₴137.42 refund cannot be expressed.
+payments, use one basket line whose unit price divides every amount. Two forms work (verified on
+monobank's test merchant); with a line like `1 × 45000` a ₴137.42 refund cannot be expressed at all.
+
+- **One hryvnia per unit** (reads naturally on the receipt): `sum` = 100 and `qty` = the amount in
+  hryvnias with two decimals. ₴450.00 is `450 × 100`; a ₴137.42 refund is `137.42 × 100`. Verified:
+  a ₴4.50 charge refunded as `1.37`, `0.10`, then `3.03` (× 100). The quantity is fractional; monobank's
+  developers say quantities should be whole, and whether every fiscal receipt service (e.g. Checkbox)
+  accepts a fractional quantity could not be checked on the test merchant (it issues no receipts).
+- **One kopiyka per unit** (quantity always whole): `sum` = 1 and `qty` = the amount in kopiyky.
+  ₴450.00 is `45000 × 1`; a ₴137.42 refund is `13742 × 1`. Verified: refunded as `13742`, `1000`, then
+  `30258` (× 1). The receipt shows a unit price of ₴0.01.
 
 ```kotlin
-val amount = 45_000L // ₴450.00
-val line = BasketItem.builder("Pro plan, November", BigDecimal.valueOf(amount), 1, "pro-monthly")
+val amount = 45_000L // ₴450.00, in kopiyky
+// one hryvnia per unit: qty 450.00 × sum 100
+val line = BasketItem.builder("Pro plan, November", BigDecimal.valueOf(amount, 2), 100, "pro-monthly")
     .splitReceiverId(receiverId).build()
-// refund ₴137.42 later:
+// refund ₴137.42 later: qty 137.42 × sum 100
 CancelInvoiceRequest.builder(invoiceId).amount(13_742).extRef(refundId)
-    .items(listOf(FiscalizationItem.builder("Pro plan, November", BigDecimal.valueOf(13_742), 1, "pro-monthly")
+    .items(listOf(FiscalizationItem.builder("Pro plan, November", BigDecimal.valueOf(13_742, 2), 100, "pro-monthly")
         .splitReceiverId(receiverId).build()))
     .build()
+// one kopiyka per unit instead: BigDecimal.valueOf(amount) with sum 1, and BigDecimal.valueOf(13_742) with sum 1
 ```
 
 Payments made on monobank's payment page or with `payment-direct` can also be refunded without `items`.
@@ -231,7 +240,7 @@ are **never** retried after an unknown outcome.
    `currentPublicKey()` returns the key in use.
 3. **Charge a saved card**: `mono.wallet.payment(WalletPaymentRequest.builder(cardToken, amount, CurrencyCodes.UAH, InitiationKind.MERCHANT).build())`.
    If `isThreeDsRequired`, send the customer to `tdsUrl`; the result comes by webhook or status.
-   Charge in UAH, and on fiscal or split merchants use the kopiyka basket line (see above) if you
+   Charge in UAH, and on fiscal or split merchants use a one-hryvnia or one-kopiyka basket line (see above) if you
    will refund arbitrary amounts.
 4. **Holds**: `paymentType(PaymentType.HOLD)`, then `invoices.finalize(FinalizeInvoiceRequest.of(invoiceId, amount))`
    within 9 days, or `invoices.cancel(...)` to release.

@@ -34,7 +34,8 @@ see the README's migration section.
 - Use UAH with merchant acquiring. USD/EUR payments are converted to UAH; saved-card charges in
   USD/EUR cannot be fully refunded (monobank bug, reported).
 - On fiscal or split merchants every refund of a saved-card payment needs `items` matching the paid
-  basket exactly; a basket line in kopiyky (`qty` = amount, `sum` 1) allows refunds of any amount.
+  basket exactly; a basket line priced per hryvnia (`sum` 100, `qty` with two decimals) or per kopiyka
+  (`sum` 1, whole `qty`) allows refunds of any amount.
   README and `InvoiceApi.cancel` describe the rules.
 
 ### Changed (from app.spilki 0.0.x)
