@@ -2,6 +2,7 @@ package io.github.damienmiheev.monobank.acquiring
 
 import io.github.damienmiheev.monobank.core.MonobankClientOptions
 import io.github.damienmiheev.monobank.core.Redaction
+import java.time.Duration
 
 /**
  * Settings for [MonobankAcquiring].
@@ -13,15 +14,19 @@ import io.github.damienmiheev.monobank.core.Redaction
  * @property cmsName Optional `X-Cms` header: the name of your CMS or platform.
  * @property cmsVersion Optional `X-Cms-Version` header.
  * @property options Transport settings: host override, timeouts, retries, custom HTTP client.
+ * @property webhookKeyRefreshInterval Minimum time between two webhook key fetches triggered by a
+ *   signature that does not verify (default 1 minute). Tests that rotate keys can lower it.
  */
 public class AcquiringConfig private constructor(
     public val token: String,
     public val cmsName: String?,
     public val cmsVersion: String?,
     public val options: MonobankClientOptions,
+    public val webhookKeyRefreshInterval: Duration,
 ) {
     override fun toString(): String =
-        "AcquiringConfig(token=***, cmsName=$cmsName, cmsVersion=$cmsVersion, options=$options)"
+        "AcquiringConfig(token=***, cmsName=$cmsName, cmsVersion=$cmsVersion, options=$options, " +
+            "webhookKeyRefreshInterval=$webhookKeyRefreshInterval)"
 
     /** Builder for [AcquiringConfig]. */
     public class Builder internal constructor(
@@ -30,6 +35,7 @@ public class AcquiringConfig private constructor(
         private var cmsName: String? = null
         private var cmsVersion: String? = null
         private var options: MonobankClientOptions = MonobankClientOptions.DEFAULT
+        private var webhookKeyRefreshInterval: Duration = Duration.ofMinutes(1)
 
         /** Sets the `X-Cms` header. */
         public fun cmsName(cmsName: String?): Builder =
@@ -45,8 +51,16 @@ public class AcquiringConfig private constructor(
         /** Sets transport options. */
         public fun options(options: MonobankClientOptions): Builder = apply { this.options = options }
 
+        /** Minimum time between webhook key re-fetches (default 1 minute; zero allowed in tests). */
+        public fun webhookKeyRefreshInterval(interval: Duration): Builder =
+            apply {
+                require(!interval.isNegative) { "webhookKeyRefreshInterval must not be negative" }
+                webhookKeyRefreshInterval = interval
+            }
+
         /** Builds the config. */
-        public fun build(): AcquiringConfig = AcquiringConfig(token, cmsName, cmsVersion, options)
+        public fun build(): AcquiringConfig =
+            AcquiringConfig(token, cmsName, cmsVersion, options, webhookKeyRefreshInterval)
     }
 
     public companion object {

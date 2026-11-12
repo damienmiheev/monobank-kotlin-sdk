@@ -256,3 +256,21 @@ class WebhookVerifierTest : AcquiringTestSupport() {
         assertThat(WebhookParser.parse(String(docsBody)).invoiceId).isEqualTo("p2_9ZgpZVsl3")
     }
 }
+
+class FacadeWebhookRefreshIntervalTest {
+    @Test
+    fun `the facade verifier uses the configured refresh interval`() {
+        val config =
+            io.github.damienmiheev.monobank.acquiring.AcquiringConfig
+                .builder("t")
+                .webhookKeyRefreshInterval(Duration.ZERO)
+                .build()
+        assertThat(config.webhookKeyRefreshInterval).isZero()
+        assertThat(config.toString()).doesNotContain("=t,").contains("webhookKeyRefreshInterval=PT0S")
+        assertThatThrownBy {
+            io.github.damienmiheev.monobank.acquiring.AcquiringConfig
+                .builder("t")
+                .webhookKeyRefreshInterval(Duration.ofSeconds(-1))
+        }.isInstanceOf(IllegalArgumentException::class.java)
+    }
+}

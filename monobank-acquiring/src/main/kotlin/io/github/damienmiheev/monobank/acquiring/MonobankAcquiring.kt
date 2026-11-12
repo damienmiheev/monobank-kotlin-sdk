@@ -1,3 +1,5 @@
+@file:Suppress("DEPRECATION") // wires the deprecated legacy EmployeeApi on purpose
+
 package io.github.damienmiheev.monobank.acquiring
 
 import io.github.damienmiheev.monobank.acquiring.employee.EmployeeApi
@@ -71,7 +73,12 @@ public class MonobankAcquiring internal constructor(
      * see [WebhookVerifier] for the single-fetch and back-off rules.
      */
     public val webhooks: WebhookVerifier =
-        MerchantApi(keyHttp).let { keyApi -> WebhookVerifier(WebhookKeyProvider { keyApi.publicKey().key }) }
+        MerchantApi(keyHttp).let { keyApi ->
+            WebhookVerifier
+                .builder(WebhookKeyProvider { keyApi.publicKey().key })
+                .minRefreshInterval(config.webhookKeyRefreshInterval)
+                .build()
+        }
 
     override fun toString(): String = "MonobankAcquiring($config)"
 
