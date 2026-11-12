@@ -1,9 +1,16 @@
 package io.github.damienmiheev.monobank.acquiring.invoice
 
 import io.github.damienmiheev.monobank.acquiring.internal.AcquiringHttp
+import io.github.damienmiheev.monobank.core.MonobankSerializationException
+import io.github.damienmiheev.monobank.core.RequestOutcome
 
 /**
- * Invoices: create, check, refund, hold/finalize.
+ * Invoices: create, check, refund, hold/finalize, direct and synchronous payments, receipts.
+ *
+ * Retries: reads (status, receipt without email, fiscal checks) are retried after a server error
+ * or timeout. Everything that changes state is retried only when the request provably never
+ * reached monobank or was rate-limited; after an unknown outcome the SDK throws, and you
+ * reconcile first (see `MerchantApi.findByReference`).
  */
 public class InvoiceApi internal constructor(
     private val http: AcquiringHttp,
@@ -12,11 +19,13 @@ public class InvoiceApi internal constructor(
      * Creates an invoice and returns the payment page URL.
      *
      * `POST /api/merchant/invoice/create`. Not retried after an unknown outcome: if this throws
-     * with `RequestOutcome.UNKNOWN`, look the payment up by `merchantPaymInfo.reference` before
-     * creating another invoice.
+     * with `RequestOutcome.UNKNOWN`, look the payment up by `merchantPaymInfo.reference` (see
+     * `MerchantApi.findByReference`) before creating another invoice.
+     *
+     * To save a card without charging it, use `CreateInvoiceRequest.verification(walletId)`.
      */
     public fun create(request: CreateInvoiceRequest): CreateInvoiceResponse =
-        http.post("/api/merchant/invoice/create", request, CreateInvoiceResponse::class.java, idempotent = false)
+        http.post(INVOICE + "create", request, CreateInvoiceResponse::class.java, idempotent = false)
 
     /**
      * Current state of an invoice. Use it to recover from missed webhooks.
@@ -24,11 +33,121 @@ public class InvoiceApi internal constructor(
      * `GET /api/merchant/invoice/status`. Safe to retry.
      */
     public fun status(invoiceId: String): InvoiceStatusResponse {
-        require(invoiceId.isNotBlank()) { "invoiceId must not be blank" }
-        return http.get(
-            "/api/merchant/invoice/status",
-            InvoiceStatusResponse::class.java,
-            query = listOf("invoiceId" to invoiceId),
-        )
+        requireId(invoiceId, "invoiceId")
+        return http.get(INVOICE + "status", InvoiceStatusResponse::class.java, query = listOf("invoiceId" to invoiceId))
+    }
+
+    /**
+     * Refunds a successful payment (fully, or partly with `amount`), or releases a hold.
+     *
+     * `POST /api/merchant/invoice/cancel`. Not retried after an unknown outcome. The refund is
+     * usually [io.github.damienmiheev.monobank.acquiring.common.OperationStatus.PROCESSING]: follow
+     * it with `status(invoiceId).cancelFor(extRef)` or webhooks. A refund that is impossible fails
+     * with HTTP 500 `CANCEL_NOT_AVAILABLE`, whose outcome is `RequestOutcome.REJECTED`.
+     */
+    public fun cancel(request: CancelInvoiceRequest): CancelInvoiceResponse =
+        http.post(INVOICE + "cancel", request, CancelInvoiceResponse::class.java, idempotent = false)
+
+    /**
+     * Invalidates an invoice that has not been paid yet, so it can no longer be paid.
+     *
+     * `POST /api/merchant/invoice/remove`. Not retried after an unknown outcome (a repeated call
+     * may fail although the first one worked). Fails with a `MonobankApiException` if the invoice
+     * was already paid or does not exist.
+     */
+    public fun remove(invoiceId: String) {
+        requireId(invoiceId, "invoiceId")
+        http.postNoContent(INVOICE + "remove", InvoiceIdRequest(invoiceId), idempotent = false)
+    }
+
+    /**
+     * Captures (finalizes) a hold, fully or partly.
+     *
+     * `POST /api/merchant/invoice/finalize`. Not retried after an unknown outcome; check
+     * `status(invoiceId)` before finalizing again.
+     */
+    public fun finalize(request: FinalizeInvoiceRequest): FinalizeInvoiceResponse =
+        http.post(INVOICE + "finalize", request, FinalizeInvoiceResponse::class.java, idempotent = false)
+
+    /**
+     * Creates and pays an invoice with raw card data (PCI DSS certified merchants only). Handle
+     * [PaymentResponse.tdsUrl] for 3-D Secure.
+     *
+     * `POST /api/merchant/invoice/payment-direct`. A payment: never retried after an unknown outcome.
+     */
+    public fun paymentDirect(request: PaymentDirectRequest): PaymentResponse =
+        http.post(INVOICE + "payment-direct", request, PaymentResponse::class.java, idempotent = false)
+
+    /**
+     * Pays synchronously with card data or decrypted Apple Pay / Google Pay data (access via
+     * monobank support). Returns the invoice state.
+     *
+     * `POST /api/merchant/invoice/sync-payment`. This is a payment, **not** a status lookup:
+     * calling it again charges again. Never retried after an unknown outcome.
+     */
+    public fun syncPayment(request: SyncPaymentRequest): InvoiceStatusResponse =
+        http.post(INVOICE + "sync-payment", request, InvoiceStatusResponse::class.java, idempotent = false)
+
+    /**
+     * The payment receipt as PDF bytes.
+     *
+     * `GET /api/merchant/invoice/receipt`. Safe to retry.
+     *
+     * @throws MonobankSerializationException when monobank returned no file or a broken one.
+     */
+    public fun receipt(invoiceId: String): ByteArray {
+        requireId(invoiceId, "invoiceId")
+        val wire = http.get(INVOICE + "receipt", ReceiptWire::class.java, query = listOf("invoiceId" to invoiceId))
+        val file =
+            wire.file ?: throw MonobankSerializationException(
+                "monobank returned a receipt without a file",
+                null,
+                RequestOutcome.UNKNOWN,
+            )
+        return Base64Pdf.decode(file)
+    }
+
+    /**
+     * Emails the payment receipt to [email] and returns the PDF bytes when monobank includes them.
+     *
+     * `GET /api/merchant/invoice/receipt?email=`. It sends an email, so it is **not** retried after
+     * an unknown outcome (a retry could send the receipt twice).
+     */
+    public fun sendReceipt(
+        invoiceId: String,
+        email: String,
+    ): ByteArray? {
+        requireId(invoiceId, "invoiceId")
+        require(email.isNotBlank()) { "email must not be blank" }
+        val wire =
+            http.get(
+                INVOICE + "receipt",
+                ReceiptWire::class.java,
+                query = listOf("invoiceId" to invoiceId, "email" to email),
+                idempotent = false,
+            )
+        return wire.file?.let { Base64Pdf.decode(it) }
+    }
+
+    /**
+     * Fiscal checks (receipts registered with the tax service) of an invoice.
+     *
+     * `GET /api/merchant/invoice/fiscal-checks`. Safe to retry.
+     */
+    public fun fiscalChecks(invoiceId: String): List<FiscalCheck> {
+        requireId(invoiceId, "invoiceId")
+        return http
+            .get(INVOICE + "fiscal-checks", FiscalChecksWire::class.java, query = listOf("invoiceId" to invoiceId))
+            .checks
+            .orEmpty()
+    }
+
+    private companion object {
+        const val INVOICE = "/api/merchant/invoice/"
+
+        fun requireId(
+            value: String,
+            name: String,
+        ) = require(value.isNotBlank()) { "$name must not be blank" }
     }
 }

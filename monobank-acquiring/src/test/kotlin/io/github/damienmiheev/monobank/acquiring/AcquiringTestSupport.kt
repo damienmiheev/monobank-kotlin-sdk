@@ -1,8 +1,10 @@
 package io.github.damienmiheev.monobank.acquiring
 
+import com.fasterxml.jackson.databind.JsonNode
 import io.github.damienmiheev.monobank.acquiring.internal.AcquiringHttp
 import io.github.damienmiheev.monobank.core.MonobankClientOptions
 import io.github.damienmiheev.monobank.core.RetryPolicy
+import io.github.damienmiheev.monobank.core.json.MonobankJson
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import okhttp3.mockwebserver.RecordedRequest
@@ -65,6 +67,23 @@ abstract class AcquiringTestSupport {
         assertThat(request.getHeader("X-Cms-Version")).isEqualTo("1.2.3")
         return request
     }
+
+    /** Takes the next request, checks the common headers, method and path (without query). */
+    protected fun takeRequest(
+        method: String,
+        path: String,
+    ): RecordedRequest {
+        val request = takeRequest()
+        assertThat(request.method).isEqualTo(method)
+        assertThat(request.requestUrl!!.encodedPath).isEqualTo(path)
+        return request
+    }
+
+    /** The request body parsed as JSON. */
+    protected fun RecordedRequest.json(): JsonNode = MonobankJson.mapper.readTree(body.readUtf8())
+
+    /** A query parameter of the request, decoded. */
+    protected fun RecordedRequest.query(name: String): String? = requestUrl!!.queryParameter(name)
 
     companion object {
         const val TOKEN = "test-token-123"

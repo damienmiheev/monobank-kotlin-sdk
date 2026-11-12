@@ -74,6 +74,7 @@ public class WebhookVerifier
 
         private class KeySet(
             val current: PublicKey,
+            val currentRaw: String,
             val previous: PublicKey?,
             val fetchedAt: Instant,
         )
@@ -97,6 +98,14 @@ public class WebhookVerifier
                 else -> VerificationResult.INVALID_SIGNATURE
             }
         }
+
+        /**
+         * The current webhook public key exactly as the [WebhookKeyProvider] returned it (for the
+         * default provider: base64 of a PEM, as `GET /api/merchant/pubkey` returns it), loading it
+         * on first use. Returns `null` when the key cannot be loaded. Useful to hand the key to
+         * another service that verifies webhooks itself.
+         */
+        public fun currentPublicKey(): String? = (keys ?: refresh(force = true).keys)?.currentRaw
 
         /** `true` only when [check] is [VerificationResult.VALID]. */
         public fun verify(
@@ -171,9 +180,11 @@ public class WebhookVerifier
                         return Refresh(cached, fetchFailed = false)
                     }
                 }
+                var raw = ""
                 val fetched =
                     try {
-                        parsePublicKey(keyProvider.fetchPublicKey())
+                        raw = keyProvider.fetchPublicKey()
+                        parsePublicKey(raw)
                     } catch (e: MonobankException) {
                         logger.warn("Could not load monobank webhook public key: {}", e.message)
                         null
@@ -190,9 +201,9 @@ public class WebhookVerifier
                 if (fetched == null) return Refresh(cached, fetchFailed = true)
                 val updated =
                     if (cached != null && cached.current.encoded.contentEquals(fetched.encoded)) {
-                        KeySet(cached.current, cached.previous, clock.instant())
+                        KeySet(cached.current, raw.trim(), cached.previous, clock.instant())
                     } else {
-                        KeySet(fetched, cached?.current, clock.instant())
+                        KeySet(fetched, raw.trim(), cached?.current, clock.instant())
                     }
                 keys = updated
                 Refresh(updated, fetchFailed = false)
@@ -207,14 +218,13 @@ public class WebhookVerifier
              */
             @JvmStatic
             public fun ofPublicKey(publicKey: String): WebhookVerifier {
-                val parsed =
-                    try {
-                        parsePublicKey(publicKey)
-                    } catch (e: GeneralSecurityException) {
-                        throw IllegalArgumentException("Not an EC public key: ${e.message}", e)
-                    }
-                val encoded = Base64.getEncoder().encodeToString(parsed.encoded)
-                return WebhookVerifier(WebhookKeyProvider { encoded }, Duration.ofDays(DAYS_FOREVER))
+                try {
+                    parsePublicKey(publicKey)
+                } catch (e: GeneralSecurityException) {
+                    throw IllegalArgumentException("Not an EC public key: ${e.message}", e)
+                }
+                val fixed = publicKey.trim()
+                return WebhookVerifier(WebhookKeyProvider { fixed }, Duration.ofDays(DAYS_FOREVER))
             }
 
             private const val DAYS_FOREVER = 36_500L

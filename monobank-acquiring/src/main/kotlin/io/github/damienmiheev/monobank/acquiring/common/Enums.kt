@@ -40,6 +40,12 @@ public enum class InvoiceStatus(
     /** `true` when the status can no longer change except through a refund ([SUCCESS] → [REVERSED]). */
     public val isFinal: Boolean
         get() = this == SUCCESS || this == FAILURE || this == REVERSED || this == EXPIRED
+
+    public companion object {
+        /** Parses a wire value; an unknown value or `null` gives [UNKNOWN]. */
+        @JvmStatic
+        public fun fromValue(value: String?): InvoiceStatus = entries.firstOrNull { it.value == value } ?: UNKNOWN
+    }
 }
 
 /**
@@ -53,19 +59,26 @@ public enum class PaymentType(
     /** Charge immediately (default). */
     DEBIT("debit"),
 
-    /** Hold the amount for up to 9 days; then finalize or cancel. UAH only. */
+    /**
+     * Hold (authorise) the amount for up to 9 days; then finalize it with `InvoiceApi.finalize` or
+     * release it with `InvoiceApi.cancel`. A hold that is not finalized within 9 days is cancelled
+     * automatically. Works only with UAH (`ccy` 980).
+     */
     HOLD("hold"),
 
-    /** Verify (and save) a card without charging it. */
+    /**
+     * Verify and save a card without charging it ("add payment method"): only for `invoice/create`,
+     * with amount `0` and `saveCardData.saveCard = true`. Use `CreateInvoiceRequest.verification`.
+     */
     VERIFICATION("verification"),
 
-    /** A value this SDK version does not know. */
+    /** A value this SDK version does not know. Never sent: request builders reject it. */
     @JsonEnumDefaultValue
     UNKNOWN("unknown"),
 }
 
 /**
- * Status of a refund (cancel) or finalize request.
+ * Status of a refund (cancel), a finalize request, or a payment by card token / card data.
  *
  * @property value Wire value.
  */
@@ -84,6 +97,13 @@ public enum class OperationStatus(
     /** A value this SDK version does not know. */
     @JsonEnumDefaultValue
     UNKNOWN("unknown"),
+    ;
+
+    public companion object {
+        /** Parses a wire value; an unknown value or `null` gives [UNKNOWN]. */
+        @JvmStatic
+        public fun fromValue(value: String?): OperationStatus = entries.firstOrNull { it.value == value } ?: UNKNOWN
+    }
 }
 
 /**
@@ -103,6 +123,13 @@ public enum class PaymentSystem(
     /** A value this SDK version does not know. */
     @JsonEnumDefaultValue
     UNKNOWN("unknown"),
+    ;
+
+    public companion object {
+        /** Parses a wire value; an unknown value or `null` gives [UNKNOWN]. */
+        @JvmStatic
+        public fun fromValue(value: String?): PaymentSystem = entries.firstOrNull { it.value == value } ?: UNKNOWN
+    }
 }
 
 /**
@@ -134,6 +161,13 @@ public enum class PaymentMethod(
     /** A value this SDK version does not know. */
     @JsonEnumDefaultValue
     UNKNOWN("unknown"),
+    ;
+
+    public companion object {
+        /** Parses a wire value; an unknown value or `null` gives [UNKNOWN]. */
+        @JvmStatic
+        public fun fromValue(value: String?): PaymentMethod = entries.firstOrNull { it.value == value } ?: UNKNOWN
+    }
 }
 
 /**
@@ -156,6 +190,13 @@ public enum class CardTokenStatus(
     /** A value this SDK version does not know. */
     @JsonEnumDefaultValue
     UNKNOWN("unknown"),
+    ;
+
+    public companion object {
+        /** Parses a wire value; an unknown value or `null` gives [UNKNOWN]. */
+        @JvmStatic
+        public fun fromValue(value: String?): CardTokenStatus = entries.firstOrNull { it.value == value } ?: UNKNOWN
+    }
 }
 
 /**
