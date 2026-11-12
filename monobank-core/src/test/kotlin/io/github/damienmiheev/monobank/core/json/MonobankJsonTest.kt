@@ -119,3 +119,43 @@ class MonobankJsonPrimitivesTest {
         assertThat(MonobankJson.read("""{"amount":0}""".toByteArray(), Money::class.java).amount).isZero()
     }
 }
+
+class MonobankJsonLeakTest {
+    class Payment
+        @com.fasterxml.jackson.annotation.JsonCreator
+        constructor(
+            @param:com.fasterxml.jackson.annotation.JsonProperty("cardToken") val cardToken: String?,
+            @param:com.fasterxml.jackson.annotation.JsonProperty("amount") val amount: Long,
+        )
+
+    private fun chain(e: Throwable): String =
+        generateSequence(e) {
+            it.cause
+        }.joinToString(" | ") { "${it.javaClass.name}: ${it.message}" }
+
+    @Test
+    fun `decoding errors never quote the body`() {
+        val secret = "tok-SECRET-4444333322221111"
+        val bodies =
+            listOf(
+                """{"cardToken":"$secret"}""", // missing amount
+                """{"cardToken":"$secret","amount":"$secret"}""", // wrong type
+                """{"cardToken":"$secret","amount":1""", // truncated
+                """{"cardToken":"$secret","amount":100.5}""", // fraction
+                """not json $secret""",
+            )
+        bodies.forEach { body ->
+            assertThatThrownBy { MonobankJson.read(body.toByteArray(), Payment::class.java) }
+                .isInstanceOfSatisfying(MonobankSerializationException::class.java) {
+                    assertThat(chain(it)).doesNotContain(secret).doesNotContain("4444")
+                }
+        }
+    }
+
+    @Test
+    fun `fractional amounts are rejected`() {
+        assertThatThrownBy { MonobankJson.read("""{"amount":100.5}""".toByteArray(), Payment::class.java) }
+            .isInstanceOf(MonobankSerializationException::class.java)
+            .hasMessageContaining("amount")
+    }
+}

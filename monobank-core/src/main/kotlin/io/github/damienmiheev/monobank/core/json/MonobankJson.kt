@@ -5,10 +5,12 @@ import com.fasterxml.jackson.core.JsonGenerator
 import com.fasterxml.jackson.core.JsonParser
 import com.fasterxml.jackson.core.JsonProcessingException
 import com.fasterxml.jackson.core.JsonToken
+import com.fasterxml.jackson.core.StreamReadFeature
 import com.fasterxml.jackson.core.type.TypeReference
 import com.fasterxml.jackson.databind.DeserializationContext
 import com.fasterxml.jackson.databind.DeserializationFeature
 import com.fasterxml.jackson.databind.JsonDeserializer
+import com.fasterxml.jackson.databind.JsonMappingException
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.JsonSerializer
 import com.fasterxml.jackson.databind.MapperFeature
@@ -47,6 +49,10 @@ public object MonobankJson {
             .disable(DeserializationFeature.ADJUST_DATES_TO_CONTEXT_TIME_ZONE)
             .disable(SerializationFeature.FAIL_ON_EMPTY_BEANS)
             .disable(MapperFeature.AUTO_DETECT_IS_GETTERS)
+            // "amount": 100.5 must fail, not become 100.
+            .disable(DeserializationFeature.ACCEPT_FLOAT_AS_INT)
+            // Jackson would otherwise copy parts of the body (card tokens, personal data) into error messages.
+            .disable(StreamReadFeature.INCLUDE_SOURCE_IN_LOCATION)
             .defaultPropertyInclusion(
                 JsonInclude.Value.construct(JsonInclude.Include.NON_NULL, JsonInclude.Include.NON_NULL),
             ).addModule(timeModule())
@@ -58,8 +64,8 @@ public object MonobankJson {
             mapper.writeValueAsBytes(value)
         } catch (e: JsonProcessingException) {
             throw MonobankSerializationException(
-                "Could not encode ${value.javaClass.simpleName} as JSON",
-                e,
+                "Could not encode ${value.javaClass.simpleName} as JSON: ${describe(e)}",
+                null,
                 RequestOutcome.NOT_SENT,
             )
         }
@@ -94,16 +100,40 @@ public object MonobankJson {
         } catch (e: MonobankSerializationException) {
             throw e
         } catch (e: IOException) {
-            throw MonobankSerializationException("Could not decode monobank response as $what", e, outcome)
+            throw MonobankSerializationException(
+                "Could not decode monobank response as $what: ${describe(e)}",
+                null,
+                outcome,
+            )
         } catch (
             @Suppress("TooGenericExceptionCaught") e: RuntimeException,
         ) {
             // Kotlin null checks on non-null constructor parameters, date parsing, unexpected shapes.
             throw MonobankSerializationException(
-                "Could not decode monobank response as $what: ${e.message}",
-                e,
+                "Could not decode monobank response as $what: ${describe(e)}",
+                null,
                 outcome,
             )
+        }
+
+    /**
+     * Describes a decoding failure WITHOUT any value from the body: Jackson and JDK messages quote
+     * the offending value (which may be a card token or personal data), so the cause is not kept.
+     * Only the exception type and the JSON path or position are reported.
+     */
+    private fun describe(e: Exception): String =
+        when (e) {
+            is JsonMappingException -> {
+                "${e.javaClass.simpleName} at ${e.pathReference}"
+            }
+
+            is JsonProcessingException -> {
+                "${e.javaClass.simpleName} at line ${e.location?.lineNr ?: -1}, column ${e.location?.columnNr ?: -1}"
+            }
+
+            else -> {
+                e.javaClass.simpleName
+            }
         }
 
     /** "Europe/Kyiv" exists only in tzdata 2022b+ (JDK 11.0.17+); older JDKs know "Europe/Kiev". */
