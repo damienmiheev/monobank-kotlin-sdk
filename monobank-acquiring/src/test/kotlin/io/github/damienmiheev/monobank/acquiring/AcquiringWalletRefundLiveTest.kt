@@ -206,4 +206,160 @@ class AcquiringWalletRefundLiveTest {
             log("statement: amount=${it.amount} ccy=${it.ccy} refunds=${it.cancelList?.map { c -> c.amount }}")
         }
     }
+
+    /**
+     * Saved card (one 3-D Secure confirmation), then: A) 1.00 EUR charge WITHOUT a basket, refunded
+     * partly and then fully; B) 50.00 UAH charge with a one-unit basket (qty = amount, sum 100),
+     * refunded partly with a matching item.
+     */
+    @Test
+    fun `saved-card charges - EUR without basket, UAH control`() {
+        val token = System.getenv("MONOBANK_ACQUIRING_TEST_TOKEN")
+        assumeTrue(!token.isNullOrBlank(), "MONOBANK_ACQUIRING_TEST_TOKEN is not set")
+        assumeTrue(
+            System.getenv("MONOBANK_LIVE_SAVED_CARD_RUN") == "true",
+            "MONOBANK_LIVE_SAVED_CARD_RUN=true is not set",
+        )
+        val mono = MonobankAcquiring.create(token!!)
+        val receiver =
+            mono.split
+                .receivers()
+                .firstOrNull()
+                ?.id
+        val started = Instant.now().minusSeconds(300)
+        val savedToken = saveCard(mono, receiver) ?: return
+
+        log("--- A: 1.00 EUR saved-card charge without basket")
+        val a =
+            try {
+                mono.wallet.payment(
+                    WalletPaymentRequest
+                        .builder(savedToken, 100, 978, InitiationKind.MERCHANT)
+                        .merchantPaymInfo(
+                            MerchantPaymInfo
+                                .builder()
+                                .reference(ref())
+                                .destination("SDK no-basket test")
+                                .build(),
+                        ).build(),
+                )
+            } catch (e: MonobankApiException) {
+                log("A refused: HTTP ${e.statusCode} ${e.errorCode} ${e.errorText}")
+                null
+            }
+        if (a != null) {
+            log("A ${a.invoiceId}: ${settled(mono, a.invoiceId)}")
+            refund(mono, a.invoiceId, "A partial 2019 no items") { it.amount(2019) }
+            refund(mono, a.invoiceId, "A rest: no amount, no items") { it }
+            refund(mono, a.invoiceId, "A rest: amount 3029, no items") { it.amount(3029) }
+        }
+
+        log("--- B: 50.00 UAH saved-card charge with a one-unit basket")
+
+        fun line(qty: String) =
+            FiscalizationItem.builder(name, BigDecimal(qty), 100, code).splitReceiverId(receiver).build()
+        val b =
+            mono.wallet.payment(
+                WalletPaymentRequest
+                    .builder(savedToken, 5000, 980, InitiationKind.MERCHANT)
+                    .merchantPaymInfo(
+                        MerchantPaymInfo
+                            .builder()
+                            .reference(ref())
+                            .destination("SDK UAH control")
+                            .basketOrder(
+                                listOf(
+                                    BasketItem
+                                        .builder(
+                                            name,
+                                            BigDecimal("50"),
+                                            100,
+                                            code,
+                                        ).splitReceiverId(receiver)
+                                        .build(),
+                                ),
+                            ).build(),
+                    ).build(),
+            )
+        log("B ${b.invoiceId}: ${settled(mono, b.invoiceId)}")
+        refund(
+            mono,
+            b.invoiceId,
+            "B partial 20.19 items qty 20.19 x sum 100",
+        ) { it.amount(2019).items(listOf(line("20.19"))) }
+        refund(mono, b.invoiceId, "B partial 10.00 no items") { it.amount(1000) }
+        mono.merchant
+            .statement(
+                started,
+            ).filter { it.invoiceId == a?.invoiceId || it.invoiceId == b.invoiceId }
+            .forEach {
+                log(
+                    "statement ${it.invoiceId}: amount=${it.amount} ccy=${it.ccy} refunds=${it.cancelList?.map { c ->
+                        c.amount
+                    }}",
+                )
+            }
+        runCatching { mono.wallet.deleteCard(savedToken) }
+    }
+
+    private fun ref() = "sdk-wallet-" + UUID.randomUUID().toString().take(8)
+
+    private fun settled(
+        mono: MonobankAcquiring,
+        invoiceId: String,
+    ): String {
+        var s = mono.invoices.status(invoiceId)
+        repeat(40) {
+            if (s.status.isFinal) return@repeat
+            Thread.sleep(1_500)
+            s = mono.invoices.status(invoiceId)
+        }
+        return "status=${s.statusRaw} amount=${s.amount} ccy=${s.ccy}"
+    }
+
+    private fun saveCard(
+        mono: MonobankAcquiring,
+        receiver: String?,
+    ): String? {
+        val walletId = "sdk-live-wallet-" + UUID.randomUUID().toString().take(8)
+        val first =
+            mono.invoices.paymentDirect(
+                PaymentDirectRequest
+                    .builder(
+                        100,
+                        CardData.of("4242424242424242", "1230", "123"),
+                        InitiationKind.CLIENT,
+                        "https://shop.example/r",
+                    ).saveCardData(SaveCardData.saveTo(walletId))
+                    .merchantPaymInfo(
+                        MerchantPaymInfo
+                            .builder()
+                            .reference(ref())
+                            .destination("SDK save card")
+                            .basketOrder(
+                                listOf(
+                                    BasketItem
+                                        .builder(
+                                            name,
+                                            BigDecimal.ONE,
+                                            100,
+                                            code,
+                                        ).splitReceiverId(receiver)
+                                        .build(),
+                                ),
+                            ).build(),
+                    ).build(),
+            )
+        first.tdsUrl?.let { log("3-D Secure: open and CONFIRM: $it") }
+        repeat(120) {
+            val wallet = mono.invoices.status(first.invoiceId).walletData
+            if (wallet?.status == CardTokenStatus.CREATED && wallet.cardToken != null) {
+                log("card saved")
+                return wallet.cardToken
+            }
+            Thread.sleep(1_500)
+        }
+        log("no card token after waiting")
+        return null
+    }
 }
