@@ -27,7 +27,18 @@ import io.github.damienmiheev.monobank.acquiring.subscription.SubscriptionListIt
 import io.github.damienmiheev.monobank.acquiring.subscription.SubscriptionListQuery;
 import io.github.damienmiheev.monobank.acquiring.wallet.WalletCard;
 import io.github.damienmiheev.monobank.acquiring.wallet.WalletPaymentRequest;
+import io.github.damienmiheev.monobank.acquiring.webhook.VerificationResult;
+import io.github.damienmiheev.monobank.acquiring.webhook.WebhookKeyProvider;
+import io.github.damienmiheev.monobank.acquiring.webhook.WebhookParser;
 import io.github.damienmiheev.monobank.acquiring.webhook.WebhookVerifier;
+import io.github.damienmiheev.monobank.acquiring.employee.Employee;
+import io.github.damienmiheev.monobank.acquiring.monopay.ImportMonopayKeyRequest;
+import io.github.damienmiheev.monobank.acquiring.monopay.ImportedMonopayKey;
+import io.github.damienmiheev.monobank.acquiring.pos.PosRefundRequest;
+import io.github.damienmiheev.monobank.acquiring.pos.ResponseLanguage;
+import io.github.damienmiheev.monobank.acquiring.subscription.EditSubscriptionRequest;
+import io.github.damienmiheev.monobank.acquiring.terminal.T2pPaymentStatus;
+import io.github.damienmiheev.monobank.acquiring.terminal.T2pPaymentStatusResponse;
 import io.github.damienmiheev.monobank.core.CurrencyCodes;
 import io.github.damienmiheev.monobank.core.MonobankClientOptions;
 import io.github.damienmiheev.monobank.core.MonobankServerException;
@@ -208,12 +219,66 @@ class JavaPluginFlowsTest {
         Page<SubscriptionListItem> page = mono.getSubscriptions().list(
                 SubscriptionListQuery.builder(OffsetDateTime.parse("2024-01-01T00:00:00+02:00")).limit(20).build());
         assertThat(page.getItems()).isEmpty();
-        assertThat(page.getHasNextPage()).isFalse();
+        assertThat(page.hasNextPage()).isFalse();
 
         KeyPairGenerator generator = KeyPairGenerator.getInstance("EC");
         generator.initialize(new ECGenParameterSpec("secp256r1"));
         MonopaySignedRequest signed = MonopaySigner.of(generator.generateKeyPair().getPrivate())
                 .sign("{\"amount\":100}", "req-1");
         assertThat(signed.getPayloadBase64()).isNotEmpty();
+    }
+
+    @Test
+    @SuppressWarnings("deprecation")
+    void overloadsAndOtherApisFromJava() throws Exception {
+        enqueue(200, "{\"status\":\"ok\",\"tranId\":\"t1\"}");
+        assertThat(mono.getPosRefunds().create(PosRefundRequest.of("rrn-1", 100L)).getStatus()).isEqualTo("ok");
+        assertThat(server.takeRequest().getHeader("Accept-Language")).isEqualTo("uk");
+        enqueue(200, "{\"status\":\"ok\"}");
+        mono.getPosRefunds().create(PosRefundRequest.of("rrn-1", 100L), ResponseLanguage.EN);
+        assertThat(server.takeRequest().getHeader("Accept-Language")).isEqualTo("en");
+
+        assertThat(EditSubscriptionRequest.cancel("s1").getRefundAmount()).isNull();
+        assertThat(EditSubscriptionRequest.cancel("s1", 100L).getRefundAmount()).isEqualTo(100L);
+
+        assertThat(ImportMonopayKeyRequest.of("a2V5").getKeyName()).isNull();
+        assertThat(ImportMonopayKeyRequest.of("a2V5", "my_key").getKeyName()).isEqualTo("my_key");
+        assertThat(ImportMonopayKeyRequest.of("a2V5", "my_key", OffsetDateTime.parse("2026-02-02T15:04:05+03:00"))
+                .getExpiresAt()).isNotNull();
+        enqueue(200, "{\"result\":{\"keyId\":\"k1\"}}");
+        ImportedMonopayKey imported = mono.getMonopay().importKey(ImportMonopayKeyRequest.of("a2V5"));
+        assertThat(imported.getKeyId()).isEqualTo("k1");
+        server.takeRequest();
+
+        assertThatThrownBy(() -> MonopaySigner.fromPem("-----BEGIN PUBLIC KEY-----\nAAAA\n-----END PUBLIC KEY-----"))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        enqueue(200, "{\"status\":\"success\",\"dataTime\":\"2026-04-21 23:01:54\"}");
+        T2pPaymentStatusResponse t2p = mono.getTerminals().paymentStatus("ext-1");
+        assertThat(t2p.dataTimeUtc()).isEqualTo(Instant.parse("2026-04-21T23:01:54Z"));
+        assertThat(t2p.getStatus()).isEqualTo(T2pPaymentStatus.SUCCESS);
+        server.takeRequest();
+
+        enqueue(200, "{\"list\":[{\"id\":\"e1\"}]}");
+        List<Employee> employees = mono.getEmployees().list();
+        assertThat(employees).hasSize(1);
+        server.takeRequest();
+
+        WebhookKeyProvider provider = () -> {
+            throw new IllegalStateException("down");
+        };
+        WebhookVerifier perTenant = new WebhookVerifier(provider, Duration.ofMinutes(1));
+        assertThat(perTenant.check(null, new byte[0])).isEqualTo(VerificationResult.INVALID_SIGNATURE);
+        assertThat(perTenant.check("AAAA", new byte[0])).isEqualTo(VerificationResult.KEY_UNAVAILABLE);
+        assertThat(perTenant.currentPublicKey()).isNull();
+        WebhookVerifier configured = WebhookVerifier.builder(provider)
+                .failureBackoff(Duration.ofSeconds(30))
+                .previousKeyGrace(Duration.ofMinutes(5))
+                .maxWaitForKey(Duration.ofMillis(500))
+                .build();
+        assertThat(configured.currentPublicKey()).isNull();
+
+        assertThat(WebhookParser.invoiceIdOf("{\"invoiceId\":\"i9\",\"amount\":\"x\"}".getBytes(StandardCharsets.UTF_8)))
+                .isEqualTo("i9");
     }
 }

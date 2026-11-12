@@ -22,7 +22,10 @@ public object AcquiringErrorCodes {
     /** 400: the invoice was created as a hold, paid, but not finalized yet. */
     public const val HOLD_INVOICE_NOT_FINALIZED: String = "HOLD_INVOICE_NOT_FINALIZED"
 
-    /** 400: the refund amount is wrong, or the payment was already refunded. */
+    /**
+     * 400: the refund amount is wrong, or the payment was already refunded. The refund may
+     * already exist: check `invoices.status(invoiceId).cancelList` before treating it as failed.
+     */
     public const val WRONG_CANCEL_AMOUNT: String = "WRONG_CANCEL_AMOUNT"
 
     /** 400: the card token was not found. */
@@ -46,12 +49,16 @@ public object AcquiringErrorCodes {
     /** 500: unexpected error; the outcome is unknown. */
     public const val INTERNAL_ERROR: String = "INTERNAL_ERROR"
 
-    /** 500: the payment cannot be refunded. A definite rejection: nothing was done. */
+    /**
+     * 500: the payment cannot be refunded (`invoice/cancel`). The only 5xx the SDK treats as a
+     * definite rejection (`RequestOutcome.REJECTED`): nothing was done.
+     */
     public const val CANCEL_NOT_AVAILABLE: String = "CANCEL_NOT_AVAILABLE"
 
     /**
-     * 500: an external system refused the request, e.g. `mdes.decrypt 500` when a Google Pay test
-     * token is used. A definite rejection: nothing was done.
+     * 500: an external system failed, e.g. `mdes.decrypt 500` when a Google Pay test token is used.
+     * Not documented as a definite rejection, so the outcome stays `RequestOutcome.UNKNOWN`: a
+     * payment or capture may still have happened. Reconcile before retrying.
      */
     public const val EXTERNAL_ERROR: String = "EXTERNAL_ERROR"
 }

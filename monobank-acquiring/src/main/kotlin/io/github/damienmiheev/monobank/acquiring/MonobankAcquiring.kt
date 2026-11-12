@@ -27,6 +27,7 @@ import io.github.damienmiheev.monobank.acquiring.webhook.WebhookVerifier
 public class MonobankAcquiring internal constructor(
     public val config: AcquiringConfig,
     http: AcquiringHttp,
+    keyHttp: AcquiringHttp = AcquiringHttp.forKeyFetch(config),
 ) {
     /** Creates a client from [config]. */
     public constructor(config: AcquiringConfig) : this(config, AcquiringHttp(config))
@@ -65,9 +66,12 @@ public class MonobankAcquiring internal constructor(
 
     /**
      * Verifies webhooks with this merchant's public key, fetched from `GET /api/merchant/pubkey`
-     * on first use and re-fetched when it rotates.
+     * on first use and re-fetched when it rotates. The key is fetched with a short timeout (at
+     * most 5 s) and without retries, so a slow key endpoint cannot hold webhook threads for long;
+     * see [WebhookVerifier] for the single-fetch and back-off rules.
      */
-    public val webhooks: WebhookVerifier = WebhookVerifier(WebhookKeyProvider { merchant.publicKey().key })
+    public val webhooks: WebhookVerifier =
+        MerchantApi(keyHttp).let { keyApi -> WebhookVerifier(WebhookKeyProvider { keyApi.publicKey().key }) }
 
     override fun toString(): String = "MonobankAcquiring($config)"
 

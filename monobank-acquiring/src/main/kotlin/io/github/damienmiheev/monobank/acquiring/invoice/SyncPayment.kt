@@ -117,6 +117,7 @@ public data class SyncCardData internal constructor(
             eciIndicator: String,
         ): Builder {
             require(pan.isNotBlank()) { "pan must not be blank" }
+            requireExpiry(exp)
             return Builder(pan, type, exp, eciIndicator)
         }
     }
@@ -153,6 +154,7 @@ public data class DeviceTokenData internal constructor(
             cryptogram: String? = null,
         ): DeviceTokenData {
             require(token.isNotBlank()) { "token must not be blank" }
+            requireExpiry(exp)
             return DeviceTokenData(token, exp, eciIndicator, cryptogram)
         }
     }

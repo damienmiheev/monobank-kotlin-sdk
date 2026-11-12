@@ -13,18 +13,15 @@ public class MonopayApi internal constructor(
     private val http: AcquiringHttp,
 ) {
     /**
-     * Imports a public key and returns its `keyId`, which the widget needs.
+     * Imports a public key; the result carries the `keyId` the widget needs.
      *
      * `POST /api/merchant/monopay/pubkey-import`. Not retried after an unknown outcome; check
      * [keys] first.
-     *
-     * @return the new key id, or `null` if monobank did not return one.
      */
-    public fun importKey(request: ImportMonopayKeyRequest): String? =
+    public fun importKey(request: ImportMonopayKeyRequest): ImportedMonopayKey =
         http
             .post("/api/merchant/monopay/pubkey-import", request, ImportKeyWire::class.java, idempotent = false)
-            .result
-            ?.keyId
+            .result ?: ImportedMonopayKey(null)
 
     /**
      * Deletes a key.
@@ -102,13 +99,19 @@ internal class KeyIdRequest(
 internal class ImportKeyWire
     @JsonCreator
     constructor(
-        @param:JsonProperty("result") val result: ImportedKey?,
+        @param:JsonProperty("result") val result: ImportedMonopayKey?,
     )
 
-internal class ImportedKey
+/**
+ * Answer of `POST /api/merchant/monopay/pubkey-import`.
+ *
+ * @property keyId Id of the imported key, for the widget's `keyId`; `null` if monobank did not return one.
+ */
+@ConsistentCopyVisibility
+public data class ImportedMonopayKey
     @JsonCreator
-    constructor(
-        @param:JsonProperty("keyId") val keyId: String?,
+    internal constructor(
+        @param:JsonProperty("keyId") public val keyId: String?,
     )
 
 internal class KeyListWire

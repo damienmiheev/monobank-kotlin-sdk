@@ -4,14 +4,17 @@ import io.github.damienmiheev.monobank.acquiring.common.Page
 import io.github.damienmiheev.monobank.acquiring.internal.AcquiringHttp
 import java.time.OffsetDateTime
 import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
 
 /**
  * Query of `GET /api/merchant/subscription/list`.
  *
- * @property dateFrom Start of the period. Required.
+ * @property dateFrom Start of the period. Required. Sent as RFC 3339 with whole seconds.
  * @property dateTo End of the period.
  * @property status Only subscriptions in this status.
- * @property page Page number, starting at 1 (monobank's default).
+ * @property page Page number, starting at 1 (monobank's default). monobank's docs call this parameter an
+ *   "offset" but default it to 1 and answer with `pagination.currentPage`, so the SDK treats it as
+ *   a 1-based page number.
  * @property limit Page size (monobank's default is 20).
  */
 public class SubscriptionListQuery private constructor(
@@ -59,7 +62,10 @@ public class SubscriptionListQuery private constructor(
         public fun limit(limit: Int?): Builder = apply { this.limit = limit?.also { requirePositive(it, "limit") } }
 
         /** Builds the query. */
-        public fun build(): SubscriptionListQuery = SubscriptionListQuery(dateFrom, dateTo, status, page, limit)
+        public fun build(): SubscriptionListQuery {
+            requireOrder(dateFrom, dateTo)
+            return SubscriptionListQuery(dateFrom, dateTo, status, page, limit)
+        }
     }
 
     public companion object {
@@ -73,9 +79,11 @@ public class SubscriptionListQuery private constructor(
  * Query of `GET /api/merchant/subscription/payments`.
  *
  * @property subscriptionId Subscription id.
- * @property dateFrom Start of the period. Required.
+ * @property dateFrom Start of the period. Required. Sent as RFC 3339 with whole seconds.
  * @property dateTo End of the period.
- * @property page Page number, starting at 1 (monobank's default).
+ * @property page Page number, starting at 1 (monobank's default). monobank's docs call this parameter an
+ *   "offset" but default it to 1 and answer with `pagination.currentPage`, so the SDK treats it as
+ *   a 1-based page number.
  * @property limit Page size (monobank's default is 20).
  */
 public class SubscriptionPaymentsQuery private constructor(
@@ -117,8 +125,10 @@ public class SubscriptionPaymentsQuery private constructor(
         public fun limit(limit: Int?): Builder = apply { this.limit = limit?.also { requirePositive(it, "limit") } }
 
         /** Builds the query. */
-        public fun build(): SubscriptionPaymentsQuery =
-            SubscriptionPaymentsQuery(subscriptionId, dateFrom, dateTo, page, limit)
+        public fun build(): SubscriptionPaymentsQuery {
+            requireOrder(dateFrom, dateTo)
+            return SubscriptionPaymentsQuery(subscriptionId, dateFrom, dateTo, page, limit)
+        }
     }
 
     public companion object {
@@ -134,7 +144,14 @@ public class SubscriptionPaymentsQuery private constructor(
     }
 }
 
-private fun rfc3339(value: OffsetDateTime): String = value.format(DateTimeFormatter.ISO_OFFSET_DATE_TIME)
+/** RFC 3339 with whole seconds, as in monobank's examples (`2024-06-26T18:12:44+03:00`). */
+private fun rfc3339(value: OffsetDateTime): String =
+    value.truncatedTo(ChronoUnit.SECONDS).format(DateTimeFormatter.ISO_OFFSET_DATE_TIME)
+
+private fun requireOrder(
+    dateFrom: OffsetDateTime,
+    dateTo: OffsetDateTime?,
+) = require(dateTo == null || !dateTo.isBefore(dateFrom)) { "dateTo must not be before dateFrom" }
 
 private fun requirePositive(
     value: Int,

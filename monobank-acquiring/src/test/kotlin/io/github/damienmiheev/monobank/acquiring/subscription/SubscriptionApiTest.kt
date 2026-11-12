@@ -238,4 +238,17 @@ class SubscriptionApiTest : AcquiringTestSupport() {
     private companion object {
         val MAPPER = io.github.damienmiheev.monobank.core.json.MonobankJson.mapper
     }
+
+    @Test
+    fun `dates are sent with whole seconds and must be in order`() {
+        enqueueJson("{}")
+        mono.subscriptions.list(
+            SubscriptionListQuery.builder(OffsetDateTime.parse("2024-06-26T18:12:44.123456789+03:00")).build(),
+        )
+        assertThat(takeRequest().query("dateFrom")).isEqualTo("2024-06-26T18:12:44+03:00")
+        assertThatThrownBy { SubscriptionListQuery.builder(to).dateTo(from).build() }
+            .isInstanceOf(IllegalArgumentException::class.java)
+        assertThatThrownBy { SubscriptionPaymentsQuery.builder("s", to).dateTo(from).build() }
+            .isInstanceOf(IllegalArgumentException::class.java)
+    }
 }

@@ -42,4 +42,13 @@ class SplitApiTest : AcquiringTestSupport() {
         assertThatThrownBy { mono.split.receiver("y") }.isInstanceOf(MonobankNotFoundException::class.java)
         assertThatThrownBy { mono.split.receiver(" ") }.isInstanceOf(IllegalArgumentException::class.java)
     }
+
+    @Test
+    fun `toString hides the IBAN and tax number`() {
+        enqueueFixture("GET_api_merchant_split_receiver_get_by_id.response.json")
+        val text = mono.split.receiver("sr").toString()
+        assertThat(
+            text,
+        ).doesNotContain("UA213996220000026007233566001").doesNotContain("1234567890").contains("***6001")
+    }
 }

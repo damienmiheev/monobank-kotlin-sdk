@@ -3,15 +3,23 @@ package io.github.damienmiheev.monobank.acquiring.monopay
 import io.github.damienmiheev.monobank.acquiring.AcquiringTestSupport.Companion.resource
 import io.github.damienmiheev.monobank.acquiring.invoice.CreateInvoiceRequest
 import io.github.damienmiheev.monobank.acquiring.webhook.WebhookVerifier
+import io.github.damienmiheev.monobank.core.ExperimentalMonobankApi
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
+import java.math.BigInteger
 import java.security.KeyPairGenerator
 import java.security.PublicKey
 import java.security.Signature
+import java.security.interfaces.ECPrivateKey
+import java.security.spec.ECFieldFp
 import java.security.spec.ECGenParameterSpec
+import java.security.spec.ECParameterSpec
+import java.security.spec.ECPoint
+import java.security.spec.EllipticCurve
 import java.util.Base64
 
+@OptIn(ExperimentalMonobankApi::class)
 class MonopaySignerTest {
     private val sec1Pem = resource("/monopay/test-key.sec1.pem")
     private val pkcs8Pem = resource("/monopay/test-key.pkcs8.pem")
@@ -101,5 +109,51 @@ class MonopaySignerTest {
         assertThatThrownBy { MonopaySigner.fromPem("garbage!") }.isInstanceOf(IllegalArgumentException::class.java)
         assertThatThrownBy { MonopaySigner.fromPem(pkcs8Pem).sign("{}", "") }
             .isInstanceOf(IllegalArgumentException::class.java)
+    }
+
+    @Test
+    fun `SEC1 and PKCS8 keys on other curves are rejected with IllegalArgumentException`() {
+        listOf(
+            "/monopay/test-key-secp256k1.sec1.pem",
+            "/monopay/test-key-p384.sec1.pem",
+            "/monopay/test-key-secp256k1.pkcs8.pem",
+        ).forEach { path ->
+            assertThatThrownBy { MonopaySigner.fromPem(resource(path)) }
+                .describedAs(path)
+                .isInstanceOf(IllegalArgumentException::class.java)
+        }
+    }
+
+    @Test
+    fun `a secp256k1 key object is rejected although its field is 256 bits`() {
+        // secp256k1 domain parameters (SEC 2): same field size as P-256, different curve.
+        val p = BigInteger("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F", 16)
+        val curve = EllipticCurve(ECFieldFp(p), BigInteger.ZERO, BigInteger.valueOf(7))
+        val generator =
+            ECPoint(
+                BigInteger("79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798", 16),
+                BigInteger("483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8", 16),
+            )
+        val n = BigInteger("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141", 16)
+        val spec = ECParameterSpec(curve, generator, n, 1)
+        val key =
+            object : ECPrivateKey {
+                override fun getS(): BigInteger = BigInteger.TEN
+
+                override fun getParams(): ECParameterSpec = spec
+
+                override fun getAlgorithm(): String = "EC"
+
+                override fun getFormat(): String = "PKCS#8"
+
+                override fun getEncoded(): ByteArray = ByteArray(0)
+            }
+        assertThatThrownBy { MonopaySigner.of(key) }.isInstanceOf(IllegalArgumentException::class.java)
+    }
+
+    @Test
+    fun `signed request toString hides the payload`() {
+        val signed = MonopaySigner.fromPem(pkcs8Pem).sign("""{"customerEmails":["secret@mail.com"]}""", "r")
+        assertThat(signed.toString()).doesNotContain(signed.payloadBase64).contains("requestId=r")
     }
 }

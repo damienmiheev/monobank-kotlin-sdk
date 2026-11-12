@@ -20,7 +20,8 @@ public data class Pagination
         @param:JsonProperty("currentPage") public val currentPage: Int,
         @param:JsonProperty("totalPages") public val totalPages: Int,
     ) {
-        /** `true` when there is a page after this one: request `page = currentPage + 1`. */
+        /** `true` when there is a page after this one: request `page = currentPage + 1`. Java: `hasNextPage()`. */
+        @get:JvmName("hasNextPage")
         public val hasNextPage: Boolean
             get() = currentPage < totalPages
     }
@@ -36,7 +37,8 @@ public data class Page<T> internal constructor(
     public val items: List<T>,
     public val pagination: Pagination?,
 ) {
-    /** `true` when there is a page after this one. */
+    /** `true` when there is a page after this one. Java: `hasNextPage()`. */
+    @get:JvmName("hasNextPage")
     public val hasNextPage: Boolean
         get() = pagination?.hasNextPage ?: false
 }

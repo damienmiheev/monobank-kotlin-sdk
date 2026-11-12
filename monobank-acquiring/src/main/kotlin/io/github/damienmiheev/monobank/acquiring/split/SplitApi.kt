@@ -5,6 +5,7 @@ import com.fasterxml.jackson.annotation.JsonEnumDefaultValue
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.fasterxml.jackson.annotation.JsonValue
 import io.github.damienmiheev.monobank.acquiring.internal.AcquiringHttp
+import io.github.damienmiheev.monobank.core.Redaction
 
 /**
  * Split payments: receivers (sub-merchants) that get part of a payment. Assign items to a
@@ -109,6 +110,11 @@ public data class SplitReceiverDetails
         /** Typed status. */
         public val status: SplitReceiverStatus
             get() = SplitReceiverStatus.fromValue(statusRaw)
+
+        /** Hides the tax number and most of the IBAN: for a sole proprietor they are personal data. */
+        override fun toString(): String =
+            "SplitReceiverDetails(id=$id, edrpou=${Redaction.secret(edrpou)}, name=$name, status=$statusRaw, " +
+                "iban=${Redaction.tail(iban)})"
     }
 
 internal class SplitReceiverListWire

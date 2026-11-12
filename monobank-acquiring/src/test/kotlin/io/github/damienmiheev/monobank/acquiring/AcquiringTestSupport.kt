@@ -45,7 +45,7 @@ abstract class AcquiringTestSupport {
                         .retryPolicy(retryPolicy)
                         .build(),
                 ).build()
-        return MonobankAcquiring(config, AcquiringHttp(config) { })
+        return MonobankAcquiring(config, AcquiringHttp(config, sleeper = { }))
     }
 
     protected fun enqueueJson(

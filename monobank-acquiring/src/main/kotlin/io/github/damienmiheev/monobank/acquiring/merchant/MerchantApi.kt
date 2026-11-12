@@ -62,6 +62,14 @@ public class MerchantApi internal constructor(
      * only payments that reached `hold`, `processing`, `success` or `failure`, not invoices that
      * are still `created`. An empty result therefore does not prove that no invoice exists.
      *
+     * Choosing the window: entries are filtered by the payment's operation `date`, which can be
+     * minutes after your call (3-D Secure, customer on the payment page) and monobank's clock may
+     * differ from yours. Use `from = attemptedAt - 5 minutes` and `to = null` (now), and when
+     * nothing is found, call again later (e.g. after the invoice lifetime) before treating the
+     * attempt as failed. Keep the window as short as that allows: one entry the SDK cannot read
+     * fails the whole call. Refunds cannot be reconciled here (statement refunds carry no
+     * `extRef`); use `invoices.status(invoiceId).cancelFor(extRef)`.
+     *
      * `GET /api/merchant/statement`. Safe to retry.
      */
     @JvmOverloads

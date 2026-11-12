@@ -189,4 +189,46 @@ class WalletApiTest : AcquiringTestSupport() {
         assertThatThrownBy { mono.wallet.deleteCard("t") }.isInstanceOf(MonobankServerException::class.java)
         assertThat(server.requestCount).isEqualTo(2)
     }
+
+    @Test
+    fun `a 5xx EXTERNAL_ERROR on a payment is an unknown outcome, never a rejection`() {
+        enqueueJson("""{"errCode":"EXTERNAL_ERROR","errText":"mdes.decrypt 500"}""", status = 500)
+        assertThatThrownBy {
+            mono.wallet.payment(WalletPaymentRequest.builder("tok", 100, 980, InitiationKind.MERCHANT).build())
+        }.isInstanceOfSatisfying(MonobankServerException::class.java) {
+            assertThat(it.errorCode).isEqualTo(AcquiringErrorCodes.EXTERNAL_ERROR)
+            assertThat(it.outcome).isEqualTo(RequestOutcome.UNKNOWN)
+        }
+        assertThat(server.requestCount).isEqualTo(1)
+    }
+
+    @Test
+    fun `hold works only in UAH`() {
+        assertThatThrownBy {
+            WalletPaymentRequest.builder("t", 1, 840, InitiationKind.CLIENT).paymentType(PaymentType.HOLD).build()
+        }.isInstanceOf(IllegalArgumentException::class.java)
+        assertThat(
+            WalletPaymentRequest
+                .builder("t", 1, 980, InitiationKind.CLIENT)
+                .paymentType(PaymentType.HOLD)
+                .build()
+                .ccy,
+        ).isEqualTo(980)
+    }
+
+    @Test
+    fun `metadata accepts any JSON values`() {
+        enqueueFixture("POST_api_merchant_wallet_payment.response.json")
+        mono.wallet.payment(
+            WalletPaymentRequest
+                .builder("t", 1, 980, InitiationKind.CLIENT)
+                .merchantPaymInfo(
+                    MerchantPaymInfo.builder().metadata(mapOf("n" to 5, "ok" to true, "s" to "v")).build(),
+                ).build(),
+        )
+        val metadata = takeRequest().json().at("/merchantPaymInfo/metadata")
+        assertThat(metadata.path("n").asInt()).isEqualTo(5)
+        assertThat(metadata.path("ok").asBoolean()).isTrue()
+        assertThat(metadata.path("s").asText()).isEqualTo("v")
+    }
 }

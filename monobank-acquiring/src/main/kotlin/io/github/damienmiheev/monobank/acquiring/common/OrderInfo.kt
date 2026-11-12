@@ -152,7 +152,8 @@ public data class BasketItem internal constructor(
  * @property customerEmails Emails that receive the fiscal receipt (with Checkbox).
  * @property discounts Basket-level discounts.
  * @property basketOrder Order lines.
- * @property metadata Free-form key/value data, returned in the merchant statement.
+ * @property metadata Free-form key/value data (strings, numbers, booleans, lists or maps), returned in the
+ *   merchant statement.
  */
 @ConsistentCopyVisibility
 public data class MerchantPaymInfo internal constructor(
@@ -162,7 +163,7 @@ public data class MerchantPaymInfo internal constructor(
     @get:JsonProperty("customerEmails") public val customerEmails: List<String>?,
     @get:JsonProperty("discounts") public val discounts: List<Discount>?,
     @get:JsonProperty("basketOrder") public val basketOrder: List<BasketItem>?,
-    @get:JsonProperty("metadata") public val metadata: Map<String, String>?,
+    @get:JsonProperty("metadata") public val metadata: Map<String, Any?>?,
 ) {
     /** Builder for [MerchantPaymInfo]. */
     public class Builder internal constructor() {
@@ -172,7 +173,7 @@ public data class MerchantPaymInfo internal constructor(
         private var customerEmails: List<String>? = null
         private var discounts: List<Discount>? = null
         private var basketOrder: List<BasketItem>? = null
-        private var metadata: Map<String, String>? = null
+        private var metadata: Map<String, Any?>? = null
 
         /** Your order reference. */
         public fun reference(reference: String?): Builder = apply { this.reference = reference }
@@ -194,7 +195,7 @@ public data class MerchantPaymInfo internal constructor(
         public fun basketOrder(basketOrder: List<BasketItem>?): Builder = apply { this.basketOrder = basketOrder }
 
         /** Free-form metadata. */
-        public fun metadata(metadata: Map<String, String>?): Builder = apply { this.metadata = metadata }
+        public fun metadata(metadata: Map<String, Any?>?): Builder = apply { this.metadata = metadata }
 
         /** Builds the info. */
         public fun build(): MerchantPaymInfo =

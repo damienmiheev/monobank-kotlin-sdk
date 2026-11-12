@@ -55,8 +55,9 @@ public data class PosRefundRequest internal constructor(
 /**
  * Answer of `POST /api/merchant/pos-transaction-cancel`.
  *
- * @property status Status of starting the refund, e.g. `ok` (monobank does not list the values).
- * @property tranId Id of the refund transaction.
+ * @property status Status of starting the refund. monobank does not list the values; its example
+ *   is `ok`, meaning the refund was accepted for processing (not that it is complete).
+ * @property tranId Id of the refund transaction; may be absent.
  */
 @ConsistentCopyVisibility
 public data class PosRefundResponse
@@ -139,8 +140,13 @@ public class PosRefundApi internal constructor(
      * Starts a refund of a POS transaction by its RRN.
      *
      * `POST /api/merchant/pos-transaction-cancel` with the required `Accept-Language` header
-     * ([language] only changes the language of error texts). A refund: never retried after an
-     * unknown outcome; check [status] first.
+     * ([language] only changes the language of error texts).
+     *
+     * A refund: never retried after an unknown outcome, and **you must not send it again** after
+     * one either (a timeout, a connection reset or a 5xx). monobank offers no lookup by `rrn`, and
+     * [status] needs a `cancelRef` that this call does not return. Reconcile through the merchant
+     * statement, the `pos_refund` webhook or monobank support before refunding again; otherwise
+     * the customer may be refunded twice.
      */
     @JvmOverloads
     public fun create(
@@ -157,12 +163,14 @@ public class PosRefundApi internal constructor(
 
     /**
      * Status of a POS refund, for when the `pos_refund` webhook did not arrive. Only this
-     * merchant's recent refunds are searched.
+     * merchant's recent refunds are searched (monobank does not say how far back).
      *
      * `GET /api/merchant/pos-transaction-cancel/status`. Safe to retry.
      *
-     * @param cancelRef Unique id of the refund request. monobank does not say where it comes from;
-     *   most likely it is [PosRefundResponse.tranId].
+     * monobank does not document where `cancelRef` comes from: it is neither in the refund request
+     * nor in [PosRefundResponse]. A 404 therefore does **not** prove that no refund was made.
+     *
+     * @param cancelRef Unique id of the refund request, as monobank names it.
      */
     public fun status(cancelRef: String): PosRefundStatusResponse {
         require(cancelRef.isNotBlank()) { "cancelRef must not be blank" }

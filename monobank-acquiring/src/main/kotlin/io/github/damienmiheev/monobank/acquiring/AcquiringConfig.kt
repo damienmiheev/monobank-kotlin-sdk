@@ -1,6 +1,7 @@
 package io.github.damienmiheev.monobank.acquiring
 
 import io.github.damienmiheev.monobank.core.MonobankClientOptions
+import io.github.damienmiheev.monobank.core.Redaction
 
 /**
  * Settings for [MonobankAcquiring].
@@ -31,10 +32,15 @@ public class AcquiringConfig private constructor(
         private var options: MonobankClientOptions = MonobankClientOptions.DEFAULT
 
         /** Sets the `X-Cms` header. */
-        public fun cmsName(cmsName: String?): Builder = apply { this.cmsName = cmsName }
+        public fun cmsName(cmsName: String?): Builder =
+            apply {
+                this.cmsName =
+                    cmsName?.let { headerText(it, "cmsName") }
+            }
 
         /** Sets the `X-Cms-Version` header. */
-        public fun cmsVersion(cmsVersion: String?): Builder = apply { this.cmsVersion = cmsVersion }
+        public fun cmsVersion(cmsVersion: String?): Builder =
+            apply { this.cmsVersion = cmsVersion?.let { headerText(it, "cmsVersion") } }
 
         /** Sets transport options. */
         public fun options(options: MonobankClientOptions): Builder = apply { this.options = options }
@@ -48,8 +54,22 @@ public class AcquiringConfig private constructor(
         @JvmStatic
         public fun builder(token: String): Builder {
             require(token.isNotBlank()) { "token must not be blank" }
-            require(token.none { it == '\r' || it == '\n' }) { "token must be one line" }
+            // Printable ASCII only: otherwise the JDK would reject it on the first request and
+            // echo the whole token in its exception message.
+            Redaction.requireHeaderSafe(token, "token")
             return Builder(token)
+        }
+
+        private val HEADER_TEXT = 0x20..0x7E
+
+        /** Printable ASCII; inner spaces are allowed (e.g. `Kill Bill`), leading/trailing ones are not. */
+        private fun headerText(
+            value: String,
+            what: String,
+        ): String {
+            require(value.isNotEmpty() && value.trim() == value) { "$what must not be empty or start/end with a space" }
+            require(value.all { it.code in HEADER_TEXT }) { "$what may contain only printable ASCII characters" }
+            return value
         }
     }
 }

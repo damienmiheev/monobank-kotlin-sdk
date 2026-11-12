@@ -52,8 +52,12 @@ public class InvoiceApi internal constructor(
      * Invalidates an invoice that has not been paid yet, so it can no longer be paid.
      *
      * `POST /api/merchant/invoice/remove`. Not retried after an unknown outcome (a repeated call
-     * may fail although the first one worked). Fails with a `MonobankApiException` if the invoice
-     * was already paid or does not exist.
+     * may fail although the first one worked).
+     *
+     * monobank does not document which error it returns for an invoice that is already paid or
+     * being paid: it surfaces as a `MonobankApiException` (usually `MonobankBadRequestException`)
+     * with the raw `errorCode`. After **any** error, call [status] before concluding anything:
+     * the customer may have paid a moment before.
      */
     public fun remove(invoiceId: String) {
         requireId(invoiceId, "invoiceId")
@@ -63,7 +67,8 @@ public class InvoiceApi internal constructor(
     /**
      * Captures (finalizes) a hold, fully or partly.
      *
-     * `POST /api/merchant/invoice/finalize`. Not retried after an unknown outcome; check
+     * `POST /api/merchant/invoice/finalize`. Not retried after an unknown outcome (including a
+     * 5xx `EXTERNAL_ERROR`: the capture may have happened); check
      * `status(invoiceId)` before finalizing again.
      */
     public fun finalize(request: FinalizeInvoiceRequest): FinalizeInvoiceResponse =

@@ -142,6 +142,7 @@ public data class CreateInvoiceRequest internal constructor(
             } else {
                 require(amount > 0) { "amount must be positive (minor units)" }
             }
+            requireHoldCurrency(paymentType, ccy)
             return CreateInvoiceRequest(
                 amount,
                 ccy,

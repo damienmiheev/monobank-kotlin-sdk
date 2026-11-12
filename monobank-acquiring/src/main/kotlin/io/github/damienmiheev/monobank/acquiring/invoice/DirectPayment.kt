@@ -7,6 +7,7 @@ import io.github.damienmiheev.monobank.acquiring.common.MerchantPaymInfo
 import io.github.damienmiheev.monobank.acquiring.common.OperationStatus
 import io.github.damienmiheev.monobank.acquiring.common.PaymentType
 import io.github.damienmiheev.monobank.acquiring.common.SaveCardData
+import io.github.damienmiheev.monobank.core.CurrencyCodes
 import io.github.damienmiheev.monobank.core.Redaction
 import java.time.OffsetDateTime
 
@@ -44,12 +45,10 @@ public class CardData private constructor(
             cvv: String,
         ): CardData {
             require(pan.isNotBlank()) { "pan must not be blank" }
-            require(exp.length == EXP_LENGTH && exp.all { it.isDigit() }) { "exp must be MMYY" }
+            requireExpiry(exp)
             require(cvv.isNotBlank()) { "cvv must not be blank" }
             return CardData(pan, exp, cvv)
         }
-
-        private const val EXP_LENGTH = 4
     }
 }
 
@@ -117,6 +116,7 @@ public data class PaymentDirectRequest internal constructor(
         public fun build(): PaymentDirectRequest {
             require(amount > 0) { "amount must be positive (minor units)" }
             requireDebitOrHold(paymentType)
+            requireHoldCurrency(paymentType, ccy)
             return PaymentDirectRequest(
                 amount,
                 ccy,
@@ -150,6 +150,23 @@ public data class PaymentDirectRequest internal constructor(
     }
 }
 
+/** Card expiry as `MMYY`: four ASCII digits, month 01-12. */
+internal fun requireExpiry(exp: String) {
+    require(exp.length == 4 && exp.all { it in '0'..'9' } && exp.substring(0, 2).toInt() in 1..12) {
+        "exp must be MMYY"
+    }
+}
+
+/** Holds work only in UAH (980), per monobank's docs; `null` means monobank's default, UAH. */
+internal fun requireHoldCurrency(
+    paymentType: PaymentType?,
+    ccy: Int?,
+) {
+    require(paymentType != PaymentType.HOLD || ccy == null || ccy == CurrencyCodes.UAH) {
+        "paymentType HOLD works only with ccy 980 (UAH)"
+    }
+}
+
 /** Payments by card data or token support only debit and hold. */
 internal fun requireDebitOrHold(paymentType: PaymentType?) {
     require(paymentType == null || paymentType == PaymentType.DEBIT || paymentType == PaymentType.HOLD) {
@@ -159,6 +176,9 @@ internal fun requireDebitOrHold(paymentType: PaymentType?) {
 
 /**
  * Answer of `POST /api/merchant/invoice/payment-direct` and `POST /api/merchant/wallet/payment`.
+ *
+ * For a hold (`paymentType=hold`) monobank documents only `processing`, `success` and `failure`
+ * here; if [statusRaw] is something else (typed [status] `UNKNOWN`), read `invoices.status(invoiceId)`.
  *
  * When [tdsUrl] is set and the payment is still [OperationStatus.PROCESSING], send the customer
  * there to pass 3-D Secure ([isThreeDsRequired]); the final status then comes in a webhook or from

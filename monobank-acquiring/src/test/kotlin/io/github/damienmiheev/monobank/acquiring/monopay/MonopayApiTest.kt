@@ -25,7 +25,7 @@ class MonopayApiTest : AcquiringTestSupport() {
                 ImportMonopayKeyRequest.of(keyValue, "my_key", OffsetDateTime.parse("2026-02-02T15:04:05+03:00")),
             )
 
-        assertThat(keyId).isEqualTo("28F91hHGtzoSFJ")
+        assertThat(keyId.keyId).isEqualTo("28F91hHGtzoSFJ")
         val body = takeRequest("POST", "/api/merchant/monopay/pubkey-import").json()
         assertThat(body).isEqualTo(
             io.github.damienmiheev.monobank.core.json.MonobankJson.mapper
@@ -36,7 +36,7 @@ class MonopayApiTest : AcquiringTestSupport() {
     @Test
     fun `import with only the key, a missing result, and no retry`() {
         enqueueJson("{}")
-        assertThat(mono.monopay.importKey(ImportMonopayKeyRequest.of(keyValue))).isNull()
+        assertThat(mono.monopay.importKey(ImportMonopayKeyRequest.of(keyValue)).keyId).isNull()
         assertThat(
             takeRequest()
                 .json()

@@ -155,7 +155,9 @@ class InvoiceOperationsTest : AcquiringTestSupport() {
     }
 
     @Test
-    fun `remove of a paid invoice fails with a typed error`() {
+    fun `remove failures surface as typed exceptions with the raw errCode`() {
+        // HYPOTHETICAL body: monobank does not document the error for removing a paid invoice.
+        // This only shows that any 4xx comes through typed, with errorCode and errText kept.
         enqueueJson("""{"errCode":"BAD_REQUEST","errText":"invoice already paid"}""", status = 400)
         assertThatThrownBy { mono.invoices.remove("paid") }
             .isInstanceOfSatisfying(MonobankBadRequestException::class.java) {
@@ -515,5 +517,115 @@ class InvoiceOperationsTest : AcquiringTestSupport() {
         assertThat(state.paymentInfo!!.paymentMethod).isNull()
         assertThat(state.walletData!!.isCardSaved).isTrue()
         assertThat(state.toString()).doesNotContain("tok-1234567890")
+    }
+
+    @Test
+    fun `finalize with a 5xx EXTERNAL_ERROR is an unknown outcome`() {
+        enqueueJson("""{"errCode":"EXTERNAL_ERROR","errText":"external"}""", status = 500)
+        assertThatThrownBy { mono.invoices.finalize(FinalizeInvoiceRequest.of("i", 1)) }
+            .isInstanceOfSatisfying(MonobankServerException::class.java) {
+                assertThat(it.outcome).isEqualTo(RequestOutcome.UNKNOWN)
+            }
+    }
+
+    @Test
+    fun `an event with the same modifiedDate is not older and must be applied`() {
+        fun state(date: String?) =
+            io.github.damienmiheev.monobank.core.json.MonobankJson.read(
+                """{"invoiceId":"i","status":"success","amount":1,"ccy":980${date?.let {
+                    ""","modifiedDate":"$it""""
+                } ?: ""}}""".toByteArray(),
+                InvoiceStatusResponse::class.java,
+            )
+        val first = state("2024-01-01T10:00:00Z")
+        val sameTime = state("2024-01-01T10:00:00Z")
+        val later = state("2024-01-01T10:00:01Z")
+        assertThat(sameTime.isOlderThan(first)).isFalse()
+        assertThat(sameTime.isNewerThan(first)).isFalse()
+        assertThat(first.isOlderThan(later)).isTrue()
+        assertThat(later.isOlderThan(first)).isFalse()
+        assertThat(state(null).isOlderThan(first)).isFalse()
+        assertThat(first.isOlderThan(state(null))).isFalse()
+    }
+
+    @Test
+    fun `expiry and hold currency are checked before sending`() {
+        listOf("1342", "0042", "06a2", "064", "\u0660\u0666\u0664\u0662").forEach { exp ->
+            assertThatThrownBy {
+                CardData.of(
+                    "4242",
+                    exp,
+                    "1",
+                )
+            }.describedAs(exp).isInstanceOf(IllegalArgumentException::class.java)
+            assertThatThrownBy {
+                DeviceTokenData.of(
+                    "4242",
+                    exp,
+                    "02",
+                )
+            }.isInstanceOf(IllegalArgumentException::class.java)
+            assertThatThrownBy { SyncCardData.builder("4242", SyncCardType.FPAN, exp, "02") }
+                .isInstanceOf(IllegalArgumentException::class.java)
+        }
+        assertThatThrownBy {
+            CreateInvoiceRequest
+                .builder(100)
+                .ccy(978)
+                .paymentType(PaymentType.HOLD)
+                .build()
+        }.isInstanceOf(IllegalArgumentException::class.java)
+        assertThatThrownBy {
+            PaymentDirectRequest
+                .builder(
+                    1,
+                    CardData.of("4242", "1230", "1"),
+                ).ccy(840)
+                .paymentType(PaymentType.HOLD)
+                .build()
+        }.isInstanceOf(IllegalArgumentException::class.java)
+        assertThat(
+            CreateInvoiceRequest
+                .builder(100)
+                .paymentType(PaymentType.HOLD)
+                .build()
+                .ccy,
+        ).isNull()
+    }
+
+    @Test
+    fun `invoiceIdOf reads the id of a body that does not parse`() {
+        val broken =
+            """{"invoiceId":"p2_x","status":"success","walletData":{"cardToken":"SECRET-TOKEN-1"}}"""
+                .toByteArray()
+        assertThatThrownBy {
+            io.github.damienmiheev.monobank.acquiring.webhook.WebhookParser
+                .parse(broken)
+        }.isInstanceOfSatisfying(MonobankSerializationException::class.java) {
+            val trace =
+                java.io
+                    .StringWriter()
+                    .also { w -> it.printStackTrace(java.io.PrintWriter(w)) }
+                    .toString()
+            assertThat(trace).doesNotContain("SECRET-TOKEN-1")
+        }
+        assertThat(
+            io.github.damienmiheev.monobank.acquiring.webhook.WebhookParser
+                .invoiceIdOf(broken),
+        ).isEqualTo("p2_x")
+        assertThat(
+            io.github.damienmiheev.monobank.acquiring.webhook.WebhookParser
+                .invoiceIdOf("nope".toByteArray()),
+        ).isNull()
+        assertThat(
+            io.github.damienmiheev.monobank.acquiring.webhook.WebhookParser
+                .invoiceIdOf("{}".toByteArray()),
+        ).isNull()
+    }
+
+    @Test
+    fun `fractional amounts fail instead of being truncated`() {
+        enqueueJson("""{"invoiceId":"i","status":"success","amount":100.5,"ccy":980}""")
+        assertThatThrownBy { mono.invoices.status("i") }.isInstanceOf(MonobankSerializationException::class.java)
     }
 }

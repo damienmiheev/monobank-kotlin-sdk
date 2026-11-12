@@ -27,7 +27,10 @@ import java.time.OffsetDateTime
  * @property failureReason Human-readable failure reason.
  * @property errCode Payment error code; see `PaymentErrorCodes.describe`.
  * @property createdDate When the payment was made.
- * @property modifiedDate Last change. Webhooks can arrive out of order: keep the one with the latest value.
+ * @property modifiedDate Last change. Webhooks can arrive out of order: ignore a webhook only when it is
+ *   strictly older than the state you have ([isOlderThan]). Apply one with the **same** date: monobank
+ *   may send separate webhooks for the saved card (`walletData`) and refunds (`cancelList`) without
+ *   changing this date.
  * @property reference Your [io.github.damienmiheev.monobank.acquiring.common.MerchantPaymInfo.reference].
  * @property destination Payment purpose.
  * @property cancelList Refunds requested on this invoice.
@@ -60,13 +63,25 @@ public data class InvoiceStatusResponse
             get() = InvoiceStatus.fromValue(statusRaw)
 
         /**
-         * `true` when this state is newer than [other] (by [modifiedDate]). Use it to ignore
-         * webhooks that arrive out of order. A state without a date is never newer.
+         * `true` when this state is strictly newer than [other] (by [modifiedDate]). A state
+         * without a date is never newer. Equal dates give `false`: to decide whether to apply an
+         * incoming webhook use [isOlderThan] instead, so same-date events are not dropped.
          */
         public fun isNewerThan(other: InvoiceStatusResponse): Boolean {
             val mine = modifiedDate ?: return false
             val theirs = other.modifiedDate ?: return true
             return mine.isAfter(theirs)
+        }
+
+        /**
+         * `true` when this state is strictly older than [other] (by [modifiedDate]): the only case
+         * in which an incoming webhook should be ignored. Equal dates give `false` (apply it, and
+         * merge `walletData` and `cancelList`); when either date is missing it also gives `false`.
+         */
+        public fun isOlderThan(other: InvoiceStatusResponse): Boolean {
+            val mine = modifiedDate ?: return false
+            val theirs = other.modifiedDate ?: return false
+            return mine.isBefore(theirs)
         }
 
         /**
