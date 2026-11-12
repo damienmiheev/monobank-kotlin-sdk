@@ -16,7 +16,7 @@ review), on the exact commit that gets tagged. Nothing is published until both p
    - `main`: changes only through pull requests with squash merge; 1 approving review from a code
      owner, re-approval after new pushes, resolved conversations. The admin may merge a PR without
      approval (bypass in pull-request mode only: no direct pushes).
-   - `main`, with no bypass for anyone: CI checks `build`, `newest-jdk`, `killbill-consumer`,
+   - `main` (admin may bypass, again only when merging a pull request): CI checks `build`, `newest-jdk`, `killbill-consumer`,
      `workflow-lint` and `codeql` must pass on the up-to-date branch; no high CodeQL alerts; linear
      history; no force pushes; no deletion.
    - Release tags `v*`: only the admin can create, move or delete them.
