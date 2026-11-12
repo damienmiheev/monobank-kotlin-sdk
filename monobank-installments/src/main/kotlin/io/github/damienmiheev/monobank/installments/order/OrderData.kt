@@ -2,6 +2,7 @@ package io.github.damienmiheev.monobank.installments.order
 
 import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.annotation.JsonProperty
+import io.github.damienmiheev.monobank.core.Redaction
 import io.github.damienmiheev.monobank.installments.common.OrderSource
 import java.math.BigDecimal
 import java.time.LocalDate
@@ -10,7 +11,8 @@ import java.time.OffsetDateTime
 /**
  * Order details, returned by `POST /api/order/data` (and the deprecated `POST /api/order/info`).
  *
- * monobank sends timestamps without an offset; they are read as Kyiv time (`Europe/Kyiv`).
+ * monobank sends timestamps without an offset; they are read as Kyiv time (`Europe/Kyiv`). That zone is assumed:
+ * monobank's docs do not state it. [toString] masks [iban].
  *
  * @property totalSum Order total in hryvnias, decimal.
  * @property source Sales channel.
@@ -37,13 +39,18 @@ public data class OrderData
         @param:JsonProperty("reverse_list") public val reverseList: List<OrderReverse>?,
         @param:JsonProperty("maskedCard") public val maskedCard: String?,
         @param:JsonProperty("iban") public val iban: String?,
-    )
+    ) {
+        override fun toString(): String =
+            "OrderData(totalSum=$totalSum, source=$source, invoiceNumber=$invoiceNumber, invoiceDate=$invoiceDate, " +
+                "pointId=$pointId, storeOrderId=$storeOrderId, createTimestamp=$createTimestamp, " +
+                "reverseList=$reverseList, maskedCard=$maskedCard, iban=${Redaction.tail(iban)})"
+    }
 
 /**
  * One return on an order.
  *
  * @property sum Returned amount in hryvnias, decimal.
- * @property timestamp When the return was made (Kyiv time).
+ * @property timestamp When the return was made (assumed Kyiv time; sent without an offset).
  */
 @ConsistentCopyVisibility
 public data class OrderReverse
@@ -57,7 +64,7 @@ public data class OrderReverse
  * Answer of `POST /api/order/check/paid`.
  *
  * @property fullyPaid `true` when the client repaid the installment in full (`SUCCESS` / `DONE`); `false` while
- *   payments remain (also when monobank omits the field).
+ *   payments remain. An answer without it fails to parse rather than reading as `false`.
  * @property bankCanReturnMoneyToCard Whether the bank can return money to the card when goods are returned.
  */
 @ConsistentCopyVisibility

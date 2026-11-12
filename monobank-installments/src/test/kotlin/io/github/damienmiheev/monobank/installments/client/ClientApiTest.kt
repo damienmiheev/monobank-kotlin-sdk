@@ -2,6 +2,7 @@ package io.github.damienmiheev.monobank.installments.client
 
 import io.github.damienmiheev.monobank.core.MonobankAuthException
 import io.github.damienmiheev.monobank.core.MonobankRateLimitException
+import io.github.damienmiheev.monobank.core.MonobankSerializationException
 import io.github.damienmiheev.monobank.core.RetryPolicy
 import io.github.damienmiheev.monobank.core.json.MonobankJson
 import io.github.damienmiheev.monobank.installments.InstallmentsTestSupport
@@ -75,5 +76,13 @@ class ClientApiTest : InstallmentsTestSupport() {
     fun `blank phone is rejected locally`() {
         assertThatThrownBy { chast.clients.validate(" ") }.isInstanceOf(IllegalArgumentException::class.java)
         assertThat(server.requestCount).isZero()
+    }
+
+    @Test
+    fun `an answer without found fails instead of reading as false`() {
+        enqueueJson("{}")
+
+        assertThatThrownBy { chast.clients.validate("+380501234567") }
+            .isInstanceOf(MonobankSerializationException::class.java)
     }
 }

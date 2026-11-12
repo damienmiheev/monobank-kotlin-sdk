@@ -22,7 +22,7 @@ public enum class OrderState(
 
     /** A state this SDK version does not know. Treat as non-final and poll again. */
     @JsonEnumDefaultValue
-    UNKNOWN("UNKNOWN"),
+    UNKNOWN("unknown"),
     ;
 
     /** `true` for [SUCCESS] and [FAIL]: the order is no longer in process. */
@@ -97,7 +97,7 @@ public enum class OrderSubState(
 
     /** A sub-state this SDK version does not know. Decide by [OrderState] instead. */
     @JsonEnumDefaultValue
-    UNKNOWN("UNKNOWN"),
+    UNKNOWN("unknown"),
 }
 
 /**
@@ -138,7 +138,7 @@ public enum class OrderSource(
 
     /** A channel this SDK version does not know. */
     @JsonEnumDefaultValue
-    UNKNOWN("UNKNOWN"),
+    UNKNOWN("unknown"),
 }
 
 /**

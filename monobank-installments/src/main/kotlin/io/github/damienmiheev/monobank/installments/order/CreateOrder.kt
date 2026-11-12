@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.annotation.JsonProperty
 import io.github.damienmiheev.monobank.installments.common.InvoiceSource
 import io.github.damienmiheev.monobank.installments.common.Product
+import io.github.damienmiheev.monobank.installments.internal.maskPhone
 import io.github.damienmiheev.monobank.installments.internal.requireHryvnias
 import io.github.damienmiheev.monobank.installments.internal.requireNotBlank
 import java.math.BigDecimal
@@ -23,10 +24,13 @@ import java.time.LocalDate
  * ).resultCallback("https://shop.example/chast/callback").build()
  * ```
  *
+ * [toString] masks [clientPhone].
+ *
  * @property storeOrderId Your order id, 1–64 characters. monobank deduplicates by it: repeating the request with
  *   the same id returns the existing order instead of creating a new one.
  * @property clientPhone Client phone in international format, e.g. `+380501234567`.
- * @property totalSum Order total in hryvnias, decimal (e.g. `2499.99`), not kopiyky. The spec requires at least 2.
+ * @property totalSum Order total in hryvnias, decimal (e.g. `2499.99`), not kopiyky. The spec's schema says at least 2,
+ *   the docs' prose says at least 1 UAH; only "positive, whole kopiyky" is checked locally and monobank decides.
  * @property invoice Invoice (receipt) of the purchase.
  * @property availablePrograms Offered installment programs (the spec allows exactly one).
  * @property products Products, at least one.
@@ -47,6 +51,12 @@ public data class CreateOrderRequest internal constructor(
     @get:JsonProperty("financial_company_merchant_info")
     public val financialCompanyMerchantInfo: FinancialCompanyMerchantInfo?,
 ) {
+    override fun toString(): String =
+        "CreateOrderRequest(storeOrderId=$storeOrderId, clientPhone=${maskPhone(clientPhone)}, totalSum=$totalSum, " +
+            "invoice=$invoice, availablePrograms=$availablePrograms, products=$products, " +
+            "resultCallback=$resultCallback, additionalParams=$additionalParams, " +
+            "financialCompanyMerchantInfo=$financialCompanyMerchantInfo)"
+
     /** Builder for [CreateOrderRequest]. */
     public class Builder internal constructor(
         private val storeOrderId: String,
@@ -78,7 +88,7 @@ public data class CreateOrderRequest internal constructor(
             }
             requireNotBlank(clientPhone, "clientPhone")
             requireHryvnias(totalSum, "totalSum")
-            require(availablePrograms.isNotEmpty()) { "availablePrograms must not be empty" }
+            require(availablePrograms.size == 1) { "availablePrograms must contain exactly one program" }
             require(products.isNotEmpty()) { "products must not be empty" }
             return CreateOrderRequest(
                 storeOrderId,
@@ -167,6 +177,9 @@ public data class AvailableProgram internal constructor(
     @get:JsonProperty("type") public val type: String?,
 ) {
     public companion object {
+        private const val MIN_PARTS = 3
+        private const val MAX_PARTS = 25
+
         /**
          * Creates a program.
          *
@@ -180,13 +193,16 @@ public data class AvailableProgram internal constructor(
             type: String? = null,
         ): AvailableProgram {
             require(availablePartsCount.isNotEmpty()) { "availablePartsCount must not be empty" }
+            require(availablePartsCount.all { it in MIN_PARTS..MAX_PARTS }) {
+                "availablePartsCount values must be $MIN_PARTS-$MAX_PARTS"
+            }
             return AvailableProgram(availablePartsCount.toList(), type)
         }
     }
 }
 
 /**
- * Optional parameters of a new order.
+ * Optional parameters of a new order. [toString] masks [sellerPhone].
  *
  * @property sellerPhone Seller's phone (for monobank's Telegram bot).
  * @property nds VAT amount in hryvnias, decimal (only in rare cases).
@@ -199,6 +215,9 @@ public data class CreateOrderAdditionalParams internal constructor(
     @get:JsonProperty("nds") public val nds: BigDecimal?,
     @get:JsonProperty("ext_initial_sum") public val extInitialSum: BigDecimal?,
 ) {
+    override fun toString(): String =
+        "CreateOrderAdditionalParams(sellerPhone=${maskPhone(sellerPhone)}, nds=$nds, extInitialSum=$extInitialSum)"
+
     /** Builder for [CreateOrderAdditionalParams]. */
     public class Builder internal constructor() {
         private var sellerPhone: String? = null

@@ -102,4 +102,14 @@ class InstallmentsCallbackVerifierTest : InstallmentsTestSupport() {
         assertThat(verifier.toString()).doesNotContain(STORE_SECRET)
         assertThatThrownBy { InstallmentsCallbackVerifier("") }.isInstanceOf(IllegalArgumentException::class.java)
     }
+
+    @Test
+    fun `only the exact bytes verify, so never trim or re-encode the body`() {
+        val withNewline = body + "\n".toByteArray()
+        val withBom = byteArrayOf(0xEF.toByte(), 0xBB.toByte(), 0xBF.toByte()) + body
+        assertThat(verifier.verify(opensslSignature, withNewline)).isFalse()
+        assertThat(verifier.verify(opensslSignature, withBom)).isFalse()
+        assertThat(verifier.verify(verifier.sign(withNewline), withNewline)).isTrue()
+        assertThat(verifier.verify(verifier.sign(withBom), withBom)).isTrue()
+    }
 }

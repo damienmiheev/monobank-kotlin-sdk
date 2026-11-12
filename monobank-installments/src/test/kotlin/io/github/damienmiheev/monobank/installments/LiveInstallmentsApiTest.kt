@@ -1,9 +1,9 @@
 package io.github.damienmiheev.monobank.installments
 
-import io.github.damienmiheev.monobank.core.MonobankApiException
-import io.github.damienmiheev.monobank.core.MonobankAuthException
+import io.github.damienmiheev.monobank.core.MonobankBadRequestException
 import io.github.damienmiheev.monobank.installments.order.OrderStateResult
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Assumptions.assumeTrue
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
@@ -41,15 +41,15 @@ class LiveInstallmentsApiTest {
     @Test
     fun `state of an unknown order is not-found, not an error`() {
         val chast = sandbox()
-        val result =
-            try {
-                chast.orders.state(UUID.randomUUID().toString())
-            } catch (e: MonobankApiException) {
-                // The sandbox may answer 400 for orders it never saw; only a signature problem is a failure here.
-                assertThat(e).isNotInstanceOf(MonobankAuthException::class.java)
-                return
+        // The sandbox answers an unknown (well-formed) order id with 404, so this must be NotFound. A wrong host or
+        // path would also give 404, so the order-id validation below proves the request reached the real API.
+        assertThat(chast.orders.state(UUID.randomUUID().toString()))
+            .isInstanceOf(OrderStateResult.NotFound::class.java)
+        assertThatThrownBy { chast.orders.state("not-a-uuid") }
+            .isInstanceOfSatisfying(MonobankBadRequestException::class.java) {
+                assertThat(it.errorText).isNotBlank()
+                assertThat(it.traceId).isNotBlank()
             }
-        assertThat(result).isInstanceOf(OrderStateResult.NotFound::class.java)
     }
 
     @Test

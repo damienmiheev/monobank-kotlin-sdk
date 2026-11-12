@@ -30,7 +30,8 @@ public data class GuaranteeLetterData
  * Header of a guarantee letter.
  *
  * @property requestId Order id (UUID).
- * @property answerDatetime When the letter was generated (sent without an offset; read as Kyiv time).
+ * @property answerDatetime When the letter was generated (sent without an offset; read as Kyiv time, which monobank's
+ *   docs do not state).
  * @property fromOrganization Name of the lending bank.
  * @property organizationId EDRPOU code of the lending bank.
  * @property contractNumber Number of the contract between the bank and the store (v2 only).
@@ -49,7 +50,7 @@ public data class GuaranteeLetterHeader
     )
 
 /**
- * Body of a guarantee letter.
+ * Body of a guarantee letter. [toString] prints only the lengths of [sign] and [stamp].
  *
  * @property customer The client.
  * @property invoice The invoice the credit pays for.
@@ -68,7 +69,13 @@ public data class GuaranteeLetterExpansion
         @param:JsonProperty("bank") public val bank: GuaranteeBank?,
         @param:JsonProperty("sign") public val sign: String?,
         @param:JsonProperty("stamp") public val stamp: String?,
-    )
+    ) {
+        override fun toString(): String =
+            "GuaranteeLetterExpansion(customer=$customer, invoice=$invoice, paymentDestination=$paymentDestination, " +
+                "bank=$bank, sign=${sign?.let {
+                    "<${it.length} chars>"
+                }}, stamp=${stamp?.let { "<${it.length} chars>" }})"
+    }
 
 /**
  * The client on a guarantee letter. [toString] hides [inn].
@@ -140,7 +147,7 @@ public data class PassportDocument
  * @property number Document number.
  * @property issued Issuing authority.
  * @property dateOfIssue Issue date, exactly as sent (normally `YYYY-MM-DD`).
- * @property validUntil Expiry date.
+ * @property validUntil Expiry date, exactly as sent (normally `YYYY-MM-DD`).
  * @property registryNumber Record number in the population register (13 digits, or 8 digits, a dash and 5 digits).
  */
 @ConsistentCopyVisibility
@@ -150,7 +157,7 @@ public data class IdCardDocument
         @param:JsonProperty("number") public val number: String?,
         @param:JsonProperty("issued") public val issued: String?,
         @param:JsonProperty("date_of_issue") public val dateOfIssue: String?,
-        @param:JsonProperty("valid_until") public val validUntil: LocalDate?,
+        @param:JsonProperty("valid_until") public val validUntil: String?,
         @param:JsonProperty("registry_number") public val registryNumber: String?,
     ) {
         override fun toString(): String =
@@ -164,7 +171,7 @@ public data class IdCardDocument
  * @property number Document number.
  * @property dateOfIssue Issue date, exactly as sent (normally `YYYY-MM-DD`).
  * @property series Document series.
- * @property validUntil Expiry date.
+ * @property validUntil Expiry date, exactly as sent (normally `YYYY-MM-DD`).
  */
 @ConsistentCopyVisibility
 public data class InternationalPassport
@@ -173,7 +180,7 @@ public data class InternationalPassport
         @param:JsonProperty("number") public val number: String?,
         @param:JsonProperty("date_of_issue") public val dateOfIssue: String?,
         @param:JsonProperty("series") public val series: String?,
-        @param:JsonProperty("valid_until") public val validUntil: LocalDate?,
+        @param:JsonProperty("valid_until") public val validUntil: String?,
     ) {
         override fun toString(): String =
             "InternationalPassport(number=${Redaction.secret(number)}, dateOfIssue=$dateOfIssue, series=$series, " +

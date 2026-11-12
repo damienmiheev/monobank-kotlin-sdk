@@ -5,6 +5,7 @@ import io.github.damienmiheev.monobank.installments.internal.InstallmentsErrorDe
 import io.github.damienmiheev.monobank.installments.internal.InstallmentsHttp
 import io.github.damienmiheev.monobank.installments.internal.OrderIdBody
 import io.github.damienmiheev.monobank.installments.internal.requireOrderId
+import io.github.damienmiheev.monobank.installments.internal.traceId
 
 /**
  * Installment orders: create, poll, confirm, reject, return, details.
@@ -23,6 +24,9 @@ public class OrderApi internal constructor(
      * `store_order_id` (a repeat returns the existing order's id instead of creating another), so always send a
      * stable [CreateOrderRequest.storeOrderId] per purchase. HTTP 403 (`MonobankAuthException`) means the store may
      * not create orders.
+     *
+     * After an order ends in `FAIL`, a new attempt for the same purchase needs a **new** `store_order_id`: reusing the
+     * old one just returns the failed order's id.
      */
     public fun create(request: CreateOrderRequest): CreateOrderResponse =
         http.post("/api/order/create", request, CreateOrderResponse::class.java, idempotent = true)
@@ -42,8 +46,7 @@ public class OrderApi internal constructor(
                 acceptedStatuses = setOf(NOT_FOUND),
             )
         if (response.statusCode == NOT_FOUND) {
-            val message = runCatching { InstallmentsErrorDecoder.decode(response.body).text }.getOrNull()
-            return OrderStateResult.NotFound(message)
+            return OrderStateResult.NotFound(InstallmentsErrorDecoder.messageOrNull(response), response.traceId())
         }
         return OrderStateResult.Found(MonobankJson.read(response.body, OrderStateInfo::class.java))
     }
@@ -82,6 +85,9 @@ public class OrderApi internal constructor(
      *
      * `POST /api/order/return`. Not retried after an unknown outcome (monobank does not document returns as
      * idempotent): check [data]'s `reverseList` before returning again.
+     *
+     * Returning normally means monobank accepted the return (every error is thrown); do not repeat it based on
+     * [ReturnOrderResponse.status], which is informational and may be missing.
      */
     public fun returnOrder(request: ReturnOrderRequest): ReturnOrderResponse {
         val response = http.execute("/api/order/return", request, idempotent = false)

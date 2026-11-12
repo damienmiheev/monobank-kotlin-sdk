@@ -2,21 +2,26 @@ package io.github.damienmiheev.monobank.installments.order
 
 import io.github.damienmiheev.monobank.core.MonobankAuthException
 import io.github.damienmiheev.monobank.core.MonobankBadRequestException
+import io.github.damienmiheev.monobank.core.MonobankNetworkException
 import io.github.damienmiheev.monobank.core.MonobankNotFoundException
 import io.github.damienmiheev.monobank.core.MonobankSerializationException
 import io.github.damienmiheev.monobank.core.MonobankServerException
 import io.github.damienmiheev.monobank.core.RequestOutcome
 import io.github.damienmiheev.monobank.core.json.MonobankJson
 import io.github.damienmiheev.monobank.installments.InstallmentsTestSupport
+import io.github.damienmiheev.monobank.installments.MonobankInstallments
 import io.github.damienmiheev.monobank.installments.common.InvoiceSource
 import io.github.damienmiheev.monobank.installments.common.OrderSource
 import io.github.damienmiheev.monobank.installments.common.OrderState
 import io.github.damienmiheev.monobank.installments.common.OrderSubState
 import io.github.damienmiheev.monobank.installments.common.Product
+import okhttp3.mockwebserver.MockResponse
+import okhttp3.mockwebserver.SocketPolicy
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
 import java.math.BigDecimal
+import java.time.Duration
 import java.time.LocalDate
 import java.time.OffsetDateTime
 
@@ -140,6 +145,10 @@ class OrderApiTest : InstallmentsTestSupport() {
         assertThatThrownBy { build(id = " ") }.isInstanceOf(IllegalArgumentException::class.java)
         assertThatThrownBy { build(id = "x".repeat(65)) }.isInstanceOf(IllegalArgumentException::class.java)
         assertThatThrownBy { build(programs = emptyList()) }.isInstanceOf(IllegalArgumentException::class.java)
+        assertThatThrownBy { build(programs = programs + programs) }.isInstanceOf(IllegalArgumentException::class.java)
+        assertThatThrownBy { AvailableProgram.of(listOf(2, 6)) }.isInstanceOf(IllegalArgumentException::class.java)
+        assertThatThrownBy { AvailableProgram.of(listOf(3, 26)) }.isInstanceOf(IllegalArgumentException::class.java)
+        assertThat(AvailableProgram.of(listOf(3, 25)).availablePartsCount).containsExactly(3, 25)
         assertThatThrownBy { build(items = emptyList()) }.isInstanceOf(IllegalArgumentException::class.java)
         assertThatThrownBy { Product.of("A", 0, BigDecimal.ONE) }.isInstanceOf(IllegalArgumentException::class.java)
         assertThatThrownBy { Product.of("x".repeat(501), 1, BigDecimal.ONE) }
@@ -203,11 +212,16 @@ class OrderApiTest : InstallmentsTestSupport() {
 
     @Test
     fun `state 404 is a normal not-found answer, not an exception, and is not retried`() {
-        enqueueJson("""{"message":"Замовлення не знайдене"}""", status = 404)
+        server.enqueue(
+            MockResponse()
+                .setResponseCode(404)
+                .setHeader("trace-id", "2026-11-12 16:34:46#abc")
+                .setBody("""{"message":"Замовлення не знайдене"}"""),
+        )
 
         val result = chast.orders.state(ORDER_ID)
 
-        assertThat(result).isEqualTo(OrderStateResult.NotFound("Замовлення не знайдене"))
+        assertThat(result).isEqualTo(OrderStateResult.NotFound("Замовлення не знайдене", "2026-11-12 16:34:46#abc"))
         assertThat(result.stateOrNull).isNull()
         assertThat(server.requestCount).isEqualTo(1)
     }
@@ -215,9 +229,10 @@ class OrderApiTest : InstallmentsTestSupport() {
     @Test
     fun `state 404 without a body is still not-found`() {
         enqueueJson("", status = 404)
-        assertThat(chast.orders.state(ORDER_ID)).isEqualTo(OrderStateResult.NotFound(null))
+        assertThat(chast.orders.state(ORDER_ID)).isEqualTo(OrderStateResult.NotFound(null, null))
+        // monobank's sandbox answers an unknown order with an HTML 404 page.
         enqueueJson("<html>gateway</html>", status = 404)
-        assertThat(chast.orders.state(ORDER_ID)).isEqualTo(OrderStateResult.NotFound(null))
+        assertThat(chast.orders.state(ORDER_ID)).isEqualTo(OrderStateResult.NotFound(null, null))
     }
 
     @Test
@@ -323,7 +338,6 @@ class OrderApiTest : InstallmentsTestSupport() {
             )
 
         assertThat(response.status).isEqualTo("OK")
-        assertThat(response.isOk).isTrue()
         assertThat(
             takeJson("/api/order/return"),
         ).isEqualTo(MonobankJson.mapper.readTree(fixture("POST_api_order_return.request.json")))
@@ -336,8 +350,8 @@ class OrderApiTest : InstallmentsTestSupport() {
         val response =
             chast.orders.returnOrder(ReturnOrderRequest.builder(ORDER_ID, BigDecimal("100.00"), "r-2", false).build())
 
+        // Returning normally is the success signal; the empty body only leaves the informational status unset.
         assertThat(response.status).isNull()
-        assertThat(response.isOk).isFalse()
         val raw = takeRequest("/api/order/return").body.readUtf8()
         assertThat(
             raw,
@@ -346,6 +360,8 @@ class OrderApiTest : InstallmentsTestSupport() {
 
     @Test
     fun `return validates its arguments`() {
+        assertThatThrownBy { ReturnOrderRequest.builder(ORDER_ID, BigDecimal("0.50"), "r", true).build() }
+            .isInstanceOf(IllegalArgumentException::class.java)
         assertThatThrownBy { ReturnOrderRequest.builder(ORDER_ID, BigDecimal("0"), "r", true).build() }
             .isInstanceOf(IllegalArgumentException::class.java)
         assertThatThrownBy { ReturnOrderRequest.builder(ORDER_ID, BigDecimal("1.234"), "r", true).build() }
@@ -464,4 +480,86 @@ class OrderApiTest : InstallmentsTestSupport() {
                 assertThat(it.outcome).isEqualTo(RequestOutcome.UNKNOWN)
             }
     }
+
+    @Test
+    fun `create is retried after a read timeout, which is an unknown outcome`() {
+        server.enqueue(MockResponse().setSocketPolicy(SocketPolicy.NO_RESPONSE))
+        enqueueFixture("POST_api_order_create.response.json", status = 201)
+
+        val response = shortTimeoutClient().orders.create(fullCreateRequest())
+
+        assertThat(response.orderId).isEqualTo(ORDER_ID)
+        assertThat(server.requestCount).isEqualTo(2)
+    }
+
+    @Test
+    fun `confirm is not retried after a read timeout`() {
+        server.enqueue(MockResponse().setSocketPolicy(SocketPolicy.NO_RESPONSE))
+
+        assertThatThrownBy { shortTimeoutClient().orders.confirm(ORDER_ID) }
+            .isInstanceOfSatisfying(MonobankNetworkException::class.java) {
+                assertThat(it.outcome).isEqualTo(RequestOutcome.UNKNOWN)
+            }
+        assertThat(server.requestCount).isEqualTo(1)
+    }
+
+    @Test
+    fun `confirm and reject of an unknown order throw not-found once, and 400 is not retried`() {
+        server.enqueue(
+            MockResponse()
+                .setResponseCode(
+                    404,
+                ).setHeader("trace-id", "t-1")
+                .setBody("""{"message":"Замовлення не знайдене"}"""),
+        )
+        enqueueJson("""{"message":"Замовлення не знайдене"}""", status = 404)
+        enqueueJson("""{"message":"Заявка вже підтверджена"}""", status = 400)
+
+        assertThatThrownBy { chast.orders.confirm(ORDER_ID) }
+            .isInstanceOfSatisfying(MonobankNotFoundException::class.java) {
+                assertThat(it.errorText).isEqualTo("Замовлення не знайдене")
+                assertThat(it.traceId).isEqualTo("t-1")
+            }
+        assertThatThrownBy { chast.orders.reject(ORDER_ID) }.isInstanceOf(MonobankNotFoundException::class.java)
+        assertThatThrownBy { chast.orders.confirm(ORDER_ID) }
+            .isInstanceOfSatisfying(MonobankBadRequestException::class.java) {
+                assertThat(it.errorText).isEqualTo("Заявка вже підтверджена")
+            }
+        assertThat(server.requestCount).isEqualTo(3)
+    }
+
+    @Test
+    fun `toString masks the client phone, the seller phone and the IBAN`() {
+        val request = fullCreateRequest()
+        assertThat(request.toString())
+            .doesNotContain("+380501234567")
+            .doesNotContain("+380501234568")
+            .contains("+380*******67")
+            .contains("ORD-2024-001234")
+        enqueueFixture("POST_api_order_data.response.json")
+        val data = chast.orders.data(ORDER_ID)
+        assertThat(data.toString()).doesNotContain("UA123456789012345678901234567").contains("ORD-2024-001234")
+    }
+
+    @Test
+    fun `missing fully_paid fails instead of reading as false`() {
+        enqueueJson("""{"bank_can_return_money_to_card":true}""")
+
+        assertThatThrownBy { chast.orders.checkPaid(ORDER_ID) }.isInstanceOf(MonobankSerializationException::class.java)
+    }
+
+    @Test
+    fun `Spring default error bodies still give a message`() {
+        enqueueJson(
+            """{"timestamp":"2026-01-01T00:00:00","status":400,"error":"Bad Request","path":"/api/order/data"}""",
+            400,
+        )
+
+        assertThatThrownBy { chast.orders.data(ORDER_ID) }
+            .isInstanceOfSatisfying(MonobankBadRequestException::class.java) {
+                assertThat(it.errorText).isEqualTo("Bad Request")
+            }
+    }
+
+    private fun shortTimeoutClient(): MonobankInstallments = clientWith { it.requestTimeout(Duration.ofMillis(300)) }
 }

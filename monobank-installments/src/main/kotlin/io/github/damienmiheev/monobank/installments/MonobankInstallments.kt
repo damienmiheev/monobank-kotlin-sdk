@@ -17,6 +17,9 @@ import io.github.damienmiheev.monobank.installments.report.StoreApi
  *
  * Thread-safe; create one per store and reuse it.
  *
+ * Personal data in `toString()`: identifiers (client phone, IBAN, tax number, document numbers) are masked; names
+ * are shown. The `internal` constructors of model classes are visible from Java but are not part of the API.
+ *
  * ```kotlin
  * val chast = MonobankInstallments(InstallmentsConfig.builder(storeId, storeSecret).build())
  * val order = chast.orders.create(request)
@@ -45,7 +48,7 @@ public class MonobankInstallments internal constructor(
     public val qrCarts: QrCartApi = QrCartApi(http)
 
     /** Verifies callbacks with this store's secret. */
-    public val callbacks: InstallmentsCallbackVerifier = InstallmentsCallbackVerifier(config.storeSecret)
+    public val callbacks: InstallmentsCallbackVerifier = InstallmentsCallbackVerifier(config.signer)
 
     override fun toString(): String = "MonobankInstallments($config)"
 

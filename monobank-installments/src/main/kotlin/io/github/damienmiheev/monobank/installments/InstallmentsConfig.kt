@@ -1,11 +1,13 @@
 package io.github.damienmiheev.monobank.installments
 
 import io.github.damienmiheev.monobank.core.MonobankClientOptions
+import io.github.damienmiheev.monobank.core.Redaction
+import io.github.damienmiheev.monobank.installments.internal.HmacSigner
 
 /**
  * Settings for [MonobankInstallments].
  *
- * The store secret is never printed by [toString] and is not exposed as a property.
+ * The store secret is never printed by [toString] and is not exposed: it is kept only inside the request signer.
  *
  * @property storeId Store id issued by monobank, sent as the `store-id` header.
  * @property environment Which monobank host to call; `options.baseUrl` overrides it.
@@ -13,10 +15,13 @@ import io.github.damienmiheev.monobank.core.MonobankClientOptions
  */
 public class InstallmentsConfig private constructor(
     public val storeId: String,
-    internal val storeSecret: String,
+    storeSecret: String,
     public val environment: InstallmentsEnvironment,
     public val options: MonobankClientOptions,
 ) {
+    /** Signs with the store secret; the secret itself is not reachable from it. */
+    internal val signer: HmacSigner = HmacSigner(storeSecret)
+
     /** The host requests go to: `options.baseUrl` when set, otherwise [environment]'s host. */
     public val baseUrl: String
         get() = options.baseUrl?.toString() ?: environment.baseUrl
@@ -57,7 +62,10 @@ public class InstallmentsConfig private constructor(
             storeSecret: String,
         ): Builder {
             require(storeId.isNotBlank()) { "storeId must not be blank" }
-            require(storeId.none { it == '\r' || it == '\n' }) { "storeId must be one line" }
+            // A stray space from an env var would otherwise give a 401 on every call.
+            require(storeId == storeId.trim()) { "storeId must not have leading or trailing whitespace" }
+            Redaction.requireHeaderSafe(storeId, "storeId")
+            // The secret is used exactly as issued (it is the HMAC key), so it is not trimmed.
             require(storeSecret.isNotEmpty()) { "storeSecret must not be empty" }
             return Builder(storeId, storeSecret)
         }

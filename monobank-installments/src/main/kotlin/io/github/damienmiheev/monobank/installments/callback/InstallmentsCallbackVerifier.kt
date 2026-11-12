@@ -19,17 +19,17 @@ import java.util.Base64
  * Callbacks are sent only on `IN_PROCESS` / `WAITING_FOR_STORE_CONFIRM` and on any `FAIL` (QR flow: also
  * `SUCCESS` / `ACTIVE`); poll `orders.state` for the rest.
  *
- * @param storeSecret The store secret (the same one used for requests).
+ * Callbacks carry no timestamp or nonce, so a captured callback can be replayed: process them idempotently and,
+ * before an irreversible action (handing over goods), you may re-check `orders.state`.
+ *
+ * Accept callbacks for order ids you do not know: in the QR flow the cart id can be lost when `qrCarts.create` ends
+ * with an unknown outcome. Match such an order to your purchase with `orders.data(orderId).storeOrderId`.
  */
-public class InstallmentsCallbackVerifier(
-    storeSecret: String,
+public class InstallmentsCallbackVerifier internal constructor(
+    private val signer: HmacSigner,
 ) {
-    private val signer: HmacSigner
-
-    init {
-        require(storeSecret.isNotEmpty()) { "storeSecret must not be empty" }
-        signer = HmacSigner(storeSecret)
-    }
+    /** Creates a verifier for [storeSecret], used exactly as issued (not trimmed). */
+    public constructor(storeSecret: String) : this(HmacSigner(requireSecret(storeSecret)))
 
     /**
      * `true` when [signature] (the `signature` header) matches [body].
@@ -84,6 +84,11 @@ public class InstallmentsCallbackVerifier(
     public companion object {
         /** Name of the header that carries the callback signature. */
         public const val SIGNATURE_HEADER: String = "signature"
+
+        private fun requireSecret(storeSecret: String): String {
+            require(storeSecret.isNotEmpty()) { "storeSecret must not be empty" }
+            return storeSecret
+        }
 
         private fun decode(signature: String?): ByteArray? {
             if (signature.isNullOrBlank()) return null

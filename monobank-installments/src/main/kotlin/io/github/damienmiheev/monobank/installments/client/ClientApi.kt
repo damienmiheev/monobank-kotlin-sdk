@@ -52,7 +52,8 @@ public class ClientApi internal constructor(
 /**
  * Answer of `POST /api/v2/client/validate`.
  *
- * @property found `true` when the phone belongs to a monobank client (`false` also when monobank omits the field).
+ * @property found `true` when the phone belongs to a monobank client. An answer without it fails to parse rather
+ *   than reading as `false`.
  */
 @ConsistentCopyVisibility
 public data class ValidateClientResponse

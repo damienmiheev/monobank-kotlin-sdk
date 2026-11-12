@@ -1,16 +1,21 @@
 package io.github.damienmiheev.monobank.installments.qr
 
 import io.github.damienmiheev.monobank.core.MonobankBadRequestException
+import io.github.damienmiheev.monobank.core.MonobankNetworkException
 import io.github.damienmiheev.monobank.core.MonobankServerException
+import io.github.damienmiheev.monobank.core.RequestOutcome
 import io.github.damienmiheev.monobank.core.json.MonobankJson
 import io.github.damienmiheev.monobank.installments.InstallmentsTestSupport
+import io.github.damienmiheev.monobank.installments.RefusingHttpClient
 import io.github.damienmiheev.monobank.installments.common.Product
 import io.github.damienmiheev.monobank.installments.order.OrderStateResult
 import okhttp3.mockwebserver.MockResponse
+import okhttp3.mockwebserver.SocketPolicy
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
 import java.math.BigDecimal
+import java.time.Duration
 
 class QrCartApiTest : InstallmentsTestSupport() {
     private val request =
@@ -28,6 +33,7 @@ class QrCartApiTest : InstallmentsTestSupport() {
         val result = chast.qrCarts.create(request)
 
         assertThat(result).isEqualTo(QrCartResult.Created("0b5c2c6e-3d6f-4a59-9a8e-2f3c1d9b7a10"))
+        assertThat(result.cartIdOrNull).isEqualTo("0b5c2c6e-3d6f-4a59-9a8e-2f3c1d9b7a10")
         assertThat(
             takeJson("/api/v1/qr/cart"),
         ).isEqualTo(MonobankJson.mapper.readTree(fixture("POST_api_v1_qr_cart.request.json")))
@@ -35,11 +41,18 @@ class QrCartApiTest : InstallmentsTestSupport() {
 
     @Test
     fun `409 is a normal conflict answer, not an exception`() {
-        enqueueJson("""{"message":"QR-код вже має активний кошик"}""", status = 409)
+        server.enqueue(
+            MockResponse()
+                .setResponseCode(
+                    409,
+                ).setHeader("trace-id", "t-409")
+                .setBody("""{"message":"QR-код вже має активний кошик"}"""),
+        )
 
         val result = chast.qrCarts.create(request)
 
-        assertThat(result).isEqualTo(QrCartResult.Conflict("QR-код вже має активний кошик"))
+        assertThat(result).isEqualTo(QrCartResult.Conflict("QR-код вже має активний кошик", "t-409"))
+        assertThat(result.cartIdOrNull).isNull()
         assertThat(server.requestCount).isEqualTo(1)
     }
 
@@ -100,14 +113,49 @@ class QrCartApiTest : InstallmentsTestSupport() {
     @Test
     fun `request validation`() {
         val products = listOf(Product.of("A", 1, BigDecimal.ONE))
-        assertThatThrownBy { CreateQrCartRequest.of("", "s", products, "https://x") }
+        assertThatThrownBy { CreateQrCartRequest.of("", ORDER_ID, products, "https://x") }
             .isInstanceOf(IllegalArgumentException::class.java)
         assertThatThrownBy { CreateQrCartRequest.of("q", " ", products, "https://x") }
             .isInstanceOf(IllegalArgumentException::class.java)
-        assertThatThrownBy { CreateQrCartRequest.of("q", "s", emptyList(), "https://x") }
+        assertThatThrownBy { CreateQrCartRequest.of("q", "ORD-1", products, "https://x") }
             .isInstanceOf(IllegalArgumentException::class.java)
-        assertThatThrownBy { CreateQrCartRequest.of("q", "s", products, "") }
+            .hasMessageContaining("UUID")
+        assertThatThrownBy { CreateQrCartRequest.of("q", ORDER_ID, emptyList(), "https://x") }
+            .isInstanceOf(IllegalArgumentException::class.java)
+        assertThatThrownBy { CreateQrCartRequest.of("q", ORDER_ID, products, "") }
             .isInstanceOf(IllegalArgumentException::class.java)
         assertThatThrownBy { chast.qrCarts.cancel(" ") }.isInstanceOf(IllegalArgumentException::class.java)
+    }
+
+    @Test
+    fun `create is retried after 429 because nothing was done`() {
+        enqueueJson("""{"message":"slow down"}""", status = 429)
+        enqueueFixture("POST_api_v1_qr_cart.response.json", status = 201)
+
+        assertThat(chast.qrCarts.create(request)).isInstanceOf(QrCartResult.Created::class.java)
+        assertThat(server.requestCount).isEqualTo(2)
+    }
+
+    @Test
+    fun `create is retried when the request was never sent`() {
+        val refusing = RefusingHttpClient()
+
+        assertThatThrownBy { clientWith { it.httpClient(refusing) }.qrCarts.create(request) }
+            .isInstanceOfSatisfying(MonobankNetworkException::class.java) {
+                assertThat(it.outcome).isEqualTo(RequestOutcome.NOT_SENT)
+            }
+        // The first attempt plus two retries.
+        assertThat(refusing.uris).hasSize(3)
+    }
+
+    @Test
+    fun `create is not retried after a read timeout`() {
+        server.enqueue(MockResponse().setSocketPolicy(SocketPolicy.NO_RESPONSE))
+
+        assertThatThrownBy { clientWith { it.requestTimeout(Duration.ofMillis(300)) }.qrCarts.create(request) }
+            .isInstanceOfSatisfying(MonobankNetworkException::class.java) {
+                assertThat(it.outcome).isEqualTo(RequestOutcome.UNKNOWN)
+            }
+        assertThat(server.requestCount).isEqualTo(1)
     }
 }

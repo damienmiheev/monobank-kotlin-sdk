@@ -47,7 +47,8 @@ internal class DailyReport
  * @property totalSum Credit amount in hryvnias.
  * @property transferredSum Amount transferred to the store in hryvnias.
  * @property commission Commission in hryvnias.
- * @property operationTimestamp When the operation happened (sent without an offset; read as Kyiv time).
+ * @property operationTimestamp When the operation happened (sent without an offset; read as Kyiv time, which
+ *   monobank's docs do not state).
  * @property odbContractNumber Credit agreement number.
  */
 @ConsistentCopyVisibility

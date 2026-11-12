@@ -36,18 +36,24 @@ abstract class InstallmentsTestSupport {
 
     protected fun client(
         retryPolicy: RetryPolicy = RetryPolicy.of(2, Duration.ZERO, Duration.ZERO),
+    ): MonobankInstallments = clientWith { it.retryPolicy(retryPolicy) }
+
+    /** A client pointed at [server] (zero-wait retries), with extra transport settings. */
+    protected fun clientWith(
+        baseUrl: String = server.url("/").toString(),
+        customize: (MonobankClientOptions.Builder) -> MonobankClientOptions.Builder,
     ): MonobankInstallments {
+        val options =
+            MonobankClientOptions
+                .builder()
+                .baseUrl(baseUrl)
+                .retryPolicy(RetryPolicy.of(2, Duration.ZERO, Duration.ZERO))
         val config =
             InstallmentsConfig
                 .builder(STORE_ID, STORE_SECRET)
                 .environment(InstallmentsEnvironment.SANDBOX)
-                .options(
-                    MonobankClientOptions
-                        .builder()
-                        .baseUrl(server.url("/").toString())
-                        .retryPolicy(retryPolicy)
-                        .build(),
-                ).build()
+                .options(customize(options).build())
+                .build()
         return MonobankInstallments(config, InstallmentsHttp(config) { })
     }
 

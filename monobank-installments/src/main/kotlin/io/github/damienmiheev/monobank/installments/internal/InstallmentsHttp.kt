@@ -18,14 +18,25 @@ import java.util.Base64
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
 
-/** Error body of the installments API: `{"message": "..."}`. It has no machine-readable code. */
+/**
+ * Error body of the installments API: `{"message": "..."}`. It has no machine-readable code. Spring's default error
+ * body (`{"status": 500, "error": "Internal Server Error"}`, e.g. from a gateway) falls back to `error`.
+ */
 internal object InstallmentsErrorDecoder : ErrorDecoder {
     override fun decode(body: ByteArray): ApiError {
         if (body.isEmpty()) return ApiError(null, null)
         val node = MonobankJson.readTree(body)
-        return ApiError(null, node.path("message").asText(null))
+        val text = node.path("message").asText(null) ?: node.path("error").asText(null)
+        return ApiError(null, text)
     }
+
+    /** monobank's message from an accepted non-2xx answer, or `null` when the body is empty or not JSON. */
+    fun messageOrNull(response: ApiResponse): String? = runCatching { decode(response.body).text }.getOrNull()
 }
+
+/** monobank's trace id of [this] answer (`trace-id` header; quote it to monobank support). */
+internal fun ApiResponse.traceId(): String? =
+    listOf("trace-id", "x-trace-id", "X-Request-Id", "request_trace_id").firstNotNullOfOrNull(::header)
 
 /** `Base64(HMAC-SHA256(body bytes, store secret UTF-8))`, as the installments API signs requests and callbacks. */
 internal class HmacSigner(
@@ -71,7 +82,7 @@ internal class InstallmentsHttp(
     config: InstallmentsConfig,
     sleeper: MonobankHttp.Sleeper = MonobankHttp.Sleeper.SYSTEM,
 ) {
-    private val signer = HmacSigner(config.storeSecret)
+    private val signer = config.signer
     private val http =
         MonobankHttp(
             options = config.options,

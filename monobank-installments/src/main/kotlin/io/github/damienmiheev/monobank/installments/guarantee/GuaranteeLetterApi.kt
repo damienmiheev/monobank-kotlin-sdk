@@ -28,7 +28,7 @@ public class GuaranteeLetterApi internal constructor(
                     "/api/order/guarantee/letter",
                     request,
                     idempotent = true,
-                    headers = mapOf("Accept" to "application/pdf"),
+                    headers = mapOf("Accept" to ACCEPT_PDF_OR_ERROR),
                 ).body
         if (!looksLikePdf(body)) {
             throw MonobankSerializationException(
@@ -73,6 +73,9 @@ public class GuaranteeLetterApi internal constructor(
         )
 
     private companion object {
+        /** PDF on success; JSON for the error answers, so monobank's message is not lost to content negotiation. */
+        const val ACCEPT_PDF_OR_ERROR = "application/pdf, application/json;q=0.9"
+
         /** PDF readers accept the `%PDF-` header anywhere in the first 1024 bytes. */
         const val PDF_HEADER_WINDOW = 1024
         val PDF_MAGIC = "%PDF-".toByteArray(StandardCharsets.US_ASCII)

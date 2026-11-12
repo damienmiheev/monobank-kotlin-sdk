@@ -28,3 +28,14 @@ internal fun requireNotBlank(
     require(value.isNotBlank()) { "$name must not be blank" }
     return value
 }
+
+/** Masks a phone for `toString()`: `+380*******67`. */
+internal fun maskPhone(phone: String?): String? {
+    if (phone == null) return null
+    val visible = PHONE_PREFIX + PHONE_SUFFIX
+    if (phone.length <= visible + 2) return "***"
+    return phone.take(PHONE_PREFIX) + "*".repeat(phone.length - visible) + phone.takeLast(PHONE_SUFFIX)
+}
+
+private const val PHONE_PREFIX = 4
+private const val PHONE_SUFFIX = 2

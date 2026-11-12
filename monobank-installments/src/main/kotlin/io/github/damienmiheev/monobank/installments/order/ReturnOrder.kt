@@ -11,8 +11,8 @@ import java.math.BigDecimal
  * several partial returns are allowed.
  *
  * @property orderId monobank order id.
- * @property sum Returned amount in hryvnias, decimal, not kopiyky (at least 1 per the spec). For a **full** return
- *   pass the whole order sum.
+ * @property sum Returned amount in hryvnias, decimal, not kopiyky, at least 1. For a **full** return pass the whole
+ *   order sum.
  * @property storeReturnId Your unique id of this return.
  * @property returnMoneyToCard `true` to return the money to the client's card, `false` when the store returns cash.
  * @property additionalParams VAT of the return.
@@ -41,6 +41,7 @@ public data class ReturnOrderRequest internal constructor(
         public fun build(): ReturnOrderRequest {
             requireNotBlank(orderId, "orderId")
             requireHryvnias(sum, "sum")
+            require(sum >= BigDecimal.ONE) { "sum must be at least 1 (hryvnias)" }
             requireNotBlank(storeReturnId, "storeReturnId")
             return ReturnOrderRequest(
                 orderId,
@@ -82,17 +83,14 @@ public data class ReturnAdditionalParams internal constructor(
 )
 
 /**
- * Answer of `POST /api/order/return`.
+ * Answer of `POST /api/order/return`. Receiving it at all means monobank accepted the return: every failure is thrown
+ * as an exception. Never repeat a return because of [status].
  *
- * @property status `OK` on success; `null` if monobank sent an empty body.
+ * @property status Informational: `OK` per the docs; `null` when monobank sent an empty body.
  */
 @ConsistentCopyVisibility
 public data class ReturnOrderResponse
     @JsonCreator
     internal constructor(
         @param:JsonProperty("status") public val status: String?,
-    ) {
-        /** `true` when [status] is `OK`. */
-        public val isOk: Boolean
-            get() = status.equals("OK", ignoreCase = true)
-    }
+    )

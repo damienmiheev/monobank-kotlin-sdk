@@ -25,7 +25,8 @@ class GuaranteeLetterApiTest : InstallmentsTestSupport() {
 
         assertThat(bytes).isEqualTo(pdf)
         val recorded = takeRequest("/api/order/guarantee/letter")
-        assertThat(recorded.headers.values("Accept")).anyMatch { it.contains("application/pdf") }
+        // One Accept header that prefers PDF but lets JSON error bodies through.
+        assertThat(recorded.headers.values("Accept")).containsExactly("application/pdf, application/json;q=0.9")
         assertThat(MonobankJson.mapper.readTree(recorded.body.readUtf8()))
             .isEqualTo(MonobankJson.mapper.readTree(fixture("POST_api_order_guarantee_letter.request.json")))
     }
@@ -122,14 +123,14 @@ class GuaranteeLetterApiTest : InstallmentsTestSupport() {
             assertThat(number).isEqualTo("123456")
             assertThat(issued).isEqualTo("1234")
             assertThat(dateOfIssue).isEqualTo("1901-01-29")
-            assertThat(validUntil).isEqualTo(LocalDate.of(2025, 1, 25))
+            assertThat(validUntil).isEqualTo("2025-01-25")
             assertThat(registryNumber).isEqualTo("12345678-12345")
         }
         with(documents.internationalPassport!!) {
             assertThat(number).isEqualTo("123456")
             assertThat(dateOfIssue).isEqualTo("1901-01-29")
             assertThat(series).isEqualTo("FV")
-            assertThat(validUntil).isEqualTo(LocalDate.of(2025, 1, 25))
+            assertThat(validUntil).isEqualTo("2025-01-25")
         }
         with(expansion.invoice!!) {
             assertThat(invoiceNumber).isEqualTo("1234-1234-1234")
@@ -160,6 +161,7 @@ class GuaranteeLetterApiTest : InstallmentsTestSupport() {
         val printed = expansion.toString()
         assertThat(printed).doesNotContain("AA123456").doesNotContain("number=123456").doesNotContain("12345678-12345")
         assertThat(printed).contains("Олександр")
+        assertThat(printed).doesNotContain("12E0F76458C6D1E4").contains("sign=<16 chars>")
     }
 
     @Test
@@ -185,5 +187,22 @@ class GuaranteeLetterApiTest : InstallmentsTestSupport() {
                 null,
             )
         }.isInstanceOf(IllegalArgumentException::class.java)
+    }
+
+    @Test
+    fun `non-ISO document dates do not break the letter`() {
+        enqueueJson(
+            """{"expansion":{"customer":{"document":{"id_card":{"valid_until":"20.05.2030"}}}}}""",
+        )
+
+        val data = chast.guaranteeLetters.data(request)
+
+        assertThat(
+            data.expansion!!
+                .customer!!
+                .document!!
+                .idCard!!
+                .validUntil,
+        ).isEqualTo("20.05.2030")
     }
 }

@@ -34,6 +34,8 @@ class StoreApiTest : InstallmentsTestSupport() {
 
     @Test
     fun `amounts keep the scale monobank sends (answer recorded from the sandbox)`() {
+        // Recorded with curl from u2-demo-ext.mono.st4g3.com on 2026-11-12. The sandbox answers with canned data,
+        // hence the synthetic-looking ids, but the number formatting (3500.00, 3.50) is the server's own.
         enqueueFixture("sandbox_store_report.response.json")
 
         val order = chast.store.report(LocalDate.of(2026, 11, 11)).single()

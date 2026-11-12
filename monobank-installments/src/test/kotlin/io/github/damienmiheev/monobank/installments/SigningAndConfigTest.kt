@@ -1,6 +1,7 @@
 package io.github.damienmiheev.monobank.installments
 
 import io.github.damienmiheev.monobank.core.MonobankClientOptions
+import io.github.damienmiheev.monobank.core.MonobankNetworkException
 import io.github.damienmiheev.monobank.core.RetryPolicy
 import io.github.damienmiheev.monobank.installments.internal.HmacSigner
 import org.assertj.core.api.Assertions.assertThat
@@ -120,6 +121,40 @@ class SigningAndConfigTest : InstallmentsTestSupport() {
         assertThatThrownBy { InstallmentsConfig.builder("s", "") }.isInstanceOf(IllegalArgumentException::class.java)
         assertThatThrownBy { InstallmentsConfig.builder("s\r\nX: y", "k") }
             .isInstanceOf(IllegalArgumentException::class.java)
+    }
+
+    @Test
+    fun `storeId with surrounding whitespace or non-ASCII is rejected at config time`() {
+        for (bad in listOf("store ", " store", "store\t", "магазин", "store id")) {
+            assertThatThrownBy { InstallmentsConfig.builder(bad, "k") }
+                .`as`(bad)
+                .isInstanceOf(IllegalArgumentException::class.java)
+        }
+        // The secret is the HMAC key and is used exactly as issued, spaces included.
+        val secretWithSpaces = InstallmentsConfig.builder("store", " k ").build()
+        assertThat(secretWithSpaces.storeId).isEqualTo("store")
+    }
+
+    @Test
+    fun `each environment sends requests to its own host`() {
+        for (environment in InstallmentsEnvironment.values()) {
+            val refusing = RefusingHttpClient()
+            val config =
+                InstallmentsConfig
+                    .builder(STORE_ID, STORE_SECRET)
+                    .environment(environment)
+                    .options(
+                        MonobankClientOptions
+                            .builder()
+                            .httpClient(refusing)
+                            .retryPolicy(RetryPolicy.NONE)
+                            .build(),
+                    ).build()
+
+            assertThatThrownBy { MonobankInstallments(config).clients.validate("+380501234567") }
+                .isInstanceOf(MonobankNetworkException::class.java)
+            assertThat(refusing.uris.single().toString()).isEqualTo(environment.baseUrl + "/api/v2/client/validate")
+        }
     }
 
     @Test
