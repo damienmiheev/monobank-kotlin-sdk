@@ -7,6 +7,21 @@ import java.math.RoundingMode
 import java.net.URI
 import java.time.Duration
 
+/**
+ * The merchant's rules for `merchantPaymInfo.basketOrder`.
+ *
+ * @property validateTotal The basket must add up to the amount (the fake's own rule).
+ * @property basketRequired Fiscalization or split payments: a non-empty basket is mandatory.
+ * @property splitRequired Split payments: every basket item needs a `splitReceiverId`.
+ */
+internal class BasketRules(
+    val validateTotal: Boolean,
+    val basketRequired: Boolean,
+    val splitRequired: Boolean,
+) {
+    fun withoutRequirements(): BasketRules = BasketRules(validateTotal, basketRequired = false, splitRequired = false)
+}
+
 /** A validated `invoice/create` request. */
 internal class CreateParams(
     val amount: Long,
@@ -44,7 +59,7 @@ internal object RequestParsing {
 
     fun create(
         json: ObjectNode,
-        validateBasketTotal: Boolean,
+        rules: BasketRules,
     ): CreateParams {
         val amount = Fields.requiredLong(json, "amount")
         val ccy = currency(json, required = false)
@@ -65,7 +80,8 @@ internal object RequestParsing {
             amount = amount,
             ccy = ccy,
             paymentType = paymentType,
-            order = order(json, amount, validateBasketTotal),
+            // A verification invoice charges nothing, so the fake does not require a basket for it.
+            order = order(json, amount, if (paymentType == "verification") rules.withoutRequirements() else rules),
             webHookUrl = webHookUrl(json),
             redirectUrl = Fields.string(json, "redirectUrl")?.takeIf { it.isNotBlank() },
             validity = validity(json),
@@ -77,7 +93,7 @@ internal object RequestParsing {
 
     fun walletPayment(
         json: ObjectNode,
-        validateBasketTotal: Boolean,
+        rules: BasketRules,
     ): WalletPaymentParams {
         badRequestUnless(!json.hasNonNull("aToken") && !json.hasNonNull("gToken")) {
             "Apple Pay and Google Pay tokens are not supported by the fake"
@@ -93,7 +109,7 @@ internal object RequestParsing {
             amount = amount,
             ccy = ccy,
             paymentType = paymentType(json, WALLET_TYPES, ccy),
-            order = order(json, amount, validateBasketTotal),
+            order = order(json, amount, rules),
             webHookUrl = webHookUrl(json),
             redirectUrl = Fields.string(json, "redirectUrl")?.takeIf { it.isNotBlank() },
         )
@@ -146,27 +162,45 @@ internal object RequestParsing {
     private fun order(
         json: JsonNode,
         amount: Long,
-        validateBasketTotal: Boolean,
+        rules: BasketRules,
     ): OrderInfo {
-        val info = Fields.obj(json, "merchantPaymInfo") ?: return OrderInfo(null, null, null)
+        val info = Fields.obj(json, "merchantPaymInfo")
+        val basket = info?.get("basketOrder")?.takeIf { !it.isNull }
+        paymInfoUnless(!rules.basketRequired || (basket != null && !(basket.isArray && basket.isEmpty))) {
+            BASKET_REQUIRED
+        }
+        if (info == null) return OrderInfo(null, null, null)
         val reference = paymInfoString(info, "reference")
         val destination = paymInfoString(info, "destination")
         val comment = paymInfoString(info, "comment")
-        if ((destination?.length ?: 0) > TEXT_MAX || (comment?.length ?: 0) > TEXT_MAX) {
-            throw invalidPaymInfo("destination and comment are limited to $TEXT_MAX characters")
+        paymInfoUnless((destination?.length ?: 0) <= TEXT_MAX && (comment?.length ?: 0) <= TEXT_MAX) {
+            "destination and comment are limited to $TEXT_MAX characters"
         }
-        val basket = info.get("basketOrder")
-        if (basket != null && !basket.isNull) {
-            if (!basket.isArray) throw invalidPaymInfo("invalid 'basketOrder'")
-            val total = basket.sumOf { basketItemTotal(it) }
-            val hasDiscounts = info.hasNonNull("discounts") || basket.any { it.hasNonNull("discounts") }
-            if (validateBasketTotal && !hasDiscounts && total != amount) {
-                throw invalidPaymInfo("basketOrder total $total does not match amount $amount")
-            }
-        }
+        if (basket != null) basket(info, basket, amount, rules)
         val metadata = info.get("metadata")?.takeIf { it.isObject }
         return OrderInfo(reference, destination, metadata)
     }
+
+    private fun basket(
+        info: JsonNode,
+        basket: JsonNode,
+        amount: Long,
+        rules: BasketRules,
+    ) {
+        paymInfoUnless(basket.isArray) { "invalid 'basketOrder'" }
+        val total = basket.sumOf { basketItemTotal(it) }
+        paymInfoUnless(!rules.splitRequired || basket.all { isText(it.get("splitReceiverId")) }) {
+            "'splitReceiverId' is required"
+        }
+        val hasDiscounts = info.hasNonNull("discounts") || basket.any { it.hasNonNull("discounts") }
+        paymInfoUnless(!rules.validateTotal || hasDiscounts || total == amount) {
+            "basketOrder total $total does not match amount $amount"
+        }
+    }
+
+    /** monobank's answer (verified live) when a fiscalization or split merchant sends no basket. */
+    const val BASKET_REQUIRED =
+        "'basketOrder' cannot be empty, it is mandatory for fiscalization and split payments"
 
     private fun paymInfoString(
         info: JsonNode,

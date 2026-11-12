@@ -38,6 +38,9 @@ public object MonobankPaths {
     /** `GET /api/merchant/statement`. */
     public const val STATEMENT: String = "/api/merchant/statement"
 
+    /** `GET /api/merchant/split-receiver/list`. */
+    public const val SPLIT_RECEIVERS: String = "/api/merchant/split-receiver/list"
+
     /** Matches every path in [FakeMonobankAcquiring.injectFault]; path-specific faults take precedence. */
     public const val ANY: String = "*"
 
@@ -56,5 +59,6 @@ public object MonobankPaths {
             WALLET,
             WALLET_CARD,
             STATEMENT,
+            SPLIT_RECEIVERS,
         )
 }

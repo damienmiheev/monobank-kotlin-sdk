@@ -36,10 +36,11 @@ import java.util.function.Predicate
  * Served, with `X-Token` checked (missing → 400 `BAD_REQUEST`, as documented for `pubkey`; unknown →
  * 403 `FORBIDDEN`): `GET pubkey`, `GET details`, `POST invoice/create`, `GET invoice/status`,
  * `POST invoice/remove`, `POST invoice/finalize`, `POST invoice/cancel`, `POST wallet/payment`,
- * `GET wallet`, `DELETE wallet/card`, `GET statement` (all under `/api/merchant/`, see [MonobankPaths]).
+ * `GET wallet`, `DELETE wallet/card`, `GET statement`, `GET split-receiver/list` (all under `/api/merchant/`,
+ * see [MonobankPaths]).
  * **Not served** (they answer 404 `NOT_FOUND`, which looks like "not found", beware): `invoice/receipt`,
  * `invoice/fiscal-checks`, `invoice/payment-direct`, `invoice/sync-payment`, QR, subscriptions,
- * split receivers, submerchants, monopay keys, Tap-to-Phone, POS refunds. Apple Pay / Google Pay
+ * `split-receiver/get-by-id`, submerchants, monopay keys, Tap-to-Phone, POS refunds. Apple Pay / Google Pay
  * tokens in `wallet/payment` answer 400.
  *
  * `pageUrl` and `tdsUrl` lead to a tiny page on the fake with "Pay" and "Decline" buttons (no token
@@ -85,6 +86,10 @@ import java.util.function.Predicate
  * - Webhooks are tried 3 times, 200 ms apart, until the receiver answers 200 ([Builder.webhookRetries]).
  *   They go out one at a time, in order, on one thread: a slow receiver delays later webhooks.
  * - Dates are RFC 3339 in UTC with milliseconds.
+ * - Merchants with fiscal receipts or split payments ([Builder.fiscalization], [Builder.splitPayments]):
+ *   the basket rules of `invoice/create` and the partial-finalize rule are verified against monobank's
+ *   test merchant; the same rules on `wallet/payment`, the partial-`invoice/cancel` rule (400 `1001` without
+ *   `items`) and the exemption of verification invoices are inferred.
  *
  * ### Faults and webhook control
  * [injectFault] (delay before or after processing, answer after webhooks, timeout, dropped
@@ -193,7 +198,10 @@ public class FakeMonobankAcquiring private constructor(
                 MerchantSetup
                     .builder(builder.tokens.first(), *builder.tokens.drop(1).toTypedArray())
                     .details(builder.merchantId, builder.merchantName, builder.edrpou)
+                    .fiscalization(builder.fiscalization)
+                    .splitPayments(builder.splitPayments)
                     .apply { builder.signer?.let { signer(it) } }
+                    .apply { builder.splitReceivers?.let { splitReceivers(it) } }
                     .build(),
             ) + builder.extraMerchants
         val allTokens = setups.flatMap { it.tokens }
@@ -204,7 +212,14 @@ public class FakeMonobankAcquiring private constructor(
                 val state =
                     MerchantState(
                         bank,
-                        MerchantInfo(setup.merchantId, setup.merchantName, setup.edrpou),
+                        MerchantInfo(
+                            setup.merchantId,
+                            setup.merchantName,
+                            setup.edrpou,
+                            setup.fiscalization,
+                            setup.splitPayments,
+                            setup.splitReceivers,
+                        ),
                         setup.tokens.toSet(),
                         setup.signer,
                     )
@@ -716,6 +731,9 @@ public class FakeMonobankAcquiring private constructor(
         internal var merchantName: String = "Fake Merchant"
         internal var edrpou: String = "4242424242"
         internal val extraMerchants: MutableList<MerchantSetup> = mutableListOf()
+        internal var fiscalization: Boolean = false
+        internal var splitPayments: Boolean = false
+        internal var splitReceivers: List<SplitReceiver>? = null
         internal var webhookDelivery: WebhookDelivery = WebhookDelivery.AUTOMATIC
         internal var webhookDelay: Duration = Duration.ZERO
         internal var webhookMaxAttempts: Int = 3
@@ -751,6 +769,19 @@ public class FakeMonobankAcquiring private constructor(
                 this.merchantId = merchantId
                 this.merchantName = merchantName
                 this.edrpou = edrpou
+            }
+
+        /** Fiscal receipts for the default merchant (default off); see [MerchantSetup.Builder.fiscalization]. */
+        public fun fiscalization(enabled: Boolean): Builder = apply { fiscalization = enabled }
+
+        /** Split payments for the default merchant (default off); see [MerchantSetup.Builder.splitPayments]. */
+        public fun splitPayments(enabled: Boolean): Builder = apply { splitPayments = enabled }
+
+        /** The default merchant's split receivers; see [MerchantSetup.Builder.splitReceivers]. */
+        public fun splitReceivers(vararg receivers: SplitReceiver): Builder =
+            apply {
+                splitReceivers =
+                    receivers.toList()
             }
 
         /** Adds another merchant with its own tokens, key, invoices and wallets. */

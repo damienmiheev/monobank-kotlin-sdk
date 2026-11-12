@@ -29,6 +29,9 @@ import java.security.SecureRandom
  * @property merchantId What `GET /api/merchant/details` returns as `merchantId` (must be unique per fake).
  * @property merchantName `merchantName` in `GET /api/merchant/details`.
  * @property edrpou `edrpou` in `GET /api/merchant/details`.
+ * @property fiscalization Fiscal receipts are enabled (see [Builder.fiscalization]).
+ * @property splitPayments Split payments are enabled (see [Builder.splitPayments]).
+ * @property splitReceivers What `GET /api/merchant/split-receiver/list` returns.
  */
 public class MerchantSetup private constructor(
     builder: Builder,
@@ -38,6 +41,10 @@ public class MerchantSetup private constructor(
     public val merchantId: String = builder.merchantId ?: randomMerchantId()
     public val merchantName: String = builder.merchantName
     public val edrpou: String = builder.edrpou
+    public val fiscalization: Boolean = builder.fiscalization
+    public val splitPayments: Boolean = builder.splitPayments
+    public val splitReceivers: List<SplitReceiver> =
+        builder.splitReceivers ?: if (builder.splitPayments) listOf(SplitReceiver.DEFAULT) else emptyList()
 
     override fun toString(): String = "MerchantSetup(merchantId=$merchantId, merchantName=$merchantName)"
 
@@ -49,6 +56,35 @@ public class MerchantSetup private constructor(
         internal var merchantId: String? = null
         internal var merchantName: String = "Fake Merchant"
         internal var edrpou: String = "4242424242"
+        internal var fiscalization: Boolean = false
+        internal var splitPayments: Boolean = false
+        internal var splitReceivers: List<SplitReceiver>? = null
+
+        /**
+         * Fiscal receipts (a PRRO link) are enabled (default off). Then, as monobank answers:
+         * - `invoice/create` and `wallet/payment` without a non-empty `merchantPaymInfo.basketOrder` → 400
+         *   `INVALID_MERCHANT_PAYM_INFO` (verified live for `invoice/create`; inferred for `wallet/payment`,
+         *   and the fake exempts verification invoices, which charge nothing);
+         * - a partial `invoice/finalize` without `items` → 400 `1001` "wrong amount for finalization without
+         *   basket" (verified live); a partial `invoice/cancel` without `items` fails the same way (inferred).
+         */
+        public fun fiscalization(enabled: Boolean): Builder = apply { fiscalization = enabled }
+
+        /**
+         * Split payments are enabled (default off): the [fiscalization] rules apply too, every basket item
+         * needs a `splitReceiverId` (400 `INVALID_MERCHANT_PAYM_INFO` "'splitReceiverId' is required",
+         * verified live for `invoice/create`, inferred for `wallet/payment`), and the receiver list
+         * contains [SplitReceiver.DEFAULT] unless [splitReceivers] says otherwise. The fake does not check
+         * that a `splitReceiverId` is one of the listed receivers.
+         */
+        public fun splitPayments(enabled: Boolean): Builder = apply { splitPayments = enabled }
+
+        /**
+         * What `GET /api/merchant/split-receiver/list` returns (default: [SplitReceiver.DEFAULT] when split
+         * payments are on, otherwise none).
+         */
+        public fun splitReceivers(receivers: List<SplitReceiver>): Builder =
+            apply { splitReceivers = receivers.toList() }
 
         /** The webhook signer (default: a newly generated key). */
         public fun signer(signer: MonobankWebhookSigner): Builder = apply { this.signer = signer }

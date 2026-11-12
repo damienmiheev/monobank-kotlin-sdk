@@ -38,6 +38,7 @@ class SpecConformanceTest {
         FakeMonobankAcquiring
             .builder()
             .refundSettlement(RefundSettlement.MANUAL)
+            .addMerchant(MerchantSetup.builder("split-token").splitPayments(true).build())
             .build()
             .start()
     private val json = ObjectMapper()
@@ -52,8 +53,9 @@ class SpecConformanceTest {
         method: String,
         path: String,
         body: String? = null,
+        token: String = fake.token,
     ): JsonNode {
-        val response = rawCall(fake, method, path, body)
+        val response = rawCall(fake, method, path, body, token)
         val node = json.readTree(response.body())
         val route = "$method ${path.substringBefore('?')}"
         if (response.statusCode() == 200) conforms(route, node) else conforms("ERROR", node)
@@ -160,6 +162,9 @@ class SpecConformanceTest {
         call("POST", MonobankPaths.WALLET_PAYMENT, walletPayment)
         call("GET", "${MonobankPaths.STATEMENT}?from=${Instant.now().minusSeconds(60).epochSecond}")
         call("DELETE", "${MonobankPaths.WALLET_CARD}?cardToken=$cardToken")
+
+        assertThat(call("GET", MonobankPaths.SPLIT_RECEIVERS, token = "split-token").path("list").size()).isEqualTo(1)
+        call("GET", MonobankPaths.SPLIT_RECEIVERS)
 
         // errors
         call("GET", "${MonobankPaths.INVOICE_STATUS}?invoiceId=nope")

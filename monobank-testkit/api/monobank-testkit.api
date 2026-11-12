@@ -171,6 +171,7 @@ public final class io/github/damienmiheev/monobank/testkit/FakeMonobankAcquiring
 	public final fun build ()Lio/github/damienmiheev/monobank/testkit/FakeMonobankAcquiring;
 	public final fun clock (Lio/github/damienmiheev/monobank/testkit/TestClock;)Lio/github/damienmiheev/monobank/testkit/FakeMonobankAcquiring$Builder;
 	public final fun feePercent (Ljava/math/BigDecimal;)Lio/github/damienmiheev/monobank/testkit/FakeMonobankAcquiring$Builder;
+	public final fun fiscalization (Z)Lio/github/damienmiheev/monobank/testkit/FakeMonobankAcquiring$Builder;
 	public final fun hangLimit (Ljava/time/Duration;)Lio/github/damienmiheev/monobank/testkit/FakeMonobankAcquiring$Builder;
 	public final fun merchant (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lio/github/damienmiheev/monobank/testkit/FakeMonobankAcquiring$Builder;
 	public final fun port (I)Lio/github/damienmiheev/monobank/testkit/FakeMonobankAcquiring$Builder;
@@ -178,6 +179,8 @@ public final class io/github/damienmiheev/monobank/testkit/FakeMonobankAcquiring
 	public final fun seed (J)Lio/github/damienmiheev/monobank/testkit/FakeMonobankAcquiring$Builder;
 	public final fun sendProcessingWebhooks (Z)Lio/github/damienmiheev/monobank/testkit/FakeMonobankAcquiring$Builder;
 	public final fun signer (Lio/github/damienmiheev/monobank/testkit/MonobankWebhookSigner;)Lio/github/damienmiheev/monobank/testkit/FakeMonobankAcquiring$Builder;
+	public final fun splitPayments (Z)Lio/github/damienmiheev/monobank/testkit/FakeMonobankAcquiring$Builder;
+	public final fun splitReceivers ([Lio/github/damienmiheev/monobank/testkit/SplitReceiver;)Lio/github/damienmiheev/monobank/testkit/FakeMonobankAcquiring$Builder;
 	public final fun tokens ([Ljava/lang/String;)Lio/github/damienmiheev/monobank/testkit/FakeMonobankAcquiring$Builder;
 	public final fun validateBasketTotal (Z)Lio/github/damienmiheev/monobank/testkit/FakeMonobankAcquiring$Builder;
 	public final fun webhookDelay (Ljava/time/Duration;)Lio/github/damienmiheev/monobank/testkit/FakeMonobankAcquiring$Builder;
@@ -249,9 +252,12 @@ public final class io/github/damienmiheev/monobank/testkit/MerchantSetup {
 	public synthetic fun <init> (Lio/github/damienmiheev/monobank/testkit/MerchantSetup$Builder;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public static final fun builder (Ljava/lang/String;[Ljava/lang/String;)Lio/github/damienmiheev/monobank/testkit/MerchantSetup$Builder;
 	public final fun getEdrpou ()Ljava/lang/String;
+	public final fun getFiscalization ()Z
 	public final fun getMerchantId ()Ljava/lang/String;
 	public final fun getMerchantName ()Ljava/lang/String;
 	public final fun getSigner ()Lio/github/damienmiheev/monobank/testkit/MonobankWebhookSigner;
+	public final fun getSplitPayments ()Z
+	public final fun getSplitReceivers ()Ljava/util/List;
 	public final fun getTokens ()Ljava/util/List;
 	public fun toString ()Ljava/lang/String;
 }
@@ -259,7 +265,10 @@ public final class io/github/damienmiheev/monobank/testkit/MerchantSetup {
 public final class io/github/damienmiheev/monobank/testkit/MerchantSetup$Builder {
 	public final fun build ()Lio/github/damienmiheev/monobank/testkit/MerchantSetup;
 	public final fun details (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lio/github/damienmiheev/monobank/testkit/MerchantSetup$Builder;
+	public final fun fiscalization (Z)Lio/github/damienmiheev/monobank/testkit/MerchantSetup$Builder;
 	public final fun signer (Lio/github/damienmiheev/monobank/testkit/MonobankWebhookSigner;)Lio/github/damienmiheev/monobank/testkit/MerchantSetup$Builder;
+	public final fun splitPayments (Z)Lio/github/damienmiheev/monobank/testkit/MerchantSetup$Builder;
+	public final fun splitReceivers (Ljava/util/List;)Lio/github/damienmiheev/monobank/testkit/MerchantSetup$Builder;
 }
 
 public final class io/github/damienmiheev/monobank/testkit/MerchantSetup$Companion {
@@ -277,6 +286,7 @@ public final class io/github/damienmiheev/monobank/testkit/MonobankPaths {
 	public static final field INVOICE_STATUS Ljava/lang/String;
 	public static final field PUBKEY Ljava/lang/String;
 	public static final field ROUTES Ljava/util/Set;
+	public static final field SPLIT_RECEIVERS Ljava/lang/String;
 	public static final field STATEMENT Ljava/lang/String;
 	public static final field WALLET Ljava/lang/String;
 	public static final field WALLET_CARD Ljava/lang/String;
@@ -345,6 +355,21 @@ public final class io/github/damienmiheev/monobank/testkit/RefundSettlement : ja
 	public static fun getEntries ()Lkotlin/enums/EnumEntries;
 	public static fun valueOf (Ljava/lang/String;)Lio/github/damienmiheev/monobank/testkit/RefundSettlement;
 	public static fun values ()[Lio/github/damienmiheev/monobank/testkit/RefundSettlement;
+}
+
+public final class io/github/damienmiheev/monobank/testkit/SplitReceiver {
+	public static final field Companion Lio/github/damienmiheev/monobank/testkit/SplitReceiver$Companion;
+	public static final field DEFAULT Lio/github/damienmiheev/monobank/testkit/SplitReceiver;
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getEdrpou ()Ljava/lang/String;
+	public final fun getId ()Ljava/lang/String;
+	public final fun getName ()Ljava/lang/String;
+	public static final fun of (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lio/github/damienmiheev/monobank/testkit/SplitReceiver;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/damienmiheev/monobank/testkit/SplitReceiver$Companion {
+	public final fun of (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lio/github/damienmiheev/monobank/testkit/SplitReceiver;
 }
 
 public final class io/github/damienmiheev/monobank/testkit/TestClock : java/time/Clock {

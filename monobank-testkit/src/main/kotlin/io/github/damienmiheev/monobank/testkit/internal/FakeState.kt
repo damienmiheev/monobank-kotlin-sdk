@@ -4,6 +4,7 @@ import io.github.damienmiheev.monobank.testkit.CardSaving
 import io.github.damienmiheev.monobank.testkit.CustomerPayment
 import io.github.damienmiheev.monobank.testkit.MonobankWebhookSigner
 import io.github.damienmiheev.monobank.testkit.RefundSettlement
+import io.github.damienmiheev.monobank.testkit.SplitReceiver
 import io.github.damienmiheev.monobank.testkit.TestClock
 import io.github.damienmiheev.monobank.testkit.WalletPaymentOutcome
 import io.github.damienmiheev.monobank.testkit.WebhookKind
@@ -29,7 +30,13 @@ internal class MerchantInfo(
     val merchantId: String,
     val merchantName: String,
     val edrpou: String,
-)
+    val fiscalization: Boolean,
+    val splitPayments: Boolean,
+    val splitReceivers: List<SplitReceiver>,
+) {
+    /** Fiscal receipts or split payments need the basket, and its items for partial amounts. */
+    val needsBasket: Boolean get() = fiscalization || splitPayments
+}
 
 /**
  * All merchants of one fake, under one lock. Every state change goes through [locked], which first
@@ -75,6 +82,9 @@ internal class MerchantState(
     private val walletOutcomes = ArrayDeque<WalletPaymentOutcome>()
 
     val settings: FakeSettings get() = bank.settings
+
+    val basketRules: BasketRules
+        get() = BasketRules(settings.validateBasketTotal, info.needsBasket, info.splitPayments)
     val ids: Ids get() = bank.ids
 
     fun now(): Instant = bank.now()
@@ -252,12 +262,15 @@ internal class MerchantState(
     fun finalizeHold(
         invoice: InvoiceRecord,
         amount: Long,
+        hasItems: Boolean,
     ) {
         if (invoice.status != Status.HOLD) throw ApiError.badRequest("invoice is not on hold")
         if (invoice.cancels.any { it.status == Status.PROCESSING }) {
             throw ApiError.badRequest("the hold is being released")
         }
         if (amount > invoice.amount) throw ApiError.badRequest("invalid 'amount': more than the hold")
+        // Verified live on a merchant with fiscal receipts and split payments.
+        if (info.needsBasket && amount < invoice.amount && !hasItems) throw noBasketForPartialAmount()
         invoice.status = Status.SUCCESS
         invoice.finalAmount = amount
         invoice.fee = fee(amount, settings.feePercent)
@@ -271,6 +284,7 @@ internal class MerchantState(
         invoice: InvoiceRecord,
         extRef: String?,
         amount: Long?,
+        hasItems: Boolean,
     ): CancelRecord {
         val refundAmount =
             when (invoice.status) {
@@ -282,6 +296,9 @@ internal class MerchantState(
                     val refundable = invoice.refundable()
                     val requested = amount ?: refundable
                     if (requested <= 0 || requested > refundable) throw wrongCancelAmount()
+                    // Inferred from the finalize rule: a partial refund needs the refunded items.
+                    val partial = requested < (invoice.finalAmount ?: 0)
+                    if (info.needsBasket && partial && !hasItems) throw noBasketForPartialAmount()
                     requested
                 }
 
@@ -386,3 +403,6 @@ private fun holdReleaseAmount(
     if (invoice.cancels.any { it.status == Status.PROCESSING }) throw wrongCancelAmount()
     return invoice.amount
 }
+
+/** monobank's answer (verified live for finalize) to a partial amount without `items` on a fiscal or split merchant. */
+private fun noBasketForPartialAmount() = ApiError(400, "1001", "wrong amount for finalization without basket")

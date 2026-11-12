@@ -49,6 +49,7 @@ internal class AcquiringRoutes(
             MonobankPaths.WALLET to Route("GET", ::wallet),
             MonobankPaths.WALLET_CARD to Route("DELETE", ::deleteCard),
             MonobankPaths.STATEMENT to Route("GET", ::statement),
+            MonobankPaths.SPLIT_RECEIVERS to Route("GET") { m, _ -> splitReceivers(m) },
         )
 
     /** The route's allowed method, or `null` for an unknown path. */
@@ -83,7 +84,7 @@ internal class AcquiringRoutes(
         merchant: MerchantState,
         call: ApiCall,
     ): HttpResult {
-        val params = RequestParsing.create(FakeJson.parseObject(call.body), merchant.settings.validateBasketTotal)
+        val params = RequestParsing.create(FakeJson.parseObject(call.body), merchant.basketRules)
         return bank.locked {
             val now = merchant.now()
             val invoice =
@@ -151,7 +152,7 @@ internal class AcquiringRoutes(
         val amount = Fields.requiredLong(json, "amount")
         if (amount <= 0) throw ApiError.badRequest("invalid 'amount'")
         return bank.locked {
-            merchant.finalizeHold(merchant.find(invoiceId), amount)
+            merchant.finalizeHold(merchant.find(invoiceId), amount, hasItems(json))
             HttpResult.json(FakeJson.obj().put("status", Status.SUCCESS))
         }
     }
@@ -167,7 +168,7 @@ internal class AcquiringRoutes(
         if (amount != null && amount <= 0) throw ApiError.badRequest("invalid 'amount'")
         return bank.locked {
             val invoice = merchant.find(invoiceId)
-            val refund = merchant.cancel(invoice, extRef, amount)
+            val refund = merchant.cancel(invoice, extRef, amount, hasItems(json))
             val settlement = merchant.settings.refundSettlement
             when (settlement) {
                 RefundSettlement.IMMEDIATE_SUCCESS -> merchant.settle(invoice, refund, true)
@@ -190,7 +191,7 @@ internal class AcquiringRoutes(
         call: ApiCall,
     ): HttpResult {
         val params =
-            RequestParsing.walletPayment(FakeJson.parseObject(call.body), merchant.settings.validateBasketTotal)
+            RequestParsing.walletPayment(FakeJson.parseObject(call.body), merchant.basketRules)
         return bank.locked {
             val card =
                 merchant.card(params.cardToken) ?: throw ApiError(400, "TOKEN_NOT_FOUND", "card token not found")
@@ -302,6 +303,21 @@ internal class AcquiringRoutes(
                 .forEach { invoice -> invoice.statementJson()?.let { list.add(it) } }
             HttpResult.json(answer)
         }
+    }
+
+    private fun hasItems(json: ObjectNode): Boolean = json.get("items")?.let { it.isArray && !it.isEmpty } ?: false
+
+    private fun splitReceivers(merchant: MerchantState): HttpResult {
+        val answer = FakeJson.obj()
+        val list = answer.putArray("list")
+        merchant.info.splitReceivers.forEach {
+            list
+                .addObject()
+                .put("id", it.id)
+                .put("name", it.name)
+                .put("edrpou", it.edrpou)
+        }
+        return HttpResult.json(answer)
     }
 
     private fun requiredQuery(

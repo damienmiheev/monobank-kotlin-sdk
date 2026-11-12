@@ -89,5 +89,9 @@ GET /api/merchant/statement	list[].splitReceiverList[].amount	required	integer
 GET /api/merchant/statement	list[].splitReceiverList[].profit	required	integer	
 GET /api/merchant/statement	list[].splitReceiverList[].agentFee	optional	integer	
 GET /api/merchant/statement	list[].metadata	optional	object	
+GET /api/merchant/split-receiver/list	list	optional	array	
+GET /api/merchant/split-receiver/list	list[].id	required	string	
+GET /api/merchant/split-receiver/list	list[].edrpou	required	string	
+GET /api/merchant/split-receiver/list	list[].name	required	string	
 ERROR	errCode	required	string	
 ERROR	errText	required	string	

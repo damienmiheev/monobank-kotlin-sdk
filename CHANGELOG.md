@@ -11,7 +11,8 @@ see the README's migration section.
 ### Added
 - Modules: `monobank-core`, `monobank-acquiring`, `monobank-personal`, `monobank-corporate`
   (experimental), `monobank-installments`, `monobank-testkit` (webhook signer and a fake monobank
-  acquiring server with fault injection, for integration tests), and `monobank-bom`.
+  acquiring server with fault injection and per-merchant fiscalization/split rules seen on monobank's
+  test merchant, for integration tests), and `monobank-bom`.
 - Acquiring: every endpoint of monobank's current acquiring documentation (v2412), including
   sync payments, split receivers, POS refunds and Tap-to-Phone status; webhook verification with
   key rotation; statement lookup by order reference for reconciling timed-out payments.
