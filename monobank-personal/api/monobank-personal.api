@@ -1,0 +1,310 @@
+public final class io/github/damienmiheev/monobank/personal/MonobankPersonal {
+	public static final field Companion Lio/github/damienmiheev/monobank/personal/MonobankPersonal$Companion;
+	public fun <init> (Lio/github/damienmiheev/monobank/personal/PersonalConfig;)V
+	public static final fun create (Ljava/lang/String;)Lio/github/damienmiheev/monobank/personal/MonobankPersonal;
+	public final fun getBank ()Lio/github/damienmiheev/monobank/personal/bank/BankApi;
+	public final fun getClient ()Lio/github/damienmiheev/monobank/personal/client/ClientApi;
+	public final fun getConfig ()Lio/github/damienmiheev/monobank/personal/PersonalConfig;
+	public final fun getStatements ()Lio/github/damienmiheev/monobank/personal/statement/StatementApi;
+	public static final fun publicOnly ()Lio/github/damienmiheev/monobank/personal/MonobankPersonal;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/damienmiheev/monobank/personal/MonobankPersonal$Companion {
+	public final fun create (Ljava/lang/String;)Lio/github/damienmiheev/monobank/personal/MonobankPersonal;
+	public final fun publicOnly ()Lio/github/damienmiheev/monobank/personal/MonobankPersonal;
+}
+
+public final class io/github/damienmiheev/monobank/personal/PersonalConfig {
+	public static final field Companion Lio/github/damienmiheev/monobank/personal/PersonalConfig$Companion;
+	public synthetic fun <init> (Ljava/lang/String;Lio/github/damienmiheev/monobank/core/MonobankClientOptions;Lio/github/damienmiheev/monobank/personal/PersonalRateLimiter;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public static final fun builder (Ljava/lang/String;)Lio/github/damienmiheev/monobank/personal/PersonalConfig$Builder;
+	public final fun getOptions ()Lio/github/damienmiheev/monobank/core/MonobankClientOptions;
+	public final fun getRateLimiter ()Lio/github/damienmiheev/monobank/personal/PersonalRateLimiter;
+	public final fun getToken ()Ljava/lang/String;
+	public static final fun publicBuilder ()Lio/github/damienmiheev/monobank/personal/PersonalConfig$Builder;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/damienmiheev/monobank/personal/PersonalConfig$Builder {
+	public final fun build ()Lio/github/damienmiheev/monobank/personal/PersonalConfig;
+	public final fun options (Lio/github/damienmiheev/monobank/core/MonobankClientOptions;)Lio/github/damienmiheev/monobank/personal/PersonalConfig$Builder;
+	public final fun rateLimiter (Lio/github/damienmiheev/monobank/personal/PersonalRateLimiter;)Lio/github/damienmiheev/monobank/personal/PersonalConfig$Builder;
+}
+
+public final class io/github/damienmiheev/monobank/personal/PersonalConfig$Companion {
+	public final fun builder (Ljava/lang/String;)Lio/github/damienmiheev/monobank/personal/PersonalConfig$Builder;
+	public final fun publicBuilder ()Lio/github/damienmiheev/monobank/personal/PersonalConfig$Builder;
+}
+
+public final class io/github/damienmiheev/monobank/personal/PersonalRateLimiter {
+	public static final field Companion Lio/github/damienmiheev/monobank/personal/PersonalRateLimiter$Companion;
+	public static final field DEFAULT_INTERVAL Ljava/time/Duration;
+	public synthetic fun <init> (Ljava/time/Duration;Lkotlin/jvm/functions/Function0;Lio/github/damienmiheev/monobank/personal/PersonalRateLimiter$Sleeper;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public static final fun create ()Lio/github/damienmiheev/monobank/personal/PersonalRateLimiter;
+	public static final fun create (Ljava/time/Duration;)Lio/github/damienmiheev/monobank/personal/PersonalRateLimiter;
+	public final fun getInterval ()Ljava/time/Duration;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/damienmiheev/monobank/personal/PersonalRateLimiter$Companion {
+	public final fun create ()Lio/github/damienmiheev/monobank/personal/PersonalRateLimiter;
+	public final fun create (Ljava/time/Duration;)Lio/github/damienmiheev/monobank/personal/PersonalRateLimiter;
+}
+
+public final class io/github/damienmiheev/monobank/personal/bank/BankApi {
+	public final fun currency ()Ljava/util/List;
+	public final fun sync ()Lio/github/damienmiheev/monobank/personal/bank/SyncInfo;
+}
+
+public final class io/github/damienmiheev/monobank/personal/bank/CurrencyRate {
+	public final fun component1 ()I
+	public final fun component2 ()I
+	public final fun component3 ()Ljava/time/Instant;
+	public final fun component4 ()Ljava/math/BigDecimal;
+	public final fun component5 ()Ljava/math/BigDecimal;
+	public final fun component6 ()Ljava/math/BigDecimal;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCurrencyCodeA ()I
+	public final fun getCurrencyCodeB ()I
+	public final fun getDate ()Ljava/time/Instant;
+	public final fun getRateBuy ()Ljava/math/BigDecimal;
+	public final fun getRateCross ()Ljava/math/BigDecimal;
+	public final fun getRateSell ()Ljava/math/BigDecimal;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/damienmiheev/monobank/personal/bank/SyncInfo {
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/Long;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getServerKeyId ()Ljava/lang/String;
+	public final fun getServerPubKey ()Ljava/lang/String;
+	public final fun getServerTime ()Ljava/time/Instant;
+	public final fun getServerTimeMsec ()Ljava/lang/Long;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/damienmiheev/monobank/personal/client/Account {
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()J
+	public final fun component4 ()Ljava/lang/Long;
+	public final fun component5 ()Lio/github/damienmiheev/monobank/personal/client/AccountType;
+	public final fun component6 ()I
+	public final fun component7 ()Lio/github/damienmiheev/monobank/personal/client/CashbackType;
+	public final fun component8 ()Ljava/util/List;
+	public final fun component9 ()Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBalance ()J
+	public final fun getCashbackType ()Lio/github/damienmiheev/monobank/personal/client/CashbackType;
+	public final fun getCreditLimit ()Ljava/lang/Long;
+	public final fun getCurrencyCode ()I
+	public final fun getIban ()Ljava/lang/String;
+	public final fun getId ()Ljava/lang/String;
+	public final fun getMaskedPan ()Ljava/util/List;
+	public final fun getSendId ()Ljava/lang/String;
+	public final fun getType ()Lio/github/damienmiheev/monobank/personal/client/AccountType;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/damienmiheev/monobank/personal/client/AccountType : java/lang/Enum {
+	public static final field BLACK Lio/github/damienmiheev/monobank/personal/client/AccountType;
+	public static final field E_AID Lio/github/damienmiheev/monobank/personal/client/AccountType;
+	public static final field FOP Lio/github/damienmiheev/monobank/personal/client/AccountType;
+	public static final field IRON Lio/github/damienmiheev/monobank/personal/client/AccountType;
+	public static final field PLATINUM Lio/github/damienmiheev/monobank/personal/client/AccountType;
+	public static final field UNKNOWN Lio/github/damienmiheev/monobank/personal/client/AccountType;
+	public static final field WHITE Lio/github/damienmiheev/monobank/personal/client/AccountType;
+	public static final field YELLOW Lio/github/damienmiheev/monobank/personal/client/AccountType;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public final fun getValue ()Ljava/lang/String;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/damienmiheev/monobank/personal/client/AccountType;
+	public static fun values ()[Lio/github/damienmiheev/monobank/personal/client/AccountType;
+}
+
+public final class io/github/damienmiheev/monobank/personal/client/CashbackType : java/lang/Enum {
+	public static final field MILES Lio/github/damienmiheev/monobank/personal/client/CashbackType;
+	public static final field NONE Lio/github/damienmiheev/monobank/personal/client/CashbackType;
+	public static final field UAH Lio/github/damienmiheev/monobank/personal/client/CashbackType;
+	public static final field UNKNOWN Lio/github/damienmiheev/monobank/personal/client/CashbackType;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public final fun getValue ()Ljava/lang/String;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/damienmiheev/monobank/personal/client/CashbackType;
+	public static fun values ()[Lio/github/damienmiheev/monobank/personal/client/CashbackType;
+}
+
+public final class io/github/damienmiheev/monobank/personal/client/ClientApi {
+	public final fun info ()Lio/github/damienmiheev/monobank/personal/client/ClientInfo;
+	public final fun setWebhook (Ljava/lang/String;)V
+}
+
+public final class io/github/damienmiheev/monobank/personal/client/ClientInfo {
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun component5 ()Ljava/util/List;
+	public final fun component6 ()Ljava/util/List;
+	public final fun component7 ()Ljava/util/List;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAccounts ()Ljava/util/List;
+	public final fun getClientId ()Ljava/lang/String;
+	public final fun getJars ()Ljava/util/List;
+	public final fun getManagedClients ()Ljava/util/List;
+	public final fun getName ()Ljava/lang/String;
+	public final fun getPermissions ()Ljava/lang/String;
+	public final fun getWebHookUrl ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/damienmiheev/monobank/personal/client/Jar {
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun component5 ()I
+	public final fun component6 ()J
+	public final fun component7 ()Ljava/lang/Long;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBalance ()J
+	public final fun getCurrencyCode ()I
+	public final fun getDescription ()Ljava/lang/String;
+	public final fun getGoal ()Ljava/lang/Long;
+	public final fun getId ()Ljava/lang/String;
+	public final fun getSendId ()Ljava/lang/String;
+	public final fun getTitle ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/damienmiheev/monobank/personal/client/ManagedAccount {
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()J
+	public final fun component3 ()Ljava/lang/Long;
+	public final fun component4 ()Lio/github/damienmiheev/monobank/personal/client/AccountType;
+	public final fun component5 ()I
+	public final fun component6 ()Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBalance ()J
+	public final fun getCreditLimit ()Ljava/lang/Long;
+	public final fun getCurrencyCode ()I
+	public final fun getIban ()Ljava/lang/String;
+	public final fun getId ()Ljava/lang/String;
+	public final fun getType ()Lio/github/damienmiheev/monobank/personal/client/AccountType;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/damienmiheev/monobank/personal/client/ManagedClient {
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ljava/util/List;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAccounts ()Ljava/util/List;
+	public final fun getClientId ()Ljava/lang/String;
+	public final fun getName ()Ljava/lang/String;
+	public final fun getTin ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/damienmiheev/monobank/personal/statement/StatementApi {
+	public static final field Companion Lio/github/damienmiheev/monobank/personal/statement/StatementApi$Companion;
+	public static final field DEFAULT_ACCOUNT Ljava/lang/String;
+	public static final field MAX_RANGE_SECONDS J
+	public static final field PAGE_SIZE I
+	public final fun list (Ljava/lang/String;Ljava/time/Instant;)Ljava/util/List;
+	public final fun list (Ljava/lang/String;Ljava/time/Instant;Ljava/time/Instant;)Ljava/util/List;
+	public static synthetic fun list$default (Lio/github/damienmiheev/monobank/personal/statement/StatementApi;Ljava/lang/String;Ljava/time/Instant;Ljava/time/Instant;ILjava/lang/Object;)Ljava/util/List;
+	public final fun listAll (Ljava/lang/String;Ljava/time/Instant;)Ljava/util/List;
+	public final fun listAll (Ljava/lang/String;Ljava/time/Instant;Ljava/time/Instant;)Ljava/util/List;
+	public final fun listAll (Ljava/lang/String;Ljava/time/Instant;Ljava/time/Instant;Ljava/util/function/Consumer;)V
+}
+
+public final class io/github/damienmiheev/monobank/personal/statement/StatementApi$Companion {
+}
+
+public final class io/github/damienmiheev/monobank/personal/statement/StatementItem {
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component10 ()Ljava/lang/Long;
+	public final fun component11 ()Ljava/lang/Long;
+	public final fun component12 ()Ljava/lang/Long;
+	public final fun component13 ()Ljava/lang/String;
+	public final fun component14 ()Ljava/lang/String;
+	public final fun component15 ()Ljava/lang/String;
+	public final fun component16 ()Ljava/lang/String;
+	public final fun component17 ()Ljava/lang/String;
+	public final fun component18 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/time/Instant;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ljava/lang/Integer;
+	public final fun component5 ()Ljava/lang/Integer;
+	public final fun component6 ()Ljava/lang/Boolean;
+	public final fun component7 ()J
+	public final fun component8 ()Ljava/lang/Long;
+	public final fun component9 ()I
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAmount ()J
+	public final fun getBalance ()Ljava/lang/Long;
+	public final fun getCashbackAmount ()Ljava/lang/Long;
+	public final fun getComment ()Ljava/lang/String;
+	public final fun getCommissionRate ()Ljava/lang/Long;
+	public final fun getCounterEdrpou ()Ljava/lang/String;
+	public final fun getCounterIban ()Ljava/lang/String;
+	public final fun getCounterName ()Ljava/lang/String;
+	public final fun getCurrencyCode ()I
+	public final fun getDescription ()Ljava/lang/String;
+	public final fun getHold ()Ljava/lang/Boolean;
+	public final fun getId ()Ljava/lang/String;
+	public final fun getInvoiceId ()Ljava/lang/String;
+	public final fun getMcc ()Ljava/lang/Integer;
+	public final fun getOperationAmount ()Ljava/lang/Long;
+	public final fun getOriginalMcc ()Ljava/lang/Integer;
+	public final fun getReceiptId ()Ljava/lang/String;
+	public final fun getTime ()Ljava/time/Instant;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/damienmiheev/monobank/personal/webhook/StatementItemEventData {
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Lio/github/damienmiheev/monobank/personal/statement/StatementItem;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAccount ()Ljava/lang/String;
+	public final fun getStatementItem ()Lio/github/damienmiheev/monobank/personal/statement/StatementItem;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/damienmiheev/monobank/personal/webhook/WebhookEvent {
+	public final fun component1 ()Lio/github/damienmiheev/monobank/personal/webhook/WebhookEventType;
+	public final fun component2 ()Lio/github/damienmiheev/monobank/personal/webhook/StatementItemEventData;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getData ()Lio/github/damienmiheev/monobank/personal/webhook/StatementItemEventData;
+	public final fun getType ()Lio/github/damienmiheev/monobank/personal/webhook/WebhookEventType;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/damienmiheev/monobank/personal/webhook/WebhookEventType : java/lang/Enum {
+	public static final field STATEMENT_ITEM Lio/github/damienmiheev/monobank/personal/webhook/WebhookEventType;
+	public static final field UNKNOWN Lio/github/damienmiheev/monobank/personal/webhook/WebhookEventType;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public final fun getValue ()Ljava/lang/String;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/damienmiheev/monobank/personal/webhook/WebhookEventType;
+	public static fun values ()[Lio/github/damienmiheev/monobank/personal/webhook/WebhookEventType;
+}
+
+public final class io/github/damienmiheev/monobank/personal/webhook/WebhookParser {
+	public static final field INSTANCE Lio/github/damienmiheev/monobank/personal/webhook/WebhookParser;
+	public static final fun parse (Ljava/lang/String;)Lio/github/damienmiheev/monobank/personal/webhook/WebhookEvent;
+	public static final fun parse ([B)Lio/github/damienmiheev/monobank/personal/webhook/WebhookEvent;
+}
+

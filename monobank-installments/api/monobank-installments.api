@@ -1,0 +1,752 @@
+public final class io/github/damienmiheev/monobank/installments/InstallmentsConfig {
+	public static final field Companion Lio/github/damienmiheev/monobank/installments/InstallmentsConfig$Companion;
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Lio/github/damienmiheev/monobank/installments/InstallmentsEnvironment;Lio/github/damienmiheev/monobank/core/MonobankClientOptions;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public static final fun builder (Ljava/lang/String;Ljava/lang/String;)Lio/github/damienmiheev/monobank/installments/InstallmentsConfig$Builder;
+	public final fun getBaseUrl ()Ljava/lang/String;
+	public final fun getEnvironment ()Lio/github/damienmiheev/monobank/installments/InstallmentsEnvironment;
+	public final fun getOptions ()Lio/github/damienmiheev/monobank/core/MonobankClientOptions;
+	public final fun getStoreId ()Ljava/lang/String;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/damienmiheev/monobank/installments/InstallmentsConfig$Builder {
+	public final fun build ()Lio/github/damienmiheev/monobank/installments/InstallmentsConfig;
+	public final fun environment (Lio/github/damienmiheev/monobank/installments/InstallmentsEnvironment;)Lio/github/damienmiheev/monobank/installments/InstallmentsConfig$Builder;
+	public final fun options (Lio/github/damienmiheev/monobank/core/MonobankClientOptions;)Lio/github/damienmiheev/monobank/installments/InstallmentsConfig$Builder;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/damienmiheev/monobank/installments/InstallmentsConfig$Companion {
+	public final fun builder (Ljava/lang/String;Ljava/lang/String;)Lio/github/damienmiheev/monobank/installments/InstallmentsConfig$Builder;
+}
+
+public final class io/github/damienmiheev/monobank/installments/InstallmentsEnvironment : java/lang/Enum {
+	public static final field PRODUCTION Lio/github/damienmiheev/monobank/installments/InstallmentsEnvironment;
+	public static final field SANDBOX Lio/github/damienmiheev/monobank/installments/InstallmentsEnvironment;
+	public static final field STAGE Lio/github/damienmiheev/monobank/installments/InstallmentsEnvironment;
+	public final fun getBaseUrl ()Ljava/lang/String;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/damienmiheev/monobank/installments/InstallmentsEnvironment;
+	public static fun values ()[Lio/github/damienmiheev/monobank/installments/InstallmentsEnvironment;
+}
+
+public final class io/github/damienmiheev/monobank/installments/MonobankInstallments {
+	public static final field Companion Lio/github/damienmiheev/monobank/installments/MonobankInstallments$Companion;
+	public fun <init> (Lio/github/damienmiheev/monobank/installments/InstallmentsConfig;)V
+	public static final fun create (Ljava/lang/String;Ljava/lang/String;)Lio/github/damienmiheev/monobank/installments/MonobankInstallments;
+	public final fun getCallbacks ()Lio/github/damienmiheev/monobank/installments/callback/InstallmentsCallbackVerifier;
+	public final fun getClients ()Lio/github/damienmiheev/monobank/installments/client/ClientApi;
+	public final fun getConfig ()Lio/github/damienmiheev/monobank/installments/InstallmentsConfig;
+	public final fun getGuaranteeLetters ()Lio/github/damienmiheev/monobank/installments/guarantee/GuaranteeLetterApi;
+	public final fun getOrders ()Lio/github/damienmiheev/monobank/installments/order/OrderApi;
+	public final fun getQrCarts ()Lio/github/damienmiheev/monobank/installments/qr/QrCartApi;
+	public final fun getStore ()Lio/github/damienmiheev/monobank/installments/report/StoreApi;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/damienmiheev/monobank/installments/MonobankInstallments$Companion {
+	public final fun create (Ljava/lang/String;Ljava/lang/String;)Lio/github/damienmiheev/monobank/installments/MonobankInstallments;
+}
+
+public final class io/github/damienmiheev/monobank/installments/callback/InstallmentsCallbackParser {
+	public static final field INSTANCE Lio/github/damienmiheev/monobank/installments/callback/InstallmentsCallbackParser;
+	public static final fun parse (Ljava/lang/String;)Lio/github/damienmiheev/monobank/installments/order/OrderStateInfo;
+	public static final fun parse ([B)Lio/github/damienmiheev/monobank/installments/order/OrderStateInfo;
+}
+
+public final class io/github/damienmiheev/monobank/installments/callback/InstallmentsCallbackVerifier {
+	public static final field Companion Lio/github/damienmiheev/monobank/installments/callback/InstallmentsCallbackVerifier$Companion;
+	public static final field SIGNATURE_HEADER Ljava/lang/String;
+	public fun <init> (Ljava/lang/String;)V
+	public final fun sign ([B)Ljava/lang/String;
+	public fun toString ()Ljava/lang/String;
+	public final fun verify (Ljava/lang/String;[B)Z
+	public final fun verifyAndParse (Ljava/lang/String;[B)Lio/github/damienmiheev/monobank/installments/order/OrderStateInfo;
+	public final fun verifyOrThrow (Ljava/lang/String;[B)V
+}
+
+public final class io/github/damienmiheev/monobank/installments/callback/InstallmentsCallbackVerifier$Companion {
+}
+
+public final class io/github/damienmiheev/monobank/installments/client/ClientApi {
+	public final fun validate (Ljava/lang/String;)Lio/github/damienmiheev/monobank/installments/client/ValidateClientResponse;
+	public final fun validateWithDetails (Ljava/lang/String;)Lio/github/damienmiheev/monobank/installments/client/LegacyValidateClientResponse;
+}
+
+public final class io/github/damienmiheev/monobank/installments/client/ClientInfo {
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getFirstName ()Ljava/lang/String;
+	public final fun getInn ()Ljava/lang/String;
+	public final fun getLastName ()Ljava/lang/String;
+	public final fun getMiddleName ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/damienmiheev/monobank/installments/client/LegacyValidateClientResponse {
+	public final fun component1 ()Z
+	public final fun component2 ()Lio/github/damienmiheev/monobank/installments/client/ClientInfo;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getClient ()Lio/github/damienmiheev/monobank/installments/client/ClientInfo;
+	public final fun getFound ()Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/damienmiheev/monobank/installments/client/ValidateClientResponse {
+	public final fun component1 ()Z
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getFound ()Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/damienmiheev/monobank/installments/common/CreditProductType : java/lang/Enum {
+	public static final field PAYMENT_INSTALLMENTS Lio/github/damienmiheev/monobank/installments/common/CreditProductType;
+	public static final field UNKNOWN Lio/github/damienmiheev/monobank/installments/common/CreditProductType;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public final fun getValue ()Ljava/lang/String;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/damienmiheev/monobank/installments/common/CreditProductType;
+	public static fun values ()[Lio/github/damienmiheev/monobank/installments/common/CreditProductType;
+}
+
+public final class io/github/damienmiheev/monobank/installments/common/InvoiceSource : java/lang/Enum {
+	public static final field INTERNET Lio/github/damienmiheev/monobank/installments/common/InvoiceSource;
+	public static final field STORE Lio/github/damienmiheev/monobank/installments/common/InvoiceSource;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public final fun getValue ()Ljava/lang/String;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/damienmiheev/monobank/installments/common/InvoiceSource;
+	public static fun values ()[Lio/github/damienmiheev/monobank/installments/common/InvoiceSource;
+}
+
+public final class io/github/damienmiheev/monobank/installments/common/OrderSource : java/lang/Enum {
+	public static final field CHECKOUT Lio/github/damienmiheev/monobank/installments/common/OrderSource;
+	public static final field INTERNET Lio/github/damienmiheev/monobank/installments/common/OrderSource;
+	public static final field MARKETPLACE Lio/github/damienmiheev/monobank/installments/common/OrderSource;
+	public static final field STORE Lio/github/damienmiheev/monobank/installments/common/OrderSource;
+	public static final field UNKNOWN Lio/github/damienmiheev/monobank/installments/common/OrderSource;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public final fun getValue ()Ljava/lang/String;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/damienmiheev/monobank/installments/common/OrderSource;
+	public static fun values ()[Lio/github/damienmiheev/monobank/installments/common/OrderSource;
+}
+
+public final class io/github/damienmiheev/monobank/installments/common/OrderState : java/lang/Enum {
+	public static final field FAIL Lio/github/damienmiheev/monobank/installments/common/OrderState;
+	public static final field IN_PROCESS Lio/github/damienmiheev/monobank/installments/common/OrderState;
+	public static final field SUCCESS Lio/github/damienmiheev/monobank/installments/common/OrderState;
+	public static final field UNKNOWN Lio/github/damienmiheev/monobank/installments/common/OrderState;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public final fun getValue ()Ljava/lang/String;
+	public final fun isFinal ()Z
+	public static fun valueOf (Ljava/lang/String;)Lio/github/damienmiheev/monobank/installments/common/OrderState;
+	public static fun values ()[Lio/github/damienmiheev/monobank/installments/common/OrderState;
+}
+
+public final class io/github/damienmiheev/monobank/installments/common/OrderSubState : java/lang/Enum {
+	public static final field ACTIVE Lio/github/damienmiheev/monobank/installments/common/OrderSubState;
+	public static final field CLIENT_NOT_FOUND Lio/github/damienmiheev/monobank/installments/common/OrderSubState;
+	public static final field CLIENT_PUSH_TIMEOUT Lio/github/damienmiheev/monobank/installments/common/OrderSubState;
+	public static final field CONFIRM_TIME_EXPIRED Lio/github/damienmiheev/monobank/installments/common/OrderSubState;
+	public static final field DONE Lio/github/damienmiheev/monobank/installments/common/OrderSubState;
+	public static final field EXCEEDED_SUM_LIMIT Lio/github/damienmiheev/monobank/installments/common/OrderSubState;
+	public static final field EXISTS_OTHER_OPEN_ORDER Lio/github/damienmiheev/monobank/installments/common/OrderSubState;
+	public static final field FAIL Lio/github/damienmiheev/monobank/installments/common/OrderSubState;
+	public static final field FRAUD_REJECTED Lio/github/damienmiheev/monobank/installments/common/OrderSubState;
+	public static final field NOT_ENOUGH_MONEY_FOR_INIT_DEBIT Lio/github/damienmiheev/monobank/installments/common/OrderSubState;
+	public static final field PAY_PARTS_ARE_NOT_ACCEPTABLE Lio/github/damienmiheev/monobank/installments/common/OrderSubState;
+	public static final field REJECTED_BY_CLIENT Lio/github/damienmiheev/monobank/installments/common/OrderSubState;
+	public static final field REJECTED_BY_STORE Lio/github/damienmiheev/monobank/installments/common/OrderSubState;
+	public static final field RESTRICTED_BY_RISKS Lio/github/damienmiheev/monobank/installments/common/OrderSubState;
+	public static final field RETURNED Lio/github/damienmiheev/monobank/installments/common/OrderSubState;
+	public static final field UNKNOWN Lio/github/damienmiheev/monobank/installments/common/OrderSubState;
+	public static final field WAITING_FOR_CLIENT Lio/github/damienmiheev/monobank/installments/common/OrderSubState;
+	public static final field WAITING_FOR_STORE_CONFIRM Lio/github/damienmiheev/monobank/installments/common/OrderSubState;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public final fun getValue ()Ljava/lang/String;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/damienmiheev/monobank/installments/common/OrderSubState;
+	public static fun values ()[Lio/github/damienmiheev/monobank/installments/common/OrderSubState;
+}
+
+public final class io/github/damienmiheev/monobank/installments/common/Product {
+	public static final field Companion Lio/github/damienmiheev/monobank/installments/common/Product$Companion;
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()I
+	public final fun component3 ()Ljava/math/BigDecimal;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCount ()I
+	public final fun getName ()Ljava/lang/String;
+	public final fun getSum ()Ljava/math/BigDecimal;
+	public fun hashCode ()I
+	public static final fun of (Ljava/lang/String;ILjava/math/BigDecimal;)Lio/github/damienmiheev/monobank/installments/common/Product;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/damienmiheev/monobank/installments/common/Product$Companion {
+	public final fun of (Ljava/lang/String;ILjava/math/BigDecimal;)Lio/github/damienmiheev/monobank/installments/common/Product;
+}
+
+public final class io/github/damienmiheev/monobank/installments/guarantee/ClientDocuments {
+	public final fun component1 ()Lio/github/damienmiheev/monobank/installments/guarantee/PassportDocument;
+	public final fun component2 ()Lio/github/damienmiheev/monobank/installments/guarantee/IdCardDocument;
+	public final fun component3 ()Lio/github/damienmiheev/monobank/installments/guarantee/PassportDocument;
+	public final fun component4 ()Lio/github/damienmiheev/monobank/installments/guarantee/InternationalPassport;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getIdCard ()Lio/github/damienmiheev/monobank/installments/guarantee/IdCardDocument;
+	public final fun getInternationalPassport ()Lio/github/damienmiheev/monobank/installments/guarantee/InternationalPassport;
+	public final fun getPassport ()Lio/github/damienmiheev/monobank/installments/guarantee/PassportDocument;
+	public final fun getResidencePermit ()Lio/github/damienmiheev/monobank/installments/guarantee/PassportDocument;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/damienmiheev/monobank/installments/guarantee/GuaranteeBank {
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component10 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/time/LocalDate;
+	public final fun component3 ()Ljava/math/BigDecimal;
+	public final fun component4 ()Ljava/math/BigDecimal;
+	public final fun component5 ()Lio/github/damienmiheev/monobank/installments/common/CreditProductType;
+	public final fun component6 ()Ljava/lang/String;
+	public final fun component7 ()Ljava/lang/String;
+	public final fun component8 ()Ljava/lang/String;
+	public final fun component9 ()Ljava/lang/Integer;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAgreement ()Ljava/lang/String;
+	public final fun getAgreementDate ()Ljava/time/LocalDate;
+	public final fun getAvailablePartsCount ()Ljava/lang/Integer;
+	public final fun getBankExecutive ()Ljava/lang/String;
+	public final fun getBankId ()Ljava/lang/String;
+	public final fun getBankName ()Ljava/lang/String;
+	public final fun getCreditAmount ()Ljava/math/BigDecimal;
+	public final fun getCreditProduct ()Ljava/lang/String;
+	public final fun getCustomerPayAmount ()Ljava/math/BigDecimal;
+	public final fun getProductTypes ()Lio/github/damienmiheev/monobank/installments/common/CreditProductType;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/damienmiheev/monobank/installments/guarantee/GuaranteeCustomer {
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun component5 ()Lio/github/damienmiheev/monobank/installments/guarantee/ClientDocuments;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDocument ()Lio/github/damienmiheev/monobank/installments/guarantee/ClientDocuments;
+	public final fun getFirstName ()Ljava/lang/String;
+	public final fun getInn ()Ljava/lang/String;
+	public final fun getLastName ()Ljava/lang/String;
+	public final fun getMiddleName ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/damienmiheev/monobank/installments/guarantee/GuaranteeInvoice {
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/time/LocalDate;
+	public final fun component3 ()Ljava/math/BigDecimal;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getInvoiceAmount ()Ljava/math/BigDecimal;
+	public final fun getInvoiceDate ()Ljava/time/LocalDate;
+	public final fun getInvoiceNumber ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/damienmiheev/monobank/installments/guarantee/GuaranteeLetterApi {
+	public static final field ACCEPT_PDF_OR_ERROR Ljava/lang/String;
+	public static final field PDF_HEADER_WINDOW I
+	public final fun data (Lio/github/damienmiheev/monobank/installments/guarantee/GuaranteeLetterRequest;)Lio/github/damienmiheev/monobank/installments/guarantee/GuaranteeLetterData;
+	public final fun dataV1 (Lio/github/damienmiheev/monobank/installments/guarantee/GuaranteeLetterRequest;)Lio/github/damienmiheev/monobank/installments/guarantee/GuaranteeLetterData;
+	public final fun pdf (Lio/github/damienmiheev/monobank/installments/guarantee/GuaranteeLetterRequest;)[B
+}
+
+public final class io/github/damienmiheev/monobank/installments/guarantee/GuaranteeLetterData {
+	public final fun component1 ()Lio/github/damienmiheev/monobank/installments/guarantee/GuaranteeLetterHeader;
+	public final fun component2 ()Lio/github/damienmiheev/monobank/installments/guarantee/GuaranteeLetterExpansion;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getExpansion ()Lio/github/damienmiheev/monobank/installments/guarantee/GuaranteeLetterExpansion;
+	public final fun getHeader ()Lio/github/damienmiheev/monobank/installments/guarantee/GuaranteeLetterHeader;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/damienmiheev/monobank/installments/guarantee/GuaranteeLetterExpansion {
+	public final fun component1 ()Lio/github/damienmiheev/monobank/installments/guarantee/GuaranteeCustomer;
+	public final fun component2 ()Lio/github/damienmiheev/monobank/installments/guarantee/GuaranteeInvoice;
+	public final fun component3 ()Lio/github/damienmiheev/monobank/installments/guarantee/GuaranteePaymentDestination;
+	public final fun component4 ()Lio/github/damienmiheev/monobank/installments/guarantee/GuaranteeBank;
+	public final fun component5 ()Ljava/lang/String;
+	public final fun component6 ()Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBank ()Lio/github/damienmiheev/monobank/installments/guarantee/GuaranteeBank;
+	public final fun getCustomer ()Lio/github/damienmiheev/monobank/installments/guarantee/GuaranteeCustomer;
+	public final fun getInvoice ()Lio/github/damienmiheev/monobank/installments/guarantee/GuaranteeInvoice;
+	public final fun getPaymentDestination ()Lio/github/damienmiheev/monobank/installments/guarantee/GuaranteePaymentDestination;
+	public final fun getSign ()Ljava/lang/String;
+	public final fun getStamp ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/damienmiheev/monobank/installments/guarantee/GuaranteeLetterHeader {
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/time/OffsetDateTime;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun component5 ()Ljava/lang/String;
+	public final fun component6 ()Ljava/time/LocalDate;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAnswerDatetime ()Ljava/time/OffsetDateTime;
+	public final fun getContractDate ()Ljava/time/LocalDate;
+	public final fun getContractNumber ()Ljava/lang/String;
+	public final fun getFromOrganization ()Ljava/lang/String;
+	public final fun getOrganizationId ()Ljava/lang/String;
+	public final fun getRequestId ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/damienmiheev/monobank/installments/guarantee/GuaranteeLetterInvoice {
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/time/LocalDate;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDate ()Ljava/time/LocalDate;
+	public final fun getNumber ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/damienmiheev/monobank/installments/guarantee/GuaranteeLetterRequest {
+	public static final field Companion Lio/github/damienmiheev/monobank/installments/guarantee/GuaranteeLetterRequest$Companion;
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Lio/github/damienmiheev/monobank/installments/guarantee/GuaranteeLetterInvoice;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getInvoice ()Lio/github/damienmiheev/monobank/installments/guarantee/GuaranteeLetterInvoice;
+	public final fun getOrderId ()Ljava/lang/String;
+	public fun hashCode ()I
+	public static final fun of (Ljava/lang/String;)Lio/github/damienmiheev/monobank/installments/guarantee/GuaranteeLetterRequest;
+	public static final fun of (Ljava/lang/String;Ljava/lang/String;Ljava/time/LocalDate;)Lio/github/damienmiheev/monobank/installments/guarantee/GuaranteeLetterRequest;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/damienmiheev/monobank/installments/guarantee/GuaranteeLetterRequest$Companion {
+	public final fun of (Ljava/lang/String;)Lio/github/damienmiheev/monobank/installments/guarantee/GuaranteeLetterRequest;
+	public final fun of (Ljava/lang/String;Ljava/lang/String;Ljava/time/LocalDate;)Lio/github/damienmiheev/monobank/installments/guarantee/GuaranteeLetterRequest;
+}
+
+public final class io/github/damienmiheev/monobank/installments/guarantee/GuaranteePaymentDestination {
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun component5 ()Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDestAccNumber ()Ljava/lang/String;
+	public final fun getDestBankName ()Ljava/lang/String;
+	public final fun getDestId ()Ljava/lang/String;
+	public final fun getDestMfo ()Ljava/lang/String;
+	public final fun getDestName ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/damienmiheev/monobank/installments/guarantee/IdCardDocument {
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun component5 ()Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDateOfIssue ()Ljava/lang/String;
+	public final fun getIssued ()Ljava/lang/String;
+	public final fun getNumber ()Ljava/lang/String;
+	public final fun getRegistryNumber ()Ljava/lang/String;
+	public final fun getValidUntil ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/damienmiheev/monobank/installments/guarantee/InternationalPassport {
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDateOfIssue ()Ljava/lang/String;
+	public final fun getNumber ()Ljava/lang/String;
+	public final fun getSeries ()Ljava/lang/String;
+	public final fun getValidUntil ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/damienmiheev/monobank/installments/guarantee/PassportDocument {
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDateOfIssue ()Ljava/lang/String;
+	public final fun getIssued ()Ljava/lang/String;
+	public final fun getNumber ()Ljava/lang/String;
+	public final fun getSeries ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/damienmiheev/monobank/installments/order/AvailableProgram {
+	public static final field Companion Lio/github/damienmiheev/monobank/installments/order/AvailableProgram$Companion;
+	public final fun component1 ()Ljava/util/List;
+	public final fun component2 ()Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAvailablePartsCount ()Ljava/util/List;
+	public final fun getType ()Ljava/lang/String;
+	public fun hashCode ()I
+	public static final fun of (Ljava/util/List;)Lio/github/damienmiheev/monobank/installments/order/AvailableProgram;
+	public static final fun of (Ljava/util/List;Ljava/lang/String;)Lio/github/damienmiheev/monobank/installments/order/AvailableProgram;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/damienmiheev/monobank/installments/order/AvailableProgram$Companion {
+	public final fun of (Ljava/util/List;)Lio/github/damienmiheev/monobank/installments/order/AvailableProgram;
+	public final fun of (Ljava/util/List;Ljava/lang/String;)Lio/github/damienmiheev/monobank/installments/order/AvailableProgram;
+	public static synthetic fun of$default (Lio/github/damienmiheev/monobank/installments/order/AvailableProgram$Companion;Ljava/util/List;Ljava/lang/String;ILjava/lang/Object;)Lio/github/damienmiheev/monobank/installments/order/AvailableProgram;
+}
+
+public final class io/github/damienmiheev/monobank/installments/order/CheckPaidResponse {
+	public final fun component1 ()Z
+	public final fun component2 ()Ljava/lang/Boolean;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBankCanReturnMoneyToCard ()Ljava/lang/Boolean;
+	public final fun getFullyPaid ()Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/damienmiheev/monobank/installments/order/CreateOrderAdditionalParams {
+	public static final field Companion Lio/github/damienmiheev/monobank/installments/order/CreateOrderAdditionalParams$Companion;
+	public static final fun builder ()Lio/github/damienmiheev/monobank/installments/order/CreateOrderAdditionalParams$Builder;
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/math/BigDecimal;
+	public final fun component3 ()Ljava/math/BigDecimal;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getExtInitialSum ()Ljava/math/BigDecimal;
+	public final fun getNds ()Ljava/math/BigDecimal;
+	public final fun getSellerPhone ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/damienmiheev/monobank/installments/order/CreateOrderAdditionalParams$Builder {
+	public final fun build ()Lio/github/damienmiheev/monobank/installments/order/CreateOrderAdditionalParams;
+	public final fun extInitialSum (Ljava/math/BigDecimal;)Lio/github/damienmiheev/monobank/installments/order/CreateOrderAdditionalParams$Builder;
+	public final fun nds (Ljava/math/BigDecimal;)Lio/github/damienmiheev/monobank/installments/order/CreateOrderAdditionalParams$Builder;
+	public final fun sellerPhone (Ljava/lang/String;)Lio/github/damienmiheev/monobank/installments/order/CreateOrderAdditionalParams$Builder;
+}
+
+public final class io/github/damienmiheev/monobank/installments/order/CreateOrderAdditionalParams$Companion {
+	public final fun builder ()Lio/github/damienmiheev/monobank/installments/order/CreateOrderAdditionalParams$Builder;
+}
+
+public final class io/github/damienmiheev/monobank/installments/order/CreateOrderInvoice {
+	public static final field Companion Lio/github/damienmiheev/monobank/installments/order/CreateOrderInvoice$Companion;
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/time/LocalDate;
+	public final fun component3 ()Lio/github/damienmiheev/monobank/installments/common/InvoiceSource;
+	public final fun component4 ()Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDate ()Ljava/time/LocalDate;
+	public final fun getNumber ()Ljava/lang/String;
+	public final fun getPointId ()Ljava/lang/String;
+	public final fun getSource ()Lio/github/damienmiheev/monobank/installments/common/InvoiceSource;
+	public fun hashCode ()I
+	public static final fun of (Ljava/lang/String;Ljava/time/LocalDate;Lio/github/damienmiheev/monobank/installments/common/InvoiceSource;)Lio/github/damienmiheev/monobank/installments/order/CreateOrderInvoice;
+	public static final fun of (Ljava/lang/String;Ljava/time/LocalDate;Lio/github/damienmiheev/monobank/installments/common/InvoiceSource;Ljava/lang/String;)Lio/github/damienmiheev/monobank/installments/order/CreateOrderInvoice;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/damienmiheev/monobank/installments/order/CreateOrderInvoice$Companion {
+	public final fun of (Ljava/lang/String;Ljava/time/LocalDate;Lio/github/damienmiheev/monobank/installments/common/InvoiceSource;)Lio/github/damienmiheev/monobank/installments/order/CreateOrderInvoice;
+	public final fun of (Ljava/lang/String;Ljava/time/LocalDate;Lio/github/damienmiheev/monobank/installments/common/InvoiceSource;Ljava/lang/String;)Lio/github/damienmiheev/monobank/installments/order/CreateOrderInvoice;
+	public static synthetic fun of$default (Lio/github/damienmiheev/monobank/installments/order/CreateOrderInvoice$Companion;Ljava/lang/String;Ljava/time/LocalDate;Lio/github/damienmiheev/monobank/installments/common/InvoiceSource;Ljava/lang/String;ILjava/lang/Object;)Lio/github/damienmiheev/monobank/installments/order/CreateOrderInvoice;
+}
+
+public final class io/github/damienmiheev/monobank/installments/order/CreateOrderRequest {
+	public static final field Companion Lio/github/damienmiheev/monobank/installments/order/CreateOrderRequest$Companion;
+	public static final fun builder (Ljava/lang/String;Ljava/lang/String;Ljava/math/BigDecimal;Lio/github/damienmiheev/monobank/installments/order/CreateOrderInvoice;Ljava/util/List;Ljava/util/List;)Lio/github/damienmiheev/monobank/installments/order/CreateOrderRequest$Builder;
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/math/BigDecimal;
+	public final fun component4 ()Lio/github/damienmiheev/monobank/installments/order/CreateOrderInvoice;
+	public final fun component5 ()Ljava/util/List;
+	public final fun component6 ()Ljava/util/List;
+	public final fun component7 ()Ljava/lang/String;
+	public final fun component8 ()Lio/github/damienmiheev/monobank/installments/order/CreateOrderAdditionalParams;
+	public final fun component9 ()Lio/github/damienmiheev/monobank/installments/order/FinancialCompanyMerchantInfo;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAdditionalParams ()Lio/github/damienmiheev/monobank/installments/order/CreateOrderAdditionalParams;
+	public final fun getAvailablePrograms ()Ljava/util/List;
+	public final fun getClientPhone ()Ljava/lang/String;
+	public final fun getFinancialCompanyMerchantInfo ()Lio/github/damienmiheev/monobank/installments/order/FinancialCompanyMerchantInfo;
+	public final fun getInvoice ()Lio/github/damienmiheev/monobank/installments/order/CreateOrderInvoice;
+	public final fun getProducts ()Ljava/util/List;
+	public final fun getResultCallback ()Ljava/lang/String;
+	public final fun getStoreOrderId ()Ljava/lang/String;
+	public final fun getTotalSum ()Ljava/math/BigDecimal;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/damienmiheev/monobank/installments/order/CreateOrderRequest$Builder {
+	public final fun additionalParams (Lio/github/damienmiheev/monobank/installments/order/CreateOrderAdditionalParams;)Lio/github/damienmiheev/monobank/installments/order/CreateOrderRequest$Builder;
+	public final fun build ()Lio/github/damienmiheev/monobank/installments/order/CreateOrderRequest;
+	public final fun financialCompanyMerchantInfo (Lio/github/damienmiheev/monobank/installments/order/FinancialCompanyMerchantInfo;)Lio/github/damienmiheev/monobank/installments/order/CreateOrderRequest$Builder;
+	public final fun resultCallback (Ljava/lang/String;)Lio/github/damienmiheev/monobank/installments/order/CreateOrderRequest$Builder;
+}
+
+public final class io/github/damienmiheev/monobank/installments/order/CreateOrderRequest$Companion {
+	public final fun builder (Ljava/lang/String;Ljava/lang/String;Ljava/math/BigDecimal;Lio/github/damienmiheev/monobank/installments/order/CreateOrderInvoice;Ljava/util/List;Ljava/util/List;)Lio/github/damienmiheev/monobank/installments/order/CreateOrderRequest$Builder;
+}
+
+public final class io/github/damienmiheev/monobank/installments/order/CreateOrderResponse {
+	public final fun component1 ()Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getOrderId ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/damienmiheev/monobank/installments/order/FinancialCompanyMerchantInfo {
+	public static final field Companion Lio/github/damienmiheev/monobank/installments/order/FinancialCompanyMerchantInfo$Companion;
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getEdrpouCode ()Ljava/lang/String;
+	public final fun getIbanAccount ()Ljava/lang/String;
+	public final fun getStoreName ()Ljava/lang/String;
+	public fun hashCode ()I
+	public static final fun of (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lio/github/damienmiheev/monobank/installments/order/FinancialCompanyMerchantInfo;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/damienmiheev/monobank/installments/order/FinancialCompanyMerchantInfo$Companion {
+	public final fun of (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lio/github/damienmiheev/monobank/installments/order/FinancialCompanyMerchantInfo;
+}
+
+public final class io/github/damienmiheev/monobank/installments/order/OrderApi {
+	public static final field NOT_FOUND I
+	public final fun checkPaid (Ljava/lang/String;)Lio/github/damienmiheev/monobank/installments/order/CheckPaidResponse;
+	public final fun confirm (Ljava/lang/String;)Lio/github/damienmiheev/monobank/installments/order/OrderStateInfo;
+	public final fun create (Lio/github/damienmiheev/monobank/installments/order/CreateOrderRequest;)Lio/github/damienmiheev/monobank/installments/order/CreateOrderResponse;
+	public final fun data (Ljava/lang/String;)Lio/github/damienmiheev/monobank/installments/order/OrderData;
+	public final fun info (Ljava/lang/String;)Lio/github/damienmiheev/monobank/installments/order/OrderData;
+	public final fun reject (Ljava/lang/String;)Lio/github/damienmiheev/monobank/installments/order/OrderStateInfo;
+	public final fun returnOrder (Lio/github/damienmiheev/monobank/installments/order/ReturnOrderRequest;)Lio/github/damienmiheev/monobank/installments/order/ReturnOrderResponse;
+	public final fun state (Ljava/lang/String;)Lio/github/damienmiheev/monobank/installments/order/OrderStateResult;
+}
+
+public final class io/github/damienmiheev/monobank/installments/order/OrderData {
+	public final fun component1 ()Ljava/math/BigDecimal;
+	public final fun component10 ()Ljava/lang/String;
+	public final fun component2 ()Lio/github/damienmiheev/monobank/installments/common/OrderSource;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ljava/time/LocalDate;
+	public final fun component5 ()Ljava/lang/String;
+	public final fun component6 ()Ljava/lang/String;
+	public final fun component7 ()Ljava/time/OffsetDateTime;
+	public final fun component8 ()Ljava/util/List;
+	public final fun component9 ()Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCreateTimestamp ()Ljava/time/OffsetDateTime;
+	public final fun getIban ()Ljava/lang/String;
+	public final fun getInvoiceDate ()Ljava/time/LocalDate;
+	public final fun getInvoiceNumber ()Ljava/lang/String;
+	public final fun getMaskedCard ()Ljava/lang/String;
+	public final fun getPointId ()Ljava/lang/String;
+	public final fun getReverseList ()Ljava/util/List;
+	public final fun getSource ()Lio/github/damienmiheev/monobank/installments/common/OrderSource;
+	public final fun getStoreOrderId ()Ljava/lang/String;
+	public final fun getTotalSum ()Ljava/math/BigDecimal;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/damienmiheev/monobank/installments/order/OrderReverse {
+	public final fun component1 ()Ljava/math/BigDecimal;
+	public final fun component2 ()Ljava/time/OffsetDateTime;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getSum ()Ljava/math/BigDecimal;
+	public final fun getTimestamp ()Ljava/time/OffsetDateTime;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/damienmiheev/monobank/installments/order/OrderStateInfo {
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Lio/github/damienmiheev/monobank/installments/common/OrderState;
+	public final fun component3 ()Lio/github/damienmiheev/monobank/installments/common/OrderSubState;
+	public final fun component4 ()Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getMessage ()Ljava/lang/String;
+	public final fun getOrderId ()Ljava/lang/String;
+	public final fun getState ()Lio/github/damienmiheev/monobank/installments/common/OrderState;
+	public final fun getSubState ()Lio/github/damienmiheev/monobank/installments/common/OrderSubState;
+	public fun hashCode ()I
+	public final fun isWaitingForStoreConfirm ()Z
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract class io/github/damienmiheev/monobank/installments/order/OrderStateResult {
+	public abstract fun getStateOrNull ()Lio/github/damienmiheev/monobank/installments/order/OrderStateInfo;
+}
+
+public final class io/github/damienmiheev/monobank/installments/order/OrderStateResult$Found : io/github/damienmiheev/monobank/installments/order/OrderStateResult {
+	public final fun component1 ()Lio/github/damienmiheev/monobank/installments/order/OrderStateInfo;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getInfo ()Lio/github/damienmiheev/monobank/installments/order/OrderStateInfo;
+	public fun getStateOrNull ()Lio/github/damienmiheev/monobank/installments/order/OrderStateInfo;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/damienmiheev/monobank/installments/order/OrderStateResult$NotFound : io/github/damienmiheev/monobank/installments/order/OrderStateResult {
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getMessage ()Ljava/lang/String;
+	public fun getStateOrNull ()Lio/github/damienmiheev/monobank/installments/order/OrderStateInfo;
+	public final fun getTraceId ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/damienmiheev/monobank/installments/order/ReturnAdditionalParams {
+	public final fun component1 ()Ljava/math/BigDecimal;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getNds ()Ljava/math/BigDecimal;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/damienmiheev/monobank/installments/order/ReturnOrderRequest {
+	public static final field Companion Lio/github/damienmiheev/monobank/installments/order/ReturnOrderRequest$Companion;
+	public static final fun builder (Ljava/lang/String;Ljava/math/BigDecimal;Ljava/lang/String;Z)Lio/github/damienmiheev/monobank/installments/order/ReturnOrderRequest$Builder;
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/math/BigDecimal;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Z
+	public final fun component5 ()Lio/github/damienmiheev/monobank/installments/order/ReturnAdditionalParams;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAdditionalParams ()Lio/github/damienmiheev/monobank/installments/order/ReturnAdditionalParams;
+	public final fun getOrderId ()Ljava/lang/String;
+	public final fun getReturnMoneyToCard ()Z
+	public final fun getStoreReturnId ()Ljava/lang/String;
+	public final fun getSum ()Ljava/math/BigDecimal;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/damienmiheev/monobank/installments/order/ReturnOrderRequest$Builder {
+	public final fun build ()Lio/github/damienmiheev/monobank/installments/order/ReturnOrderRequest;
+	public final fun nds (Ljava/math/BigDecimal;)Lio/github/damienmiheev/monobank/installments/order/ReturnOrderRequest$Builder;
+}
+
+public final class io/github/damienmiheev/monobank/installments/order/ReturnOrderRequest$Companion {
+	public final fun builder (Ljava/lang/String;Ljava/math/BigDecimal;Ljava/lang/String;Z)Lio/github/damienmiheev/monobank/installments/order/ReturnOrderRequest$Builder;
+}
+
+public final class io/github/damienmiheev/monobank/installments/order/ReturnOrderResponse {
+	public final fun component1 ()Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getStatus ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/damienmiheev/monobank/installments/qr/CreateQrCartRequest {
+	public static final field Companion Lio/github/damienmiheev/monobank/installments/qr/CreateQrCartRequest$Companion;
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/util/List;
+	public final fun component4 ()Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getProducts ()Ljava/util/List;
+	public final fun getQrId ()Ljava/lang/String;
+	public final fun getResultCallback ()Ljava/lang/String;
+	public final fun getStoreOrderId ()Ljava/lang/String;
+	public fun hashCode ()I
+	public static final fun of (Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;)Lio/github/damienmiheev/monobank/installments/qr/CreateQrCartRequest;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/damienmiheev/monobank/installments/qr/CreateQrCartRequest$Companion {
+	public final fun of (Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;)Lio/github/damienmiheev/monobank/installments/qr/CreateQrCartRequest;
+}
+
+public final class io/github/damienmiheev/monobank/installments/qr/QrCartApi {
+	public static final field CONFLICT I
+	public final fun cancel (Ljava/lang/String;)V
+	public final fun create (Lio/github/damienmiheev/monobank/installments/qr/CreateQrCartRequest;)Lio/github/damienmiheev/monobank/installments/qr/QrCartResult;
+}
+
+public abstract class io/github/damienmiheev/monobank/installments/qr/QrCartResult {
+	public abstract fun getCartIdOrNull ()Ljava/lang/String;
+}
+
+public final class io/github/damienmiheev/monobank/installments/qr/QrCartResult$Conflict : io/github/damienmiheev/monobank/installments/qr/QrCartResult {
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getCartIdOrNull ()Ljava/lang/String;
+	public final fun getMessage ()Ljava/lang/String;
+	public final fun getTraceId ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/damienmiheev/monobank/installments/qr/QrCartResult$Created : io/github/damienmiheev/monobank/installments/qr/QrCartResult {
+	public final fun component1 ()Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCartId ()Ljava/lang/String;
+	public fun getCartIdOrNull ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/damienmiheev/monobank/installments/report/ReportOrder {
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component10 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/time/LocalDate;
+	public final fun component4 ()Ljava/lang/Integer;
+	public final fun component5 ()Ljava/math/BigDecimal;
+	public final fun component6 ()Ljava/math/BigDecimal;
+	public final fun component7 ()Ljava/math/BigDecimal;
+	public final fun component8 ()Ljava/math/BigDecimal;
+	public final fun component9 ()Ljava/time/OffsetDateTime;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCommission ()Ljava/math/BigDecimal;
+	public final fun getCommissionPercent ()Ljava/math/BigDecimal;
+	public final fun getInvoiceNumber ()Ljava/lang/String;
+	public final fun getOdbContractNumber ()Ljava/lang/String;
+	public final fun getOperationTimestamp ()Ljava/time/OffsetDateTime;
+	public final fun getOrderDate ()Ljava/time/LocalDate;
+	public final fun getOrderId ()Ljava/lang/String;
+	public final fun getPayParts ()Ljava/lang/Integer;
+	public final fun getTotalSum ()Ljava/math/BigDecimal;
+	public final fun getTransferredSum ()Ljava/math/BigDecimal;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/damienmiheev/monobank/installments/report/StoreApi {
+	public final fun report (Ljava/time/LocalDate;)Ljava/util/List;
+}
+

@@ -1,0 +1,308 @@
+public final class io/github/damienmiheev/monobank/testkit/CardSaving : java/lang/Enum {
+	public static final field FAILED Lio/github/damienmiheev/monobank/testkit/CardSaving;
+	public static final field SAVED Lio/github/damienmiheev/monobank/testkit/CardSaving;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/damienmiheev/monobank/testkit/CardSaving;
+	public static fun values ()[Lio/github/damienmiheev/monobank/testkit/CardSaving;
+}
+
+public final class io/github/damienmiheev/monobank/testkit/CustomerPayment {
+	public static final field Companion Lio/github/damienmiheev/monobank/testkit/CustomerPayment$Companion;
+	public static final field DEFAULT_DECLINE_CODE Ljava/lang/String;
+	public static final field DEFAULT_MASKED_PAN Ljava/lang/String;
+	public synthetic fun <init> (Lio/github/damienmiheev/monobank/testkit/CustomerPayment$Builder;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public static final fun approved ()Lio/github/damienmiheev/monobank/testkit/CustomerPayment;
+	public static final fun builder ()Lio/github/damienmiheev/monobank/testkit/CustomerPayment$Builder;
+	public static final fun declined ()Lio/github/damienmiheev/monobank/testkit/CustomerPayment;
+	public static final fun declined (Ljava/lang/String;Ljava/lang/String;)Lio/github/damienmiheev/monobank/testkit/CustomerPayment;
+	public final fun getApproved ()Z
+	public final fun getBank ()Ljava/lang/String;
+	public final fun getCardSaving ()Lio/github/damienmiheev/monobank/testkit/CardSaving;
+	public final fun getCountry ()Ljava/lang/String;
+	public final fun getErrCode ()Ljava/lang/String;
+	public final fun getFailureReason ()Ljava/lang/String;
+	public final fun getMaskedPan ()Ljava/lang/String;
+	public final fun getPaymentMethod ()Ljava/lang/String;
+	public final fun getPaymentSystem ()Ljava/lang/String;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/damienmiheev/monobank/testkit/CustomerPayment$Builder {
+	public final fun bank (Ljava/lang/String;)Lio/github/damienmiheev/monobank/testkit/CustomerPayment$Builder;
+	public final fun build ()Lio/github/damienmiheev/monobank/testkit/CustomerPayment;
+	public final fun cardSaving (Lio/github/damienmiheev/monobank/testkit/CardSaving;)Lio/github/damienmiheev/monobank/testkit/CustomerPayment$Builder;
+	public final fun country (Ljava/lang/String;)Lio/github/damienmiheev/monobank/testkit/CustomerPayment$Builder;
+	public final fun declined (Ljava/lang/String;Ljava/lang/String;)Lio/github/damienmiheev/monobank/testkit/CustomerPayment$Builder;
+	public final fun maskedPan (Ljava/lang/String;)Lio/github/damienmiheev/monobank/testkit/CustomerPayment$Builder;
+	public final fun paymentMethod (Ljava/lang/String;)Lio/github/damienmiheev/monobank/testkit/CustomerPayment$Builder;
+	public final fun paymentSystem (Ljava/lang/String;)Lio/github/damienmiheev/monobank/testkit/CustomerPayment$Builder;
+}
+
+public final class io/github/damienmiheev/monobank/testkit/CustomerPayment$Companion {
+	public final fun approved ()Lio/github/damienmiheev/monobank/testkit/CustomerPayment;
+	public final fun builder ()Lio/github/damienmiheev/monobank/testkit/CustomerPayment$Builder;
+	public final fun declined ()Lio/github/damienmiheev/monobank/testkit/CustomerPayment;
+	public final fun declined (Ljava/lang/String;Ljava/lang/String;)Lio/github/damienmiheev/monobank/testkit/CustomerPayment;
+}
+
+public final class io/github/damienmiheev/monobank/testkit/FakeInvoice {
+	public final fun getAmount ()J
+	public final fun getCardToken ()Ljava/lang/String;
+	public final fun getCcy ()I
+	public final fun getCreatedDate ()Ljava/time/Instant;
+	public final fun getFinalAmount ()Ljava/lang/Long;
+	public final fun getHoldUntil ()Ljava/time/Instant;
+	public final fun getInvoiceId ()Ljava/lang/String;
+	public final fun getModifiedDate ()Ljava/time/Instant;
+	public final fun getPaymentType ()Ljava/lang/String;
+	public final fun getReference ()Ljava/lang/String;
+	public final fun getRefunds ()Ljava/util/List;
+	public final fun getStatus ()Ljava/lang/String;
+	public final fun getStatusJson ()Ljava/lang/String;
+	public final fun getValidUntil ()Ljava/time/Instant;
+	public final fun getViaWallet ()Z
+	public final fun getWalletId ()Ljava/lang/String;
+	public final fun getWebHookUrl ()Ljava/lang/String;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/damienmiheev/monobank/testkit/FakeMonobankAcquiring : java/lang/AutoCloseable {
+	public static final field Companion Lio/github/damienmiheev/monobank/testkit/FakeMonobankAcquiring$Companion;
+	public static final field DEFAULT_TOKEN Ljava/lang/String;
+	public fun <init> ()V
+	public synthetic fun <init> (Lio/github/damienmiheev/monobank/testkit/FakeMonobankAcquiring$Builder;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun addCard (Ljava/lang/String;)Ljava/lang/String;
+	public final fun addCard (Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;
+	public static synthetic fun addCard$default (Lio/github/damienmiheev/monobank/testkit/FakeMonobankAcquiring;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Ljava/lang/String;
+	public final fun advanceClock (Ljava/time/Duration;)V
+	public final fun awaitWebhooks (ILjava/time/Duration;)Ljava/util/List;
+	public static final fun builder ()Lio/github/damienmiheev/monobank/testkit/FakeMonobankAcquiring$Builder;
+	public final fun clearFaults ()V
+	public final fun clientOptions ()Lio/github/damienmiheev/monobank/core/MonobankClientOptions;
+	public final fun clientOptionsBuilder ()Lio/github/damienmiheev/monobank/core/MonobankClientOptions$Builder;
+	public fun close ()V
+	public final fun corruptNextWebhookSignatures (I)V
+	public final fun deliverWebhooksInReverseOrder ()Ljava/util/List;
+	public final fun deliverWebhooksNow ()Ljava/util/List;
+	public final fun dropNextWebhooks (I)V
+	public final fun duplicateNextWebhooks (I)V
+	public final fun enqueueWalletPaymentOutcome (Lio/github/damienmiheev/monobank/testkit/WalletPaymentOutcome;)V
+	public final fun expireInvoice (Ljava/lang/String;)Lio/github/damienmiheev/monobank/testkit/FakeInvoice;
+	public final fun failInvoice (Ljava/lang/String;)Lio/github/damienmiheev/monobank/testkit/FakeInvoice;
+	public final fun getBaseUrl ()Ljava/lang/String;
+	public final fun getClock ()Lio/github/damienmiheev/monobank/testkit/TestClock;
+	public final fun getPort ()I
+	public final fun getSigner ()Lio/github/damienmiheev/monobank/testkit/MonobankWebhookSigner;
+	public final fun getToken ()Ljava/lang/String;
+	public final fun injectFault (Ljava/lang/String;Lio/github/damienmiheev/monobank/testkit/Fault;)V
+	public final fun injectFault (Ljava/lang/String;Lio/github/damienmiheev/monobank/testkit/Fault;I)V
+	public final fun invoice (Ljava/lang/String;)Lio/github/damienmiheev/monobank/testkit/FakeInvoice;
+	public final fun invoices ()Ljava/util/List;
+	public final fun nextResponse (Ljava/lang/String;ILjava/lang/String;)V
+	public final fun payInvoice (Ljava/lang/String;)Lio/github/damienmiheev/monobank/testkit/FakeInvoice;
+	public final fun payInvoice (Ljava/lang/String;Lio/github/damienmiheev/monobank/testkit/CustomerPayment;)Lio/github/damienmiheev/monobank/testkit/FakeInvoice;
+	public final fun pendingWebhookCount ()I
+	public final fun refundExternally (Ljava/lang/String;J)Lio/github/damienmiheev/monobank/testkit/FakeInvoice;
+	public final fun requestCount (Ljava/lang/String;)I
+	public final fun requests ()Ljava/util/List;
+	public final fun reset ()V
+	public final fun rotateKey ()Ljava/lang/String;
+	public final fun sentWebhooks ()Ljava/util/List;
+	public final fun setRefundSettlement (Lio/github/damienmiheev/monobank/testkit/RefundSettlement;)V
+	public final fun setWebhookDelay (Ljava/time/Duration;)V
+	public final fun setWebhookDelivery (Lio/github/damienmiheev/monobank/testkit/WebhookDelivery;)V
+	public final fun settleRefund (Ljava/lang/String;Ljava/lang/String;Z)Lio/github/damienmiheev/monobank/testkit/FakeInvoice;
+	public final fun start ()Lio/github/damienmiheev/monobank/testkit/FakeMonobankAcquiring;
+	public final fun startPayment (Ljava/lang/String;)Lio/github/damienmiheev/monobank/testkit/FakeInvoice;
+	public final fun startPayment (Ljava/lang/String;Lio/github/damienmiheev/monobank/testkit/CustomerPayment;)Lio/github/damienmiheev/monobank/testkit/FakeInvoice;
+	public static synthetic fun startPayment$default (Lio/github/damienmiheev/monobank/testkit/FakeMonobankAcquiring;Ljava/lang/String;Lio/github/damienmiheev/monobank/testkit/CustomerPayment;ILjava/lang/Object;)Lio/github/damienmiheev/monobank/testkit/FakeInvoice;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/damienmiheev/monobank/testkit/FakeMonobankAcquiring$Builder {
+	public final fun build ()Lio/github/damienmiheev/monobank/testkit/FakeMonobankAcquiring;
+	public final fun clock (Lio/github/damienmiheev/monobank/testkit/TestClock;)Lio/github/damienmiheev/monobank/testkit/FakeMonobankAcquiring$Builder;
+	public final fun feePercent (Ljava/math/BigDecimal;)Lio/github/damienmiheev/monobank/testkit/FakeMonobankAcquiring$Builder;
+	public final fun hangLimit (Ljava/time/Duration;)Lio/github/damienmiheev/monobank/testkit/FakeMonobankAcquiring$Builder;
+	public final fun merchant (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lio/github/damienmiheev/monobank/testkit/FakeMonobankAcquiring$Builder;
+	public final fun port (I)Lio/github/damienmiheev/monobank/testkit/FakeMonobankAcquiring$Builder;
+	public final fun refundSettlement (Lio/github/damienmiheev/monobank/testkit/RefundSettlement;)Lio/github/damienmiheev/monobank/testkit/FakeMonobankAcquiring$Builder;
+	public final fun sendProcessingWebhooks (Z)Lio/github/damienmiheev/monobank/testkit/FakeMonobankAcquiring$Builder;
+	public final fun signer (Lio/github/damienmiheev/monobank/testkit/MonobankWebhookSigner;)Lio/github/damienmiheev/monobank/testkit/FakeMonobankAcquiring$Builder;
+	public final fun tokens ([Ljava/lang/String;)Lio/github/damienmiheev/monobank/testkit/FakeMonobankAcquiring$Builder;
+	public final fun validateBasketTotal (Z)Lio/github/damienmiheev/monobank/testkit/FakeMonobankAcquiring$Builder;
+	public final fun webhookDelay (Ljava/time/Duration;)Lio/github/damienmiheev/monobank/testkit/FakeMonobankAcquiring$Builder;
+	public final fun webhookDelivery (Lio/github/damienmiheev/monobank/testkit/WebhookDelivery;)Lio/github/damienmiheev/monobank/testkit/FakeMonobankAcquiring$Builder;
+	public final fun webhookRetries (ILjava/time/Duration;)Lio/github/damienmiheev/monobank/testkit/FakeMonobankAcquiring$Builder;
+	public final fun webhookTimeout (Ljava/time/Duration;)Lio/github/damienmiheev/monobank/testkit/FakeMonobankAcquiring$Builder;
+}
+
+public final class io/github/damienmiheev/monobank/testkit/FakeMonobankAcquiring$Companion {
+	public final fun builder ()Lio/github/damienmiheev/monobank/testkit/FakeMonobankAcquiring$Builder;
+}
+
+public final class io/github/damienmiheev/monobank/testkit/FakeRefund {
+	public final fun getAmount ()J
+	public final fun getExtRef ()Ljava/lang/String;
+	public final fun getStatus ()Ljava/lang/String;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/damienmiheev/monobank/testkit/FakeRequest {
+	public final fun getBody ()Ljava/lang/String;
+	public final fun getMethod ()Ljava/lang/String;
+	public final fun getPath ()Ljava/lang/String;
+	public final fun getQuery ()Ljava/util/Map;
+	public final fun getReceivedAt ()Ljava/time/Instant;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/damienmiheev/monobank/testkit/Fault {
+	public static final field Companion Lio/github/damienmiheev/monobank/testkit/Fault$Companion;
+	public static final fun delay (Ljava/time/Duration;)Lio/github/damienmiheev/monobank/testkit/Fault;
+	public static final fun dropConnection ()Lio/github/damienmiheev/monobank/testkit/Fault;
+	public static final fun dropConnectionWithoutProcessing ()Lio/github/damienmiheev/monobank/testkit/Fault;
+	public static final fun response (ILjava/lang/String;)Lio/github/damienmiheev/monobank/testkit/Fault;
+	public static final fun response (ILjava/lang/String;Ljava/util/Map;)Lio/github/damienmiheev/monobank/testkit/Fault;
+	public static final fun serverError ()Lio/github/damienmiheev/monobank/testkit/Fault;
+	public static final fun serverError (ILjava/lang/String;Ljava/lang/String;)Lio/github/damienmiheev/monobank/testkit/Fault;
+	public static final fun serverErrorAfterProcessing ()Lio/github/damienmiheev/monobank/testkit/Fault;
+	public static final fun timeout ()Lio/github/damienmiheev/monobank/testkit/Fault;
+	public static final fun timeoutWithoutProcessing ()Lio/github/damienmiheev/monobank/testkit/Fault;
+	public fun toString ()Ljava/lang/String;
+	public static final fun tooManyRequests ()Lio/github/damienmiheev/monobank/testkit/Fault;
+	public static final fun tooManyRequests (Ljava/time/Duration;)Lio/github/damienmiheev/monobank/testkit/Fault;
+}
+
+public final class io/github/damienmiheev/monobank/testkit/Fault$Companion {
+	public final fun delay (Ljava/time/Duration;)Lio/github/damienmiheev/monobank/testkit/Fault;
+	public final fun dropConnection ()Lio/github/damienmiheev/monobank/testkit/Fault;
+	public final fun dropConnectionWithoutProcessing ()Lio/github/damienmiheev/monobank/testkit/Fault;
+	public final fun response (ILjava/lang/String;)Lio/github/damienmiheev/monobank/testkit/Fault;
+	public final fun response (ILjava/lang/String;Ljava/util/Map;)Lio/github/damienmiheev/monobank/testkit/Fault;
+	public final fun serverError ()Lio/github/damienmiheev/monobank/testkit/Fault;
+	public final fun serverError (ILjava/lang/String;Ljava/lang/String;)Lio/github/damienmiheev/monobank/testkit/Fault;
+	public final fun serverErrorAfterProcessing ()Lio/github/damienmiheev/monobank/testkit/Fault;
+	public final fun timeout ()Lio/github/damienmiheev/monobank/testkit/Fault;
+	public final fun timeoutWithoutProcessing ()Lio/github/damienmiheev/monobank/testkit/Fault;
+	public final fun tooManyRequests ()Lio/github/damienmiheev/monobank/testkit/Fault;
+	public final fun tooManyRequests (Ljava/time/Duration;)Lio/github/damienmiheev/monobank/testkit/Fault;
+}
+
+public final class io/github/damienmiheev/monobank/testkit/MonobankPaths {
+	public static final field ANY Ljava/lang/String;
+	public static final field DETAILS Ljava/lang/String;
+	public static final field INSTANCE Lio/github/damienmiheev/monobank/testkit/MonobankPaths;
+	public static final field INVOICE_CANCEL Ljava/lang/String;
+	public static final field INVOICE_CREATE Ljava/lang/String;
+	public static final field INVOICE_FINALIZE Ljava/lang/String;
+	public static final field INVOICE_REMOVE Ljava/lang/String;
+	public static final field INVOICE_STATUS Ljava/lang/String;
+	public static final field PUBKEY Ljava/lang/String;
+	public static final field STATEMENT Ljava/lang/String;
+	public static final field WALLET Ljava/lang/String;
+	public static final field WALLET_CARD Ljava/lang/String;
+	public static final field WALLET_PAYMENT Ljava/lang/String;
+}
+
+public final class io/github/damienmiheev/monobank/testkit/MonobankWebhookSigner {
+	public static final field Companion Lio/github/damienmiheev/monobank/testkit/MonobankWebhookSigner$Companion;
+	public synthetic fun <init> (Ljava/security/KeyPair;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public static final fun generate ()Lio/github/damienmiheev/monobank/testkit/MonobankWebhookSigner;
+	public static final fun generateKeyPair ()Ljava/security/KeyPair;
+	public final fun getKeyPair ()Ljava/security/KeyPair;
+	public final fun getPublicKey ()Ljava/lang/String;
+	public final fun getPublicKeyPem ()Ljava/lang/String;
+	public static final fun of (Ljava/security/KeyPair;)Lio/github/damienmiheev/monobank/testkit/MonobankWebhookSigner;
+	public final fun rotate ()Ljava/lang/String;
+	public final fun rotate (Ljava/security/KeyPair;)Ljava/lang/String;
+	public final fun sign (Ljava/lang/String;)Ljava/lang/String;
+	public final fun sign ([B)Ljava/lang/String;
+	public fun toString ()Ljava/lang/String;
+	public final fun verify (Ljava/lang/String;[B)Z
+}
+
+public final class io/github/damienmiheev/monobank/testkit/MonobankWebhookSigner$Companion {
+	public final fun generate ()Lio/github/damienmiheev/monobank/testkit/MonobankWebhookSigner;
+	public final fun generateKeyPair ()Ljava/security/KeyPair;
+	public final fun of (Ljava/security/KeyPair;)Lio/github/damienmiheev/monobank/testkit/MonobankWebhookSigner;
+}
+
+public final class io/github/damienmiheev/monobank/testkit/RecordedWebhook {
+	public final fun bodyBytes ()[B
+	public final fun getAttempts ()I
+	public final fun getBody ()Ljava/lang/String;
+	public final fun getDuplicate ()Z
+	public final fun getInvoiceId ()Ljava/lang/String;
+	public final fun getOutcome ()Lio/github/damienmiheev/monobank/testkit/WebhookOutcome;
+	public final fun getResponseStatus ()Ljava/lang/Integer;
+	public final fun getSentAt ()Ljava/time/Instant;
+	public final fun getSignatureValid ()Z
+	public final fun getStatus ()Ljava/lang/String;
+	public final fun getUrl ()Ljava/lang/String;
+	public final fun getXSign ()Ljava/lang/String;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/damienmiheev/monobank/testkit/RefundSettlement : java/lang/Enum {
+	public static final field AUTOMATIC Lio/github/damienmiheev/monobank/testkit/RefundSettlement;
+	public static final field MANUAL Lio/github/damienmiheev/monobank/testkit/RefundSettlement;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/damienmiheev/monobank/testkit/RefundSettlement;
+	public static fun values ()[Lio/github/damienmiheev/monobank/testkit/RefundSettlement;
+}
+
+public final class io/github/damienmiheev/monobank/testkit/TestClock : java/time/Clock {
+	public static final field Companion Lio/github/damienmiheev/monobank/testkit/TestClock$Companion;
+	public synthetic fun <init> (Lio/github/damienmiheev/monobank/testkit/TestClock$State;Ljava/time/ZoneId;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun advance (Ljava/time/Duration;)V
+	public static final fun fixed (Ljava/time/Instant;)Lio/github/damienmiheev/monobank/testkit/TestClock;
+	public fun getZone ()Ljava/time/ZoneId;
+	public fun instant ()Ljava/time/Instant;
+	public final fun set (Ljava/time/Instant;)V
+	public static final fun system ()Lio/github/damienmiheev/monobank/testkit/TestClock;
+	public fun toString ()Ljava/lang/String;
+	public fun withZone (Ljava/time/ZoneId;)Ljava/time/Clock;
+}
+
+public final class io/github/damienmiheev/monobank/testkit/TestClock$Companion {
+	public final fun fixed (Ljava/time/Instant;)Lio/github/damienmiheev/monobank/testkit/TestClock;
+	public final fun system ()Lio/github/damienmiheev/monobank/testkit/TestClock;
+}
+
+public final class io/github/damienmiheev/monobank/testkit/WalletPaymentOutcome {
+	public static final field Companion Lio/github/damienmiheev/monobank/testkit/WalletPaymentOutcome$Companion;
+	public synthetic fun <init> (Lio/github/damienmiheev/monobank/testkit/WalletPaymentOutcome$Kind;Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public static final fun declined ()Lio/github/damienmiheev/monobank/testkit/WalletPaymentOutcome;
+	public static final fun declined (Ljava/lang/String;Ljava/lang/String;)Lio/github/damienmiheev/monobank/testkit/WalletPaymentOutcome;
+	public static final fun processing ()Lio/github/damienmiheev/monobank/testkit/WalletPaymentOutcome;
+	public static final fun success ()Lio/github/damienmiheev/monobank/testkit/WalletPaymentOutcome;
+	public static final fun threeDs ()Lio/github/damienmiheev/monobank/testkit/WalletPaymentOutcome;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/damienmiheev/monobank/testkit/WalletPaymentOutcome$Companion {
+	public final fun declined ()Lio/github/damienmiheev/monobank/testkit/WalletPaymentOutcome;
+	public final fun declined (Ljava/lang/String;Ljava/lang/String;)Lio/github/damienmiheev/monobank/testkit/WalletPaymentOutcome;
+	public final fun processing ()Lio/github/damienmiheev/monobank/testkit/WalletPaymentOutcome;
+	public final fun success ()Lio/github/damienmiheev/monobank/testkit/WalletPaymentOutcome;
+	public final fun threeDs ()Lio/github/damienmiheev/monobank/testkit/WalletPaymentOutcome;
+}
+
+public final class io/github/damienmiheev/monobank/testkit/WebhookDelivery : java/lang/Enum {
+	public static final field AUTOMATIC Lio/github/damienmiheev/monobank/testkit/WebhookDelivery;
+	public static final field MANUAL Lio/github/damienmiheev/monobank/testkit/WebhookDelivery;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/damienmiheev/monobank/testkit/WebhookDelivery;
+	public static fun values ()[Lio/github/damienmiheev/monobank/testkit/WebhookDelivery;
+}
+
+public final class io/github/damienmiheev/monobank/testkit/WebhookOutcome : java/lang/Enum {
+	public static final field DELIVERED Lio/github/damienmiheev/monobank/testkit/WebhookOutcome;
+	public static final field DROPPED Lio/github/damienmiheev/monobank/testkit/WebhookOutcome;
+	public static final field FAILED Lio/github/damienmiheev/monobank/testkit/WebhookOutcome;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/damienmiheev/monobank/testkit/WebhookOutcome;
+	public static fun values ()[Lio/github/damienmiheev/monobank/testkit/WebhookOutcome;
+}
+

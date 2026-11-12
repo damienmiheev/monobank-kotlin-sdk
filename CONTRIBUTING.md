@@ -22,7 +22,8 @@ for Java 11 and also runs the tests on a Java 11 runtime, which Gradle finds or 
 - Responses tolerate unknown fields and unknown enum values (`UNKNOWN`).
 - Never log or `toString()` tokens, keys, card numbers, CVV, card tokens or payment cryptograms.
 - Public API changes after 1.0.0 must be backwards compatible (`apiCheck`); breaking changes wait
-  for a major version.
+  for a major version. `apiCheck` also lists compiler-generated `synthetic <init>(..., DefaultConstructorMarker)`
+  accessors of private constructors; changes to those are not breaking (Java and Kotlin code can't call them).
 - Tests: MockWebServer for every endpoint (request and response), plus edge cases. Crypto code is
   tested with real key pairs and with the documentation's examples.
 

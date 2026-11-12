@@ -62,6 +62,7 @@ public class MonobankHttp(
         listOfNotNull(SdkInfo.userAgent(module), options.userAgentSuffix).joinToString(" ")
 
     /** Pauses between retries; replaceable in tests. */
+    @InternalMonobankApi
     public fun interface Sleeper {
         /** Sleeps for [duration]. */
         public fun sleep(duration: Duration)
