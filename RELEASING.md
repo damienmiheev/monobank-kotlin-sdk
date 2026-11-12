@@ -14,6 +14,8 @@ Nothing is published until both passes are clean.
 2. Central Portal → Account → Generate User Token.
 3. Repository settings: run `tools/github/apply.sh` (needs `gh` logged in as admin). It applies and
    can re-apply everything below; review the result under Settings → Rules.
+   - Classic branch protection on `main` is removed (the rulesets replace it; its checks and
+     reviews could not be bypassed).
    - Ruleset `main` (no bypass for anyone, admin included): changes only through squash-merged
      pull requests with resolved conversations; CI checks `build`, `newest-jdk`, `killbill-consumer`,
      `workflow-lint`, `codeql` and `codeql-actions` must pass on the up-to-date branch; no high CodeQL alerts; signed
@@ -75,7 +77,8 @@ On a clean checkout of the release pull request's head (version `X.Y.Z`, not a s
 `main` only accepts squash-merged pull requests and `v*` tags can't be moved, so:
 
 1. Open a release pull request: `VERSION_NAME=X.Y.Z` in `gradle.properties`, the CHANGELOG
-   `Unreleased` section moved under `X.Y.Z`, and nothing else.
+   `Unreleased` section moved under `X.Y.Z`, the version in the README's installation and
+   migration examples, and nothing else.
 2. Run both verification passes on its head; fix anything in a new pull request first.
 3. Squash-merge it (all required checks green). The merge commit on `main` has the same tree as
    the verified head.
