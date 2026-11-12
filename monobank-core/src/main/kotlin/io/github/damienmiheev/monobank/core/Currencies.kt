@@ -5,6 +5,10 @@ import java.util.Currency
 
 /**
  * ISO 4217 numeric currency codes used by monobank (`ccy` fields).
+ *
+ * Merchant acquiring accepts only [UAH], [USD] and [EUR]: other codes get 400 `1001`
+ * "invalid 'ccy'" (verified on monobank's test merchant). The personal and corporate APIs report
+ * accounts and rates in many more currencies.
  */
 public object CurrencyCodes {
     /** Ukrainian hryvnia. */

@@ -108,6 +108,9 @@ partial `finalize` (and, likely, a partial refund); otherwise monobank answers 4
 
 ## Money
 
+Merchant acquiring accepts three currencies: UAH (980), USD (840) and EUR (978); holds work only in
+UAH. Other codes (e.g. PLN 985) are refused with 400 `1001` "invalid 'ccy'".
+
 The acquiring, personal and corporate APIs use **minor units** (kopiyky, cents) for every amount:
 `4200` is 42.00 UAH. Every amount field's documentation says so. The installments API uses decimal
 hryvnias (`BigDecimal`). Convert without rounding:

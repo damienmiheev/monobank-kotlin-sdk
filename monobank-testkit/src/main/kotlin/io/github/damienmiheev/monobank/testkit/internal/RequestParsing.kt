@@ -50,6 +50,7 @@ internal class WalletPaymentParams(
 /** Validates request bodies the way monobank documents them, answering 400 like it does. */
 internal object RequestParsing {
     private const val UAH = 980
+    private val ACQUIRING_CURRENCIES = setOf(980L, 840L, 978L)
     private const val TEXT_MAX = 280
     private val DEFAULT_VALIDITY: Duration = Duration.ofHours(24)
     private val MAX_VALIDITY: Duration = Duration.ofDays(30)
@@ -143,7 +144,9 @@ internal object RequestParsing {
         required: Boolean,
     ): Int {
         val ccy = Fields.long(json, "ccy") ?: if (required) throw ApiError.badRequest("empty 'ccy'") else UAH.toLong()
-        if (ccy !in 1..999) throw ApiError.badRequest("invalid 'ccy'")
+        // Acquiring accepts only UAH, USD and EUR (verified on monobank's test merchant: PLN, GBP,
+        // CHF, CZK, HUF and RON get 400 1001 "invalid 'ccy'").
+        if (ccy !in ACQUIRING_CURRENCIES) throw ApiError(400, "1001", "invalid 'ccy'")
         return ccy.toInt()
     }
 

@@ -13,7 +13,8 @@ import io.github.damienmiheev.monobank.core.CurrencyCodes
  * Build it with [builder]: `CreateInvoiceRequest.builder(4200).redirectUrl(...).build()`.
  *
  * @property amount Amount in minor units (kopiyky): 4200 is 42.00 UAH.
- * @property ccy ISO 4217 numeric currency code; monobank defaults to 980 (UAH).
+ * @property ccy ISO 4217 numeric currency code; monobank defaults to 980 (UAH). Acquiring accepts
+ *   only 980 (UAH), 840 (USD) and 978 (EUR); holds only UAH.
  * @property merchantPaymInfo Order details; required when fiscal receipts are enabled.
  * @property redirectUrl Where the customer returns after paying (GET).
  * @property successUrl Where the customer returns after a successful payment (GET).

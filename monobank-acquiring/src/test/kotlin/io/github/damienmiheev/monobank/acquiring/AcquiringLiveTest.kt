@@ -14,6 +14,8 @@ import org.junit.jupiter.api.Assumptions.assumeTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 import java.math.BigDecimal
 import java.time.Duration
 import java.time.Instant
@@ -54,9 +56,10 @@ class AcquiringLiveTest {
             .isEqualTo("i")
     }
 
-    @Test
-    fun `create, check and remove a small invoice`() {
-        val reference = "sdk-live-" + UUID.randomUUID()
+    @ParameterizedTest(name = "ccy {0}")
+    @ValueSource(ints = [CurrencyCodes.UAH, CurrencyCodes.USD, CurrencyCodes.EUR])
+    fun `create, check and remove a small invoice`(ccy: Int) {
+        val reference = "sdk-live-$ccy-" + UUID.randomUUID()
         // Merchants with split payments must name a receiver on every basket item.
         val splitReceiverId =
             mono.split
@@ -67,7 +70,7 @@ class AcquiringLiveTest {
             mono.invoices.create(
                 CreateInvoiceRequest
                     .builder(100)
-                    .ccy(CurrencyCodes.UAH)
+                    .ccy(ccy)
                     .validity(600)
                     .merchantPaymInfo(
                         MerchantPaymInfo
@@ -91,6 +94,7 @@ class AcquiringLiveTest {
         assertThat(status.invoiceId).isEqualTo(created.invoiceId)
         assertThat(status.status).isEqualTo(InvoiceStatus.CREATED)
         assertThat(status.amount).isEqualTo(100)
+        assertThat(status.ccy).isEqualTo(ccy)
 
         mono.invoices.remove(created.invoiceId)
     }

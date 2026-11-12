@@ -236,3 +236,41 @@ class HoldCurrencyTest {
         }
     }
 }
+
+class AcquiringCurrencyTest {
+    @org.junit.jupiter.api.Test
+    fun `only UAH, USD and EUR are accepted, like the live API`() {
+        FakeMonobankAcquiring().start().use { fake ->
+            val mono = clientFor(fake)
+            listOf(980, 840, 978).forEach { ccy ->
+                val id =
+                    mono.invoices
+                        .create(
+                            io.github.damienmiheev.monobank.acquiring.invoice.CreateInvoiceRequest
+                                .builder(100)
+                                .ccy(ccy)
+                                .build(),
+                        ).invoiceId
+                org.assertj.core.api.Assertions
+                    .assertThat(mono.invoices.status(id).ccy)
+                    .isEqualTo(ccy)
+            }
+            org.assertj.core.api.Assertions
+                .assertThatThrownBy {
+                    mono.invoices.create(
+                        io.github.damienmiheev.monobank.acquiring.invoice.CreateInvoiceRequest
+                            .builder(100)
+                            .ccy(985)
+                            .build(),
+                    )
+                }.isInstanceOfSatisfying(io.github.damienmiheev.monobank.core.MonobankBadRequestException::class.java) {
+                    org.assertj.core.api.Assertions
+                        .assertThat(it.errorCode)
+                        .isEqualTo("1001")
+                    org.assertj.core.api.Assertions
+                        .assertThat(it.errorText)
+                        .isEqualTo("invalid 'ccy'")
+                }
+        }
+    }
+}
