@@ -56,66 +56,75 @@ class AcquiringHoldLiveTest {
         val name = "SDK live hold"
         val code = "sdk-live-hold"
 
-        val paid =
-            step("payment-direct hold 2.00 UAH") {
-                mono.invoices.paymentDirect(
-                    PaymentDirectRequest
-                        .builder(
-                            200,
-                            CardData.of("4242424242424242", "1230", "123"),
-                            InitiationKind.CLIENT,
-                            "https://shop.example/return",
-                        ).ccy(CurrencyCodes.UAH)
-                        .paymentType(PaymentType.HOLD)
-                        .merchantPaymInfo(
-                            MerchantPaymInfo
-                                .builder()
-                                .reference("sdk-live-hold-" + UUID.randomUUID())
-                                .destination("SDK live hold test")
-                                .basketOrder(
-                                    listOf(
-                                        BasketItem
-                                            .builder(
-                                                name,
-                                                BigDecimal.ONE,
-                                                200,
-                                                code,
-                                            ).splitReceiverId(receiver)
-                                            .build(),
-                                    ),
-                                ).build(),
-                        ).build(),
-                )
-            } ?: return
-        if (paid.tdsUrl != null) {
-            log("3-D Secure: open this link in your browser and confirm, then wait here: ${paid.tdsUrl}")
-            System.out.flush()
-        }
-
-        val held = waitFor(mono, paid.invoiceId, attempts = 120) { it == InvoiceStatus.HOLD || it.isFinal }
-        log("status after payment: $held")
-        if (held != InvoiceStatus.HOLD) return
-
         fun item(qty: String) =
             FiscalizationItem.builder(name, BigDecimal(qty), 200, code).splitReceiverId(receiver).build()
 
-        step("finalize 1.50 as qty 0.75 x 2.00") {
-            mono.invoices.finalize(
-                FinalizeInvoiceRequest.builder(paid.invoiceId, 150).items(listOf(item("0.75"))).build(),
-            )
-        }
-        log(
-            "status after finalize: ${waitFor(
-                mono,
-                paid.invoiceId,
-            ) { it.isFinal }}, finalAmount=${mono.invoices.status(paid.invoiceId).finalAmount}",
-        )
+        // MONOBANK_LIVE_INVOICE_ID: continue with an already finalized invoice (skips paying again).
+        val existing = System.getenv("MONOBANK_LIVE_INVOICE_ID")?.takeIf { it.isNotBlank() }
+        val invoiceId =
+            existing ?: run {
+                val paid =
+                    step("payment-direct hold 2.00 UAH") {
+                        mono.invoices.paymentDirect(
+                            PaymentDirectRequest
+                                .builder(
+                                    200,
+                                    CardData.of("4242424242424242", "1230", "123"),
+                                    InitiationKind.CLIENT,
+                                    "https://shop.example/return",
+                                ).ccy(CurrencyCodes.UAH)
+                                .paymentType(PaymentType.HOLD)
+                                .merchantPaymInfo(
+                                    MerchantPaymInfo
+                                        .builder()
+                                        .reference("sdk-live-hold-" + UUID.randomUUID())
+                                        .destination("SDK live hold test")
+                                        .basketOrder(
+                                            listOf(
+                                                BasketItem
+                                                    .builder(
+                                                        name,
+                                                        BigDecimal.ONE,
+                                                        200,
+                                                        code,
+                                                    ).splitReceiverId(receiver)
+                                                    .build(),
+                                            ),
+                                        ).build(),
+                                ).build(),
+                        )
+                    } ?: return
+                if (paid.tdsUrl != null) {
+                    log("3-D Secure: open this link in your browser and confirm, then wait here: ${paid.tdsUrl}")
+                    System.out.flush()
+                }
+
+                val held = waitFor(mono, paid.invoiceId, attempts = 120) { it == InvoiceStatus.HOLD || it.isFinal }
+                log("status after payment: $held")
+                if (held != InvoiceStatus.HOLD) return
+
+                step("finalize 1.50 as qty 0.75 x 2.00") {
+                    mono.invoices.finalize(
+                        FinalizeInvoiceRequest.builder(paid.invoiceId, 150).items(listOf(item("0.75"))).build(),
+                    )
+                }
+                log(
+                    "status after finalize: ${waitFor(
+                        mono,
+                        paid.invoiceId,
+                    ) { it.isFinal }}, finalAmount=${mono.invoices.status(paid.invoiceId).finalAmount}",
+                )
+                paid.invoiceId
+            }
+        // A finalized invoice stays `processing` for a while; a refund before `success` gets 404 1004.
+        val settled = waitFor(mono, invoiceId, attempts = 120) { it.isFinal }
+        log("status before refund: $settled")
 
         step("refund 0.50 as qty 0.25 x 2.00") {
             mono.invoices.cancel(
                 CancelInvoiceRequest
                     .builder(
-                        paid.invoiceId,
+                        invoiceId,
                     ).amount(50)
                     .extRef("sdk-live-refund-1")
                     .items(listOf(item("0.25")))
@@ -123,7 +132,7 @@ class AcquiringHoldLiveTest {
             )
         }
         Thread.sleep(3_000)
-        val last = mono.invoices.status(paid.invoiceId)
+        val last = mono.invoices.status(invoiceId)
         log(
             "final: status=${last.status} finalAmount=${last.finalAmount} cancelList=${last.cancelList?.map {
                 "${it.status}/${it.amount}"
