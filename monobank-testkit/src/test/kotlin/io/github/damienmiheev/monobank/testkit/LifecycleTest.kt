@@ -188,4 +188,94 @@ class LifecycleTest {
             assertThat(fake.invoice(invoiceId).toString()).contains(invoiceId, "success")
         }
     }
+
+    @Test
+    fun `a port in use fails start with an unchecked exception`() {
+        FakeMonobankAcquiring().start().use { first ->
+            val second = FakeMonobankAcquiring.builder().port(first.port).build()
+            assertThatThrownBy { second.start() }
+                .isInstanceOf(java.io.UncheckedIOException::class.java)
+                .hasMessageContaining(first.port.toString())
+            second.close()
+        }
+    }
+
+    @Test
+    fun `an interrupted wait for webhooks throws unchecked and keeps the interrupt`() {
+        FakeMonobankAcquiring().start().use { fake ->
+            Thread.currentThread().interrupt()
+            assertThatThrownBy { fake.awaitWebhooks(1, Duration.ofSeconds(5)) }
+                .isInstanceOf(IllegalStateException::class.java)
+            assertThat(Thread.interrupted()).isTrue()
+        }
+    }
+
+    @Test
+    fun `close cuts off a webhook delivery to a receiver that hangs`() {
+        val hanging = java.net.ServerSocket(0, 50, java.net.InetAddress.getByName("127.0.0.1"))
+        val accepted = java.util.concurrent.CopyOnWriteArrayList<java.net.Socket>()
+        val acceptor = Thread { runCatching { while (true) accepted.add(hanging.accept()) } }.apply { start() }
+        val fake =
+            FakeMonobankAcquiring
+                .builder()
+                .webhookTimeout(Duration.ofSeconds(30))
+                .build()
+                .start()
+        try {
+            val url = "http://127.0.0.1:${hanging.localPort}/notification"
+            val invoiceId =
+                clientFor(fake).invoices.create(CreateInvoiceRequest.builder(100).webHookUrl(url).build()).invoiceId
+            fake.startPayment(invoiceId)
+            Thread.sleep(300) // the delivery is now waiting for an answer
+
+            val started = System.nanoTime()
+            fake.close()
+
+            assertThat(Duration.ofNanos(System.nanoTime() - started)).isLessThan(Duration.ofSeconds(5))
+            val deadline = System.nanoTime() + Duration.ofSeconds(5).toNanos()
+            while (fakeThreads().isNotEmpty() && System.nanoTime() < deadline) Thread.sleep(10)
+            assertThat(fakeThreads()).isEmpty()
+        } finally {
+            fake.close()
+            hanging.close()
+            acceptor.join(1000)
+            accepted.forEach { it.close() }
+        }
+    }
+
+    @Test
+    fun `a seed makes ids reproducible`() {
+        fun ids(): List<String> =
+            FakeMonobankAcquiring
+                .builder()
+                .seed(42)
+                .clock(TestClock.fixed(Instant.parse("2026-01-01T00:00:00Z")))
+                .build()
+                .start()
+                .use { fake ->
+                    val mono = clientFor(fake)
+                    listOf(mono.invoices.create(CreateInvoiceRequest.builder(100).build()).invoiceId, fake.addCard("w"))
+                }
+
+        assertThat(ids()).isEqualTo(ids())
+    }
+
+    @Test
+    fun `bind address and advertised host - urls for containers, local client options`() {
+        FakeMonobankAcquiring
+            .builder()
+            .bindAddress(java.net.InetAddress.getByName("0.0.0.0"))
+            .advertisedHost("host.testcontainers.internal")
+            .build()
+            .start()
+            .use { fake ->
+                assertThat(fake.baseUrl).isEqualTo("http://host.testcontainers.internal:${fake.port}")
+                assertThat(fake.localBaseUrl).isEqualTo("http://127.0.0.1:${fake.port}")
+                val mono = clientFor(fake)
+                val created = mono.invoices.create(CreateInvoiceRequest.builder(100).build())
+                assertThat(created.pageUrl).startsWith("http://host.testcontainers.internal:${fake.port}/pay/")
+            }
+        assertThatThrownBy { FakeMonobankAcquiring.builder().advertisedHost("http://x/") }
+            .isInstanceOf(IllegalArgumentException::class.java)
+    }
 }

@@ -40,4 +40,21 @@ public object MonobankPaths {
 
     /** Matches every path in [FakeMonobankAcquiring.injectFault]; path-specific faults take precedence. */
     public const val ANY: String = "*"
+
+    /** Every route the fake serves. */
+    @JvmField
+    public val ROUTES: Set<String> =
+        setOf(
+            PUBKEY,
+            DETAILS,
+            INVOICE_CREATE,
+            INVOICE_STATUS,
+            INVOICE_REMOVE,
+            INVOICE_FINALIZE,
+            INVOICE_CANCEL,
+            WALLET_PAYMENT,
+            WALLET,
+            WALLET_CARD,
+            STATEMENT,
+        )
 }

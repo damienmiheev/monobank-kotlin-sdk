@@ -14,6 +14,7 @@ internal class CreateParams(
     val paymentType: String,
     val order: OrderInfo,
     val webHookUrl: String?,
+    val redirectUrl: String?,
     val validity: Duration,
     val saveCard: Boolean,
     val walletId: String?,
@@ -28,6 +29,7 @@ internal class WalletPaymentParams(
     val paymentType: String,
     val order: OrderInfo,
     val webHookUrl: String?,
+    val redirectUrl: String?,
 )
 
 /** Validates request bodies the way monobank documents them, answering 400 like it does. */
@@ -65,6 +67,7 @@ internal object RequestParsing {
             paymentType = paymentType,
             order = order(json, amount, validateBasketTotal),
             webHookUrl = webHookUrl(json),
+            redirectUrl = Fields.string(json, "redirectUrl")?.takeIf { it.isNotBlank() },
             validity = validity(json),
             saveCard = saveCard == true,
             walletId = saveCardData?.let { Fields.string(it, "walletId") }?.takeIf { it.isNotBlank() },
@@ -92,6 +95,7 @@ internal object RequestParsing {
             paymentType = paymentType(json, WALLET_TYPES, ccy),
             order = order(json, amount, validateBasketTotal),
             webHookUrl = webHookUrl(json),
+            redirectUrl = Fields.string(json, "redirectUrl")?.takeIf { it.isNotBlank() },
         )
     }
 

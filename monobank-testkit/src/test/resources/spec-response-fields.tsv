@@ -1,0 +1,93 @@
+# Response fields of acquiring-openapi.json (v2412), extracted for SpecConformanceTest.
+# route<TAB>field<TAB>required|optional<TAB>type<TAB>enum values
+GET /api/merchant/pubkey	key	required	string	
+GET /api/merchant/details	merchantId	required	string	
+GET /api/merchant/details	merchantName	required	string	
+GET /api/merchant/details	edrpou	required	string	
+POST /api/merchant/invoice/create	invoiceId	required	string	
+POST /api/merchant/invoice/create	pageUrl	required	string	
+POST /api/merchant/invoice/create	appUrl	optional	string	
+GET /api/merchant/invoice/status	invoiceId	required	string	
+GET /api/merchant/invoice/status	status	required	string	created,processing,hold,success,failure,reversed,expired
+GET /api/merchant/invoice/status	failureReason	optional	string	
+GET /api/merchant/invoice/status	errCode	optional	string	
+GET /api/merchant/invoice/status	amount	required	integer	
+GET /api/merchant/invoice/status	ccy	required	integer	
+GET /api/merchant/invoice/status	finalAmount	optional	integer	
+GET /api/merchant/invoice/status	createdDate	optional	string	
+GET /api/merchant/invoice/status	modifiedDate	optional	string	
+GET /api/merchant/invoice/status	reference	optional	string	
+GET /api/merchant/invoice/status	destination	optional	string	
+GET /api/merchant/invoice/status	cancelList	optional	array	
+GET /api/merchant/invoice/status	cancelList[].status	required	string	processing,success,failure
+GET /api/merchant/invoice/status	cancelList[].amount	optional	integer	
+GET /api/merchant/invoice/status	cancelList[].ccy	optional	integer	
+GET /api/merchant/invoice/status	cancelList[].createdDate	required	string	
+GET /api/merchant/invoice/status	cancelList[].modifiedDate	required	string	
+GET /api/merchant/invoice/status	cancelList[].approvalCode	optional	string	
+GET /api/merchant/invoice/status	cancelList[].rrn	optional	string	
+GET /api/merchant/invoice/status	cancelList[].extRef	optional	string	
+GET /api/merchant/invoice/status	paymentInfo	optional	object	
+GET /api/merchant/invoice/status	paymentInfo.maskedPan	required	string	
+GET /api/merchant/invoice/status	paymentInfo.approvalCode	optional	string	
+GET /api/merchant/invoice/status	paymentInfo.rrn	optional	string	
+GET /api/merchant/invoice/status	paymentInfo.tranId	optional	string	
+GET /api/merchant/invoice/status	paymentInfo.terminal	required	string	
+GET /api/merchant/invoice/status	paymentInfo.bank	optional	string	
+GET /api/merchant/invoice/status	paymentInfo.paymentSystem	required	string	visa,mastercard
+GET /api/merchant/invoice/status	paymentInfo.paymentMethod	required	string	pan,apple,google,monobank,wallet,direct
+GET /api/merchant/invoice/status	paymentInfo.fee	optional	integer	
+GET /api/merchant/invoice/status	paymentInfo.country	optional	string	
+GET /api/merchant/invoice/status	paymentInfo.agentFee	optional	integer	
+GET /api/merchant/invoice/status	walletData	optional	object	
+GET /api/merchant/invoice/status	walletData.cardToken	required	string	
+GET /api/merchant/invoice/status	walletData.walletId	required	string	
+GET /api/merchant/invoice/status	walletData.status	required	string	new,created,failed
+POST /api/merchant/invoice/remove				
+POST /api/merchant/invoice/finalize	status	required	string	success
+POST /api/merchant/invoice/cancel	status	required	string	processing,success,failure
+POST /api/merchant/invoice/cancel	createdDate	required	string	
+POST /api/merchant/invoice/cancel	modifiedDate	required	string	
+POST /api/merchant/wallet/payment	invoiceId	required	string	
+POST /api/merchant/wallet/payment	tdsUrl	optional	string	
+POST /api/merchant/wallet/payment	status	required	string	processing,success,failure
+POST /api/merchant/wallet/payment	failureReason	optional	string	
+POST /api/merchant/wallet/payment	amount	required	integer	
+POST /api/merchant/wallet/payment	ccy	required	integer	
+POST /api/merchant/wallet/payment	createdDate	required	string	
+POST /api/merchant/wallet/payment	modifiedDate	required	string	
+GET /api/merchant/wallet	wallet	required	array	
+GET /api/merchant/wallet	wallet[].cardToken	required	string	
+GET /api/merchant/wallet	wallet[].maskedPan	required	string	
+GET /api/merchant/wallet	wallet[].country	optional	string	
+DELETE /api/merchant/wallet/card				
+GET /api/merchant/statement	list	optional	array	
+GET /api/merchant/statement	list[].invoiceId	required	string	
+GET /api/merchant/statement	list[].status	required	string	hold,processing,success,failure
+GET /api/merchant/statement	list[].maskedPan	required	string	
+GET /api/merchant/statement	list[].date	required	string	
+GET /api/merchant/statement	list[].paymentScheme	required	string	bnpl_later_30,bnpl_parts_4,full
+GET /api/merchant/statement	list[].amount	required	integer	
+GET /api/merchant/statement	list[].profitAmount	optional	integer	
+GET /api/merchant/statement	list[].agentFee	optional	integer	
+GET /api/merchant/statement	list[].ccy	required	integer	
+GET /api/merchant/statement	list[].approvalCode	optional	string	
+GET /api/merchant/statement	list[].rrn	optional	string	
+GET /api/merchant/statement	list[].reference	optional	string	
+GET /api/merchant/statement	list[].shortQrId	optional	string	
+GET /api/merchant/statement	list[].destination	optional	string	
+GET /api/merchant/statement	list[].cancelList	optional	array	
+GET /api/merchant/statement	list[].cancelList[].amount	required	integer	
+GET /api/merchant/statement	list[].cancelList[].ccy	required	integer	
+GET /api/merchant/statement	list[].cancelList[].date	required	string	
+GET /api/merchant/statement	list[].cancelList[].approvalCode	optional	string	
+GET /api/merchant/statement	list[].cancelList[].rrn	optional	string	
+GET /api/merchant/statement	list[].cancelList[].maskedPan	required	string	
+GET /api/merchant/statement	list[].splitReceiverList	optional	array	
+GET /api/merchant/statement	list[].splitReceiverList[].splitReceiverId	required	string	
+GET /api/merchant/statement	list[].splitReceiverList[].amount	required	integer	
+GET /api/merchant/statement	list[].splitReceiverList[].profit	required	integer	
+GET /api/merchant/statement	list[].splitReceiverList[].agentFee	optional	integer	
+GET /api/merchant/statement	list[].metadata	optional	object	
+ERROR	errCode	required	string	
+ERROR	errText	required	string	

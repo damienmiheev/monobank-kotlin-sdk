@@ -23,10 +23,12 @@ fun clientFor(
     timeout: Duration = Duration.ofSeconds(5),
     retryPolicy: RetryPolicy = RetryPolicy.of(2, Duration.ZERO, Duration.ZERO),
     token: String = fake.token,
+    keyRefreshInterval: Duration = Duration.ofMinutes(1),
 ): MonobankAcquiring =
     MonobankAcquiring(
         AcquiringConfig
             .builder(token)
+            .webhookKeyRefreshInterval(keyRefreshInterval)
             .options(
                 fake
                     .clientOptionsBuilder()

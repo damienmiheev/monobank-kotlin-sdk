@@ -25,6 +25,7 @@ import io.github.damienmiheev.monobank.core.MonobankNetworkException;
 import io.github.damienmiheev.monobank.core.MonobankSignatureException;
 import io.github.damienmiheev.monobank.core.RequestOutcome;
 import io.github.damienmiheev.monobank.core.RetryPolicy;
+import java.io.UncheckedIOException;
 import java.math.BigDecimal;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -213,5 +214,39 @@ class JavaPluginFlowTest {
         assertThat(verified).singleElement()
                 .satisfies(w -> assertThat(w.getErrCode()).isEqualTo("6"));
         assertThat(fake.toString()).doesNotContain("tenant-token");
+    }
+
+    @Test
+    void javaCallersCanCatchBindFailuresAndUseSeveralMerchants() {
+        // start() throws only unchecked exceptions, so a Java fixture can catch them by type
+        FakeMonobankAcquiring busy = FakeMonobankAcquiring.builder().port(fake.getPort()).build();
+        try {
+            busy.start();
+            throw new AssertionError("expected the port to be in use");
+        } catch (UncheckedIOException expected) {
+            assertThat(expected.getCause()).isInstanceOf(java.io.IOException.class);
+        } finally {
+            busy.close();
+        }
+
+        try (FakeMonobankAcquiring tenants = FakeMonobankAcquiring.builder()
+                .tokens("tenant-a")
+                .addMerchant(MerchantSetup.builder("tenant-b").build())
+                .build()
+                .start()) {
+            FakeMerchant tenantB = tenants.merchant("tenant-b");
+            String card = tenantB.addCard("customer");
+            tenantB.enqueueWalletPaymentOutcome(WalletPaymentOutcome.declined());
+            MonobankAcquiring clientB = new MonobankAcquiring(AcquiringConfig.builder(tenantB.getToken())
+                    .options(tenants.clientOptions())
+                    .build());
+            PaymentResponse declined = clientB.getWallet().payment(
+                    WalletPaymentRequest.builder(card, 100, 980, InitiationKind.MERCHANT).build());
+            assertThat(declined.getStatus()).isEqualTo(OperationStatus.FAILURE);
+            assertThat(tenants.getMerchant().invoices()).isEmpty();
+            assertThat(tenantB.invoices()).hasSize(1);
+            tenants.dropNextWebhooks(1, w -> w.getKind() == WebhookKind.CARD);
+            tenants.injectFault(MonobankPaths.WALLET_PAYMENT, Fault.answerAfterWebhooks(), 1, r -> r.getBody().contains(card));
+        }
     }
 }

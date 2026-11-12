@@ -17,7 +17,15 @@ import java.time.Duration
  *   [serverErrorAfterProcessing]). This is the "the charge reached monobank but we never heard back"
  *   case, where the client's outcome is unknown.
  *
- * [delay] performs the request normally, only later.
+ * Timing faults perform the request and answer normally, at a chosen moment:
+ * - [delay] waits **before** performing the request (the request reaches "monobank" late);
+ * - [delayAfterProcessing] performs the request at once and answers late, so webhooks about it
+ *   can reach the receiver while the client is still waiting for the answer;
+ * - [answerAfterWebhooks] performs the request and answers only once the webhooks it caused have
+ *   been delivered (or dropped or failed): the deterministic "webhook during the synchronous call".
+ *
+ * A fault is consumed by the first request that matches it, whatever that request's answer would
+ * have been (a request with a wrong token or method also consumes it).
  */
 public class Fault private constructor(
     internal val kind: Kind,
@@ -27,14 +35,14 @@ public class Fault private constructor(
     internal val body: ByteArray = ByteArray(0),
     internal val headers: Map<String, String> = emptyMap(),
 ) {
-    internal enum class Kind { DELAY, HANG, DROP, RESPOND }
+    internal enum class Kind { DELAY, DELAY_AFTER, AFTER_WEBHOOKS, HANG, DROP, RESPOND }
 
     override fun toString(): String {
         val details =
             when (kind) {
-                Kind.DELAY -> "delay=$delay"
+                Kind.DELAY, Kind.DELAY_AFTER -> "delay=$delay"
                 Kind.RESPOND -> "status=$status"
-                Kind.HANG, Kind.DROP -> ""
+                Kind.AFTER_WEBHOOKS, Kind.HANG, Kind.DROP -> ""
             }
         return "Fault($kind, processed=$processed${if (details.isEmpty()) "" else ", $details"})"
     }
@@ -44,12 +52,34 @@ public class Fault private constructor(
         private const val INTERNAL_SERVER_ERROR = 500
         private const val TOO_MANY_REQUESTS = 429
 
-        /** Performs the request normally but answers only after [delay]. */
+        /**
+         * Waits [delay], then performs the request and answers normally: nothing changes during
+         * the wait. See [delayAfterProcessing] for the opposite.
+         */
         @JvmStatic
         public fun delay(delay: Duration): Fault {
             require(!delay.isNegative) { "delay must not be negative" }
             return Fault(Kind.DELAY, processed = true, delay = delay)
         }
+
+        /**
+         * Performs the request at once (the invoice changes and its webhooks are queued), then
+         * waits [delay] before sending the answer. With automatic webhook delivery, the webhooks
+         * normally arrive while the client still waits; use [answerAfterWebhooks] to be sure.
+         */
+        @JvmStatic
+        public fun delayAfterProcessing(delay: Duration): Fault {
+            require(!delay.isNegative) { "delay must not be negative" }
+            return Fault(Kind.DELAY_AFTER, processed = true, delay = delay)
+        }
+
+        /**
+         * Performs the request, then holds the answer until every webhook the request caused is
+         * delivered, failed or dropped (at most the fake's hang limit). With manual delivery, the
+         * answer waits for [FakeMonobankAcquiring.deliverWebhooksNow] on another thread.
+         */
+        @JvmStatic
+        public fun answerAfterWebhooks(): Fault = Fault(Kind.AFTER_WEBHOOKS, processed = true)
 
         /**
          * Performs the request, then never answers: the connection stays open until the client

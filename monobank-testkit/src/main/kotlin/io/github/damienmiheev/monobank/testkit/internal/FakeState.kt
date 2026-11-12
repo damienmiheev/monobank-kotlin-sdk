@@ -2,9 +2,11 @@ package io.github.damienmiheev.monobank.testkit.internal
 
 import io.github.damienmiheev.monobank.testkit.CardSaving
 import io.github.damienmiheev.monobank.testkit.CustomerPayment
+import io.github.damienmiheev.monobank.testkit.MonobankWebhookSigner
 import io.github.damienmiheev.monobank.testkit.RefundSettlement
 import io.github.damienmiheev.monobank.testkit.TestClock
 import io.github.damienmiheev.monobank.testkit.WalletPaymentOutcome
+import io.github.damienmiheev.monobank.testkit.WebhookKind
 import java.math.BigDecimal
 import java.math.RoundingMode
 import java.time.Duration
@@ -13,7 +15,7 @@ import java.time.temporal.ChronoUnit
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 
-/** Settings of the simulated merchant account. */
+/** Settings shared by every merchant of a fake. */
 internal class FakeSettings(
     val clock: TestClock,
     val feePercent: BigDecimal,
@@ -22,42 +24,74 @@ internal class FakeSettings(
     @Volatile var refundSettlement: RefundSettlement,
 )
 
+/** The merchant behind a set of tokens. */
+internal class MerchantInfo(
+    val merchantId: String,
+    val merchantName: String,
+    val edrpou: String,
+)
+
 /**
- * The fake's merchant account: invoices, refunds, wallets and the status machine. Every method
- * expects the caller to hold [lock] (use [locked]); webhooks are handed to [webhookSink] in the
- * order the changes happen.
+ * All merchants of one fake, under one lock. Every state change goes through [locked], which first
+ * applies the expirations and hold lapses that are due.
  */
-internal class FakeState(
+internal class Bank(
     val settings: FakeSettings,
-    private val webhookSink: (WebhookEvent) -> Unit,
+    val ids: Ids,
+    val webhookSink: (WebhookEvent) -> Unit,
 ) {
     private val lock = ReentrantLock()
-    private val invoices = LinkedHashMap<String, InvoiceRecord>()
-    private val wallets = LinkedHashMap<String, MutableList<CardRecord>>()
-    private val walletOutcomes = ArrayDeque<WalletPaymentOutcome>()
+    val merchants: MutableList<MerchantState> = ArrayList()
 
-    /** Runs [block] under the lock, after applying expirations that are due. */
     fun <T> locked(block: () -> T): T =
         lock.withLock {
-            sweep(now())
+            val now = now()
+            merchants.forEach { it.sweep(now) }
             block()
         }
 
     /** The fake clock's time, in whole milliseconds: the precision of the dates it reports. */
     fun now(): Instant = settings.clock.instant().truncatedTo(ChronoUnit.MILLIS)
 
-    fun reset() =
-        lock.withLock {
-            invoices.clear()
-            wallets.clear()
-            walletOutcomes.clear()
-        }
+    fun reset() = lock.withLock { merchants.forEach { it.reset() } }
+
+    /** The merchant owning [invoiceId], for the control API. */
+    fun owner(invoiceId: String): MerchantState =
+        requireNotNull(merchants.firstOrNull { it.has(invoiceId) }) { "the fake has no invoice $invoiceId" }
+}
+
+/**
+ * One merchant account: invoices, refunds, wallets and the status machine. Every method expects the
+ * caller to hold the bank's lock ([Bank.locked]); webhooks are queued in the order the changes happen.
+ */
+internal class MerchantState(
+    private val bank: Bank,
+    val info: MerchantInfo,
+    val tokens: Set<String>,
+    val signer: MonobankWebhookSigner,
+) {
+    private val invoices = LinkedHashMap<String, InvoiceRecord>()
+    private val wallets = LinkedHashMap<String, MutableList<CardRecord>>()
+    private val walletOutcomes = ArrayDeque<WalletPaymentOutcome>()
+
+    val settings: FakeSettings get() = bank.settings
+    val ids: Ids get() = bank.ids
+
+    fun now(): Instant = bank.now()
+
+    fun reset() {
+        invoices.clear()
+        wallets.clear()
+        walletOutcomes.clear()
+    }
+
+    fun has(invoiceId: String): Boolean = invoiceId in invoices
 
     fun find(invoiceId: String): InvoiceRecord = invoices[invoiceId] ?: throw ApiError.notFound("invoice not found")
 
     /** For the control API: a missing invoice is a test bug, not an API error. */
     fun require(invoiceId: String): InvoiceRecord =
-        requireNotNull(invoices[invoiceId]) { "the fake has no invoice $invoiceId" }
+        requireNotNull(invoices[invoiceId]) { "merchant ${info.merchantId} has no invoice $invoiceId" }
 
     fun add(invoice: InvoiceRecord) {
         invoices[invoice.invoiceId] = invoice
@@ -67,11 +101,7 @@ internal class FakeState(
 
     fun cards(walletId: String): List<CardRecord> = wallets[walletId].orEmpty().toList()
 
-    fun card(cardToken: String): CardRecord? =
-        wallets.values.asSequence().flatten().firstOrNull {
-            it.cardToken ==
-                cardToken
-        }
+    fun card(cardToken: String): CardRecord? = wallets.values.flatten().firstOrNull { it.cardToken == cardToken }
 
     fun removeCard(cardToken: String): Boolean =
         wallets.values.any { cards ->
@@ -85,10 +115,11 @@ internal class FakeState(
         walletId: String,
         maskedPan: String,
         country: String?,
+        paymentSystem: String,
     ): CardRecord {
         val cards = wallets.getOrPut(walletId) { mutableListOf() }
         cards.firstOrNull { it.maskedPan == maskedPan }?.let { return it }
-        return CardRecord(Ids.cardToken(), walletId, maskedPan, country).also { cards.add(it) }
+        return CardRecord(ids.cardToken(), walletId, maskedPan, country, paymentSystem).also { cards.add(it) }
     }
 
     fun enqueueOutcome(outcome: WalletPaymentOutcome) {
@@ -98,7 +129,7 @@ internal class FakeState(
     fun nextOutcome(): WalletPaymentOutcome = walletOutcomes.removeFirstOrNull() ?: WalletPaymentOutcome.success()
 
     /** Expires unpaid invoices whose validity passed, and lapses holds older than 9 days. */
-    private fun sweep(now: Instant) {
+    fun sweep(now: Instant) {
         for (invoice in invoices.values) {
             val validUntil = invoice.validUntil
             val holdUntil = invoice.holdUntil
@@ -106,9 +137,7 @@ internal class FakeState(
                 invoice.status = Status.EXPIRED
                 invoice.touch(validUntil)
             } else if (invoice.status == Status.HOLD && holdUntil != null && !now.isBefore(holdUntil)) {
-                invoice.status = Status.REVERSED
-                invoice.finalAmount = 0
-                invoice.holdUntil = null
+                reverse(invoice)
                 invoice.touch(holdUntil)
                 emit(invoice)
             }
@@ -116,10 +145,17 @@ internal class FakeState(
     }
 
     /** Queues a webhook with the invoice's current state. monobank sends none for `expired`. */
-    private fun emit(invoice: InvoiceRecord) {
+    private fun emit(
+        invoice: InvoiceRecord,
+        kind: WebhookKind = WebhookKind.PAYMENT,
+    ) {
         val url = invoice.webHookUrl ?: return
         if (invoice.status == Status.EXPIRED) return
-        webhookSink(WebhookEvent(invoice.invoiceId, invoice.status, url, FakeJson.bytes(invoice.statusJson())))
+        val body = FakeJson.bytes(invoice.statusJson())
+        val walletStatus = if (invoice.saveCard) invoice.walletStatus else null
+        bank.webhookSink(
+            WebhookEvent(invoice.invoiceId, invoice.status, url, body, kind, walletStatus, info.merchantId, signer),
+        )
     }
 
     /** `created` → `processing`: the customer (or a saved-card charge) started paying. */
@@ -139,14 +175,14 @@ internal class FakeState(
                 paymentMethod = paymentMethod,
                 bank = payment.bank,
                 country = payment.country,
-                approvalCode = Ids.digits(6),
-                rrn = Ids.digits(12),
-                tranId = Ids.digits(8),
+                approvalCode = ids.digits(6),
+                rrn = ids.digits(12),
+                tranId = ids.digits(8),
             )
         if (invoice.saveCard) {
             val walletId = checkNotNull(invoice.walletId)
             invoice.cardToken =
-                wallets[walletId]?.firstOrNull { it.maskedPan == payment.maskedPan }?.cardToken ?: Ids.cardToken()
+                wallets[walletId]?.firstOrNull { it.maskedPan == payment.maskedPan }?.cardToken ?: ids.cardToken()
             invoice.walletStatus = WALLET_NEW
         }
         invoice.touch(now)
@@ -194,15 +230,13 @@ internal class FakeState(
             val cards = wallets.getOrPut(walletId) { mutableListOf() }
             val token = checkNotNull(invoice.cardToken)
             if (cards.none { it.cardToken == token }) {
-                cards.add(
-                    CardRecord(token, walletId, payment.maskedPan, payment.country),
-                )
+                cards.add(CardRecord(token, walletId, payment.maskedPan, payment.country, payment.paymentSystem))
             }
             invoice.walletStatus = WALLET_CREATED
         } else {
             invoice.walletStatus = WALLET_FAILED
         }
-        emit(invoice)
+        emit(invoice, WebhookKind.CARD)
     }
 
     /** `created`/`processing` → `expired`, without a webhook. */
@@ -220,6 +254,9 @@ internal class FakeState(
         amount: Long,
     ) {
         if (invoice.status != Status.HOLD) throw ApiError.badRequest("invoice is not on hold")
+        if (invoice.cancels.any { it.status == Status.PROCESSING }) {
+            throw ApiError.badRequest("the hold is being released")
+        }
         if (amount > invoice.amount) throw ApiError.badRequest("invalid 'amount': more than the hold")
         invoice.status = Status.SUCCESS
         invoice.finalAmount = amount
@@ -238,10 +275,7 @@ internal class FakeState(
         val refundAmount =
             when (invoice.status) {
                 Status.HOLD -> {
-                    if (amount != null && amount != invoice.amount) {
-                        throw ApiError(400, "HOLD_INVOICE_NOT_FINALIZED", "hold must be finalized first")
-                    }
-                    invoice.amount
+                    holdReleaseAmount(invoice, amount)
                 }
 
                 Status.SUCCESS -> {
@@ -261,7 +295,7 @@ internal class FakeState(
             }
         val now = now()
         val cancel =
-            CancelRecord(extRef, refundAmount, invoice.ccy, now, now, Status.PROCESSING, Ids.digits(6), Ids.digits(12))
+            CancelRecord(extRef, refundAmount, invoice.ccy, now, now, Status.PROCESSING, ids.digits(6), ids.digits(12))
         invoice.cancels.add(cancel)
         return cancel
     }
@@ -290,7 +324,7 @@ internal class FakeState(
         check(amount in 1..invoice.refundable()) { "amount must be between 1 and ${invoice.refundable()}" }
         val now = now()
         invoice.cancels.add(
-            CancelRecord(null, amount, invoice.ccy, now, now, Status.SUCCESS, Ids.digits(6), Ids.digits(12)),
+            CancelRecord(null, amount, invoice.ccy, now, now, Status.SUCCESS, ids.digits(6), ids.digits(12)),
         )
         applyRefund(invoice, amount)
         invoice.touch(now)
@@ -302,14 +336,19 @@ internal class FakeState(
         amount: Long,
     ) {
         if (invoice.status == Status.HOLD) {
-            invoice.status = Status.REVERSED
-            invoice.finalAmount = 0
-            invoice.holdUntil = null
+            reverse(invoice)
         } else {
-            val remaining = (invoice.finalAmount ?: 0) - amount
+            val remaining = maxOf(0, (invoice.finalAmount ?: 0) - amount)
             invoice.finalAmount = remaining
-            if (remaining <= 0) invoice.status = Status.REVERSED
+            if (remaining == 0L && invoice.status == Status.SUCCESS) reverse(invoice)
         }
+    }
+
+    private fun reverse(invoice: InvoiceRecord) {
+        invoice.reversedFrom = invoice.status
+        invoice.status = Status.REVERSED
+        invoice.finalAmount = 0
+        invoice.holdUntil = null
     }
 
     companion object {
@@ -335,3 +374,15 @@ private fun fee(
         .multiply(percent)
         .divide(BigDecimal.valueOf(100), 0, RoundingMode.HALF_UP)
         .toLong()
+
+/** A hold is released whole; a partial release or a second release while one is pending is refused. */
+private fun holdReleaseAmount(
+    invoice: InvoiceRecord,
+    amount: Long?,
+): Long {
+    if (amount != null && amount != invoice.amount) {
+        throw ApiError(400, "HOLD_INVOICE_NOT_FINALIZED", "hold must be finalized first")
+    }
+    if (invoice.cancels.any { it.status == Status.PROCESSING }) throw wrongCancelAmount()
+    return invoice.amount
+}

@@ -257,6 +257,149 @@ class FaultInjectionTest {
         assertThatThrownBy { fake.injectFault(MonobankPaths.DETAILS, Fault.timeout(), 0) }
             .isInstanceOf(IllegalArgumentException::class.java)
         assertThat(Fault.timeout().toString()).contains("HANG", "processed=true")
+        assertThatThrownBy { fake.injectFault("/api/merchant/wallet/card?cardToken=x", Fault.timeout()) }
+            .isInstanceOf(IllegalArgumentException::class.java)
+        assertThatThrownBy { fake.injectFault("/api/merchant/typo", Fault.timeout()) }
+            .isInstanceOf(IllegalArgumentException::class.java)
+        assertThatThrownBy { Fault.delayAfterProcessing(Duration.ofSeconds(-1)) }
+            .isInstanceOf(IllegalArgumentException::class.java)
+    }
+
+    @Test
+    fun `delay before processing - nothing changes during the wait`() {
+        val receiver = WebhookReceiver()
+        try {
+            val token = fake.addCard("customer")
+            fake.injectFault(MonobankPaths.WALLET_PAYMENT, Fault.delay(Duration.ofMillis(500)))
+            val request =
+                WalletPaymentRequest
+                    .builder(
+                        token,
+                        100,
+                        980,
+                        InitiationKind.MERCHANT,
+                    ).webHookUrl(receiver.url)
+                    .build()
+            val call = Thread { mono.wallet.payment(request) }.apply { start() }
+            Thread.sleep(200)
+            assertThat(fake.invoices().filter { it.viaWallet }).isEmpty()
+            call.join()
+            assertThat(fake.invoices().filter { it.viaWallet }).hasSize(1)
+        } finally {
+            receiver.close()
+        }
+    }
+
+    @Test
+    fun `delay after processing - webhooks arrive while the client still waits for the answer`() {
+        val receiver = WebhookReceiver()
+        try {
+            val token = fake.addCard("customer")
+            fake.injectFault(MonobankPaths.WALLET_PAYMENT, Fault.delayAfterProcessing(Duration.ofSeconds(1)))
+            val request =
+                WalletPaymentRequest
+                    .builder(
+                        token,
+                        100,
+                        980,
+                        InitiationKind.MERCHANT,
+                    ).webHookUrl(receiver.url)
+                    .build()
+
+            val payment = mono.wallet.payment(request)
+
+            // both webhooks were received before the answer came back
+            assertThat(receiver.received.map { it.text }).hasSize(2).allMatch { it.contains(payment.invoiceId) }
+        } finally {
+            receiver.close()
+        }
+    }
+
+    @Test
+    fun `answer after webhooks - deterministic webhook during the synchronous call`() {
+        val receiver = WebhookReceiver()
+        try {
+            val token = fake.addCard("customer")
+            fake.injectFault(MonobankPaths.WALLET_PAYMENT, Fault.answerAfterWebhooks())
+            val request =
+                WalletPaymentRequest
+                    .builder(
+                        token,
+                        100,
+                        980,
+                        InitiationKind.MERCHANT,
+                    ).webHookUrl(receiver.url)
+                    .build()
+
+            val payment = mono.wallet.payment(request)
+
+            assertThat(receiver.received).hasSize(2)
+            assertThat(fake.sentWebhooks().map { it.invoiceId }).containsOnly(payment.invoiceId)
+        } finally {
+            receiver.close()
+        }
+    }
+
+    @Test
+    fun `faults can match one request - others on the same path pass`() {
+        fake.injectFault(MonobankPaths.INVOICE_CREATE, Fault.serverError(), 1) { it.body.contains("\"mine\"") }
+
+        mono.invoices.create(createRequest("theirs"))
+        failure<MonobankServerException> { mono.invoices.create(createRequest("mine")) }
+        mono.invoices.create(createRequest("mine"))
+
+        assertThat(fake.invoices().map { it.reference }).containsExactly("theirs", "mine")
+    }
+
+    @Test
+    fun `pause refuses connections - the request was not sent - and resume serves the same state`() {
+        val invoiceId = mono.invoices.create(createRequest()).invoiceId
+        val port = fake.port
+        val noRetry = clientFor(fake, retryPolicy = RetryPolicy.NONE)
+
+        fake.pause()
+        val error = failure<MonobankNetworkException> { noRetry.invoices.create(createRequest("while-paused")) }
+        assertThat(error.outcome).isEqualTo(RequestOutcome.NOT_SENT)
+        assertThatThrownBy { fake.pause() }.isInstanceOf(IllegalStateException::class.java)
+
+        fake.resume()
+        assertThat(fake.port).isEqualTo(port)
+        assertThat(noRetry.invoices.status(invoiceId).status).isEqualTo(InvoiceStatus.CREATED)
+        assertThat(noRetry.invoices.create(createRequest("retry")).invoiceId).isNotBlank()
+        assertThat(fake.invoices().map { it.reference }).containsExactly("order-1", "retry")
+        assertThatThrownBy { fake.resume() }.isInstanceOf(IllegalStateException::class.java)
+    }
+
+    @Test
+    fun `pause ends a hanging request`() {
+        fake.injectFault(MonobankPaths.DETAILS, Fault.timeoutWithoutProcessing())
+        val slow = clientFor(fake, timeout = Duration.ofSeconds(30), retryPolicy = RetryPolicy.NONE)
+        val call = Thread { runCatching { slow.merchant.details() } }.apply { start() }
+        Thread.sleep(200)
+
+        val started = System.nanoTime()
+        fake.pause()
+        call.join(10_000)
+
+        assertThat(call.isAlive).isFalse()
+        assertThat(Duration.ofNanos(System.nanoTime() - started)).isLessThan(Duration.ofSeconds(5))
+        fake.resume()
+    }
+
+    @Test
+    fun `a malformed query is answered 400, not a dropped connection`() {
+        val status =
+            java.net.Socket("127.0.0.1", fake.port).use { socket ->
+                socket.getOutputStream().write(
+                    (
+                        "GET ${MonobankPaths.INVOICE_STATUS}?invoiceId=%zz HTTP/1.1\r\nHost: x\r\n" +
+                            "X-Token: ${fake.token}\r\nConnection: close\r\n\r\n"
+                    ).toByteArray(),
+                )
+                socket.getInputStream().bufferedReader().readLine()
+            }
+
+        assertThat(status).startsWith("HTTP/1.1 400")
     }
 
     private fun await(condition: () -> Boolean) {

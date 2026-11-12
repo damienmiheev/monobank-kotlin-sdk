@@ -6,6 +6,7 @@ import io.github.damienmiheev.monobank.testkit.FakeRequest
 import io.github.damienmiheev.monobank.testkit.Fault
 import org.slf4j.LoggerFactory
 import java.io.IOException
+import java.io.UncheckedIOException
 import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.URLDecoder
@@ -19,34 +20,37 @@ import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.function.Predicate
 
-/** Faults registered per path, consumed one request at a time. Thread-safe. */
+/** Faults registered per path (optionally per request), consumed one request at a time. Thread-safe. */
 internal class FaultRegistry {
     private class Rule(
         val fault: Fault,
         var remaining: Int,
+        val predicate: Predicate<FakeRequest>,
     )
 
-    private val rules = LinkedHashMap<String, ArrayDeque<Rule>>()
+    private val rules = LinkedHashMap<String, MutableList<Rule>>()
 
     @Synchronized
     fun add(
         path: String,
         fault: Fault,
         times: Int,
+        predicate: Predicate<FakeRequest>,
     ) {
-        rules.getOrPut(path) { ArrayDeque() }.addLast(Rule(fault, times))
+        rules.getOrPut(path) { ArrayList() }.add(Rule(fault, times, predicate))
     }
 
-    /** The fault for this request: rules for [path] first, then rules for every path. */
+    /** The fault for this request: the first matching rule for its path, then for every path. */
     @Synchronized
-    fun take(path: String): Fault? {
-        val key = if (rules[path].isNullOrEmpty()) ANY_PATH else path
-        val queue = rules[key] ?: return null
-        val rule = queue.firstOrNull() ?: return null
-        rule.remaining--
-        if (rule.remaining <= 0) queue.removeFirst()
-        if (queue.isEmpty()) rules.remove(key)
+    fun take(request: FakeRequest): Fault? {
+        val (key, rule) =
+            listOf(request.path, ANY_PATH).firstNotNullOfOrNull { key ->
+                rules[key]?.firstOrNull { it.predicate.test(request) }?.let { key to it }
+            } ?: return null
+        if (--rule.remaining <= 0) rules[key]?.remove(rule)
+        if (rules[key].isNullOrEmpty()) rules.remove(key)
         return rule.fault
     }
 
@@ -58,13 +62,18 @@ internal class FaultRegistry {
     }
 }
 
-/** The JDK HTTP server in front of [AcquiringRoutes], with token checks, fault injection and request logs. */
+/**
+ * The JDK HTTP server in front of [AcquiringRoutes] and [HostedPages], with token checks, fault
+ * injection and request logs. It can be paused (no listener: connection refused) and resumed on the same port.
+ */
 internal class FakeServer(
     private val routes: AcquiringRoutes,
-    private val validTokens: Set<String>,
+    private val pages: HostedPages,
+    private val dispatcher: WebhookDispatcher,
+    private val merchantsByToken: Map<String, MerchantState>,
     private val clock: Clock,
     private val hangLimit: Duration,
-    private val stopped: CountDownLatch,
+    private val bindAddress: InetAddress,
 ) {
     private val logger = LoggerFactory.getLogger(FakeServer::class.java)
     private val executor: ExecutorService = Executors.newCachedThreadPool(NamedThreadFactory("fake-monobank-http"))
@@ -73,19 +82,47 @@ internal class FakeServer(
     val faults = FaultRegistry()
     private var server: HttpServer? = null
 
+    /** Released when the listener stops (pause or close): ends hanging and delayed requests. */
+    @Volatile
+    private var stopping = CountDownLatch(1)
+
+    /**
+     * Starts listening on [port] (0: a free one) and returns the port.
+     *
+     * @throws UncheckedIOException when the port cannot be bound.
+     */
+    @Synchronized
     fun start(port: Int): Int {
-        val http = HttpServer.create(InetSocketAddress(InetAddress.getByName(LOOPBACK), port), 0)
+        val http =
+            try {
+                HttpServer.create(InetSocketAddress(bindAddress, port), 0)
+            } catch (e: IOException) {
+                throw UncheckedIOException("cannot listen on ${bindAddress.hostAddress}:$port: ${e.message}", e)
+            }
         http.createContext("/") { exchange -> handle(exchange) }
         http.executor = executor
+        stopping = CountDownLatch(1)
         http.start()
         server = http
         return http.address.port
     }
 
-    fun stop() {
+    /** Stops listening (new connections are refused) and ends requests in progress; keeps all state. */
+    @Synchronized
+    fun pause() {
+        stopping.countDown()
         server?.stop(0)
+        server = null
+    }
+
+    fun stop() {
+        pause()
         executor.shutdownNow()
-        executor.awaitTermination(SHUTDOWN_SECONDS, TimeUnit.SECONDS)
+        try {
+            executor.awaitTermination(SHUTDOWN_SECONDS, TimeUnit.SECONDS)
+        } catch (e: InterruptedException) {
+            Thread.currentThread().interrupt()
+        }
     }
 
     fun requests(): List<FakeRequest> = synchronized(requestLog) { requestLog.toList() }
@@ -105,44 +142,98 @@ internal class FakeServer(
             logger.debug("fake monobank: client went away: {}", e.javaClass.simpleName)
         } catch (e: RuntimeException) {
             logger.warn("fake monobank: unexpected failure on {}", exchange.requestURI.path, e)
+        } catch (
+            @Suppress("SwallowedException") e: InterruptedException,
+        ) {
+            Thread.currentThread().interrupt() // shutting down
         } finally {
             // Without response headers this closes the connection: the client sees no answer.
             exchange.close()
         }
     }
 
-    private fun serve(exchange: HttpExchange) {
-        val method = exchange.requestMethod.uppercase()
-        val path = exchange.requestURI.path
-        val query = parseQuery(exchange.requestURI.rawQuery)
-        val body = exchange.requestBody.use { it.readBytes() }
-        requestLog.add(FakeRequest(method, path, query, FakeJson.utf8(body), clock.instant()))
-        counts.computeIfAbsent(path) { AtomicInteger() }.incrementAndGet()
-        val fault = faults.take(path)
-        if (fault != null && !fault.processed) {
-            applyFault(exchange, fault, path)
-            return
-        }
-        if (fault?.kind == Fault.Kind.DELAY && stopped.await(fault.delay.toNanos(), TimeUnit.NANOSECONDS)) return
-        val result = process(method, path, exchange.requestHeaders.getFirst("X-Token"), ApiCall(query, body))
-        if (fault != null && fault.kind != Fault.Kind.DELAY) {
-            applyFault(exchange, fault, path)
-            return
-        }
-        send(exchange, result, path)
+    private fun record(
+        exchange: HttpExchange,
+        body: ByteArray,
+        query: Map<String, String>?,
+    ): FakeRequest {
+        val request =
+            FakeRequest(
+                method = exchange.requestMethod.uppercase(),
+                path = exchange.requestURI.path,
+                query = query ?: emptyMap(),
+                headers = headers(exchange),
+                body = FakeJson.utf8(body),
+                receivedAt = clock.instant(),
+            )
+        requestLog.add(request)
+        counts.computeIfAbsent(request.path) { AtomicInteger() }.incrementAndGet()
+        return request
     }
 
-    private fun applyFault(
+    private fun serve(exchange: HttpExchange) {
+        val interrupted = stopping
+        val body = exchange.requestBody.use { it.readBytes() }
+        val query = parseQuery(exchange.requestURI.rawQuery)
+        val request = record(exchange, body, query)
+        val fault = faults.take(request)
+        if (fault != null) logger.debug("fake monobank: injecting {} on {}", fault, request.path)
+        if (fault != null && !fault.processed) {
+            answerWith(exchange, fault, interrupted, request.path)
+            return
+        }
+        if (fault?.kind == Fault.Kind.DELAY && interrupted.await(fault.delay.toNanos(), TimeUnit.NANOSECONDS)) return
+        val token = exchange.requestHeaders.getFirst(TOKEN_HEADER)
+        val (result, webhooks) =
+            dispatcher.capture {
+                if (query == null) {
+                    HttpResult.error(ApiError.badRequest("invalid query string"))
+                } else {
+                    process(request.method, request.path, token, ApiCall(query, body))
+                }
+            }
+        if (afterProcessing(exchange, fault, webhooks, interrupted, request.path)) send(exchange, result, request.path)
+    }
+
+    /** Applies a fault that acts after the request was performed; `true` when the real answer should go out. */
+    private fun afterProcessing(
+        exchange: HttpExchange,
+        fault: Fault?,
+        webhooks: List<WebhookEvent>,
+        interrupted: CountDownLatch,
+        path: String,
+    ): Boolean =
+        when (fault?.kind) {
+            Fault.Kind.DELAY_AFTER -> {
+                !interrupted.await(fault.delay.toNanos(), TimeUnit.NANOSECONDS)
+            }
+
+            Fault.Kind.AFTER_WEBHOOKS -> {
+                dispatcher.awaitDone(webhooks, hangLimit)
+                true
+            }
+
+            Fault.Kind.HANG, Fault.Kind.DROP, Fault.Kind.RESPOND -> {
+                answerWith(exchange, fault, interrupted, path)
+                false
+            }
+
+            Fault.Kind.DELAY, null -> {
+                true
+            }
+        }
+
+    /** Applies a fault that replaces the answer: hang, drop the connection, or a canned answer. */
+    private fun answerWith(
         exchange: HttpExchange,
         fault: Fault,
+        interrupted: CountDownLatch,
         path: String,
     ) {
-        logger.debug("fake monobank: injecting {} on {}", fault, path)
         when (fault.kind) {
-            Fault.Kind.HANG -> stopped.await(hangLimit.toNanos(), TimeUnit.NANOSECONDS)
-            Fault.Kind.DROP -> Unit
+            Fault.Kind.HANG -> interrupted.await(hangLimit.toNanos(), TimeUnit.NANOSECONDS)
             Fault.Kind.RESPOND -> send(exchange, HttpResult(fault.status, fault.body, fault.headers), path)
-            Fault.Kind.DELAY -> Unit
+            else -> Unit // DROP: close without an answer
         }
     }
 
@@ -151,23 +242,36 @@ internal class FakeServer(
         path: String,
         token: String?,
         call: ApiCall,
+    ): HttpResult =
+        try {
+            if (pages.handles(path)) {
+                pages.handle(method, path, call.body)
+            } else {
+                processApi(method, path, token, call)
+            }
+        } catch (e: RuntimeException) {
+            logger.warn("fake monobank: internal error on {}", path, e)
+            HttpResult.error(ApiError(500, "INTERNAL_ERROR", "internal server error"))
+        }
+
+    private fun processApi(
+        method: String,
+        path: String,
+        token: String?,
+        call: ApiCall,
     ): HttpResult {
         val allowed = routes.methodOf(path)
+        val merchant = token?.let { merchantsByToken[it] }
         val rejection =
             when {
                 allowed == null -> ApiError.notFound("not found")
                 method != allowed -> ApiError(405, "METHOD_NOT_ALLOWED", "Method not allowed")
                 token.isNullOrBlank() -> ApiError.badRequest("empty 'X-Token'")
-                token !in validTokens -> ApiError(403, "FORBIDDEN", "forbidden")
+                merchant == null -> ApiError(403, "FORBIDDEN", "forbidden")
                 else -> null
             }
-        if (rejection != null) return HttpResult.error(rejection)
-        return try {
-            routes.handle(path, call)
-        } catch (e: RuntimeException) {
-            logger.warn("fake monobank: internal error on {}", path, e)
-            HttpResult.error(ApiError(500, "INTERNAL_ERROR", "internal server error"))
-        }
+        if (rejection != null || merchant == null) return HttpResult.error(rejection ?: ApiError.notFound("not found"))
+        return routes.handle(path, merchant, call)
     }
 
     private fun send(
@@ -185,22 +289,35 @@ internal class FakeServer(
         logger.debug("fake monobank {} {} -> {}", exchange.requestMethod, path, result.status)
     }
 
-    private fun parseQuery(raw: String?): Map<String, String> {
+    private fun headers(exchange: HttpExchange): Map<String, String> =
+        exchange.requestHeaders
+            .filterKeys { !it.equals(TOKEN_HEADER, ignoreCase = true) }
+            .mapNotNull { (name, values) -> values.firstOrNull()?.let { name.lowercase() to it } }
+            .toMap()
+
+    /** Decoded query parameters, or `null` when the query is not valid percent-encoding. */
+    private fun parseQuery(raw: String?): Map<String, String>? {
         if (raw.isNullOrEmpty()) return emptyMap()
-        return raw
-            .split('&')
-            .filter { it.isNotEmpty() }
-            .associate { pair ->
-                val name = pair.substringBefore('=')
-                val value = if ('=' in pair) pair.substringAfter('=') else ""
-                decode(name) to decode(value)
-            }
+        return try {
+            raw
+                .split('&')
+                .filter { it.isNotEmpty() }
+                .associate { pair ->
+                    val name = pair.substringBefore('=')
+                    val value = if ('=' in pair) pair.substringAfter('=') else ""
+                    decode(name) to decode(value)
+                }
+        } catch (
+            @Suppress("SwallowedException") e: IllegalArgumentException,
+        ) {
+            null
+        }
     }
 
     private fun decode(value: String): String = URLDecoder.decode(value, StandardCharsets.UTF_8)
 
     private companion object {
-        const val LOOPBACK = "127.0.0.1"
         const val SHUTDOWN_SECONDS = 5L
+        const val TOKEN_HEADER = "X-Token"
     }
 }

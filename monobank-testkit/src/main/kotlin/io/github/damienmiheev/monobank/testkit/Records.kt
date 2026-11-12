@@ -1,5 +1,6 @@
 package io.github.damienmiheev.monobank.testkit
 
+import io.github.damienmiheev.monobank.testkit.internal.WebhookEvent
 import java.nio.charset.StandardCharsets
 import java.time.Instant
 
@@ -11,31 +12,71 @@ public enum class WebhookOutcome {
     /** Every attempt failed (no answer, or an answer other than 200). */
     FAILED,
 
-    /** Deliberately not sent ([FakeMonobankAcquiring.dropNextWebhooks]): a lost webhook. */
+    /** Deliberately not sent ([FakeMonobankAcquiring.dropNextWebhooks] and friends): a lost webhook. */
     DROPPED,
+}
+
+/** Why a webhook was sent. */
+public enum class WebhookKind {
+    /** The invoice changed: status, `finalAmount` or `cancelList`. */
+    PAYMENT,
+
+    /**
+     * The saved card changed (`walletData.status` became `created` or `failed`). It carries the
+     * invoice's unchanged status and `modifiedDate`.
+     */
+    CARD,
+
+    /** A body the test built itself (see [FakeMonobankAcquiring.sendSignedWebhook]). */
+    CUSTOM,
+}
+
+/**
+ * A webhook waiting to be sent (manual delivery, a delay, or not yet picked up), for selecting
+ * webhooks in [FakeMonobankAcquiring.deliverPendingWebhooks], [FakeMonobankAcquiring.dropPendingWebhooks]
+ * and the `...NextWebhooks` rules.
+ *
+ * @property invoiceId Invoice the webhook is about.
+ * @property status Invoice status in the body.
+ * @property kind Payment change, card change or a custom body.
+ * @property walletStatus `walletData.status` in the body (`new`, `created`, `failed`), or `null`.
+ * @property merchantId The merchant whose key signs it.
+ * @property url Where it goes.
+ */
+public class PendingWebhook internal constructor(
+    internal val event: WebhookEvent,
+) {
+    public val invoiceId: String get() = event.invoiceId
+    public val status: String get() = event.status
+    public val kind: WebhookKind get() = event.kind
+    public val walletStatus: String? get() = event.walletStatus
+    public val merchantId: String get() = event.merchantId
+    public val url: String get() = event.url
+
+    override fun toString(): String = "PendingWebhook(invoiceId=$invoiceId, status=$status, kind=$kind)"
 }
 
 /**
  * A webhook [FakeMonobankAcquiring] sent (or deliberately dropped), for assertions.
  * [toString] leaves out the body, which may contain a card token.
  *
- * @property invoiceId Invoice the webhook is about.
+ * @property invoiceId Invoice the webhook is about (empty for a custom body without one).
  * @property status Invoice status in the body (`processing`, `success`, ...).
+ * @property kind Payment change, card change or a custom body.
+ * @property walletStatus `walletData.status` in the body, or `null`.
+ * @property merchantId The merchant whose key signed it.
  * @property url Where it was sent (the invoice's `webHookUrl`).
  * @property body Body exactly as sent (UTF-8 JSON, the same shape as `GET /api/merchant/invoice/status`).
- * @property xSign The `X-Sign` header sent; `null` when dropped.
- * @property signatureValid `false` when the signature was deliberately corrupted.
+ * @property xSign The `X-Sign` header sent; `null` when dropped or sent without one.
+ * @property signatureValid `false` when the signature was deliberately corrupted or hand-made.
  * @property outcome Delivered, failed or dropped.
- * @property attempts HTTP attempts made (0 when dropped; monobank tries at most 3 times).
+ * @property attempts HTTP attempts made (0 when dropped; at most the configured attempts, 3 by default).
  * @property responseStatus HTTP status of the last attempt, or `null` when there was no answer.
- * @property duplicate `true` for the second copy of a duplicated webhook.
+ * @property duplicate `true` for a copy of an earlier webhook: the second of a duplicate, or a [FakeMonobankAcquiring.redeliver].
  * @property sentAt When the last attempt was made (fake clock), or `null` when dropped.
  */
 public class RecordedWebhook internal constructor(
-    public val invoiceId: String,
-    public val status: String,
-    public val url: String,
-    private val bodyBytes: ByteArray,
+    internal val event: WebhookEvent,
     public val xSign: String?,
     public val signatureValid: Boolean,
     public val outcome: WebhookOutcome,
@@ -44,14 +85,19 @@ public class RecordedWebhook internal constructor(
     public val duplicate: Boolean,
     public val sentAt: Instant?,
 ) {
-    public val body: String
-        get() = String(bodyBytes, StandardCharsets.UTF_8)
+    public val invoiceId: String get() = event.invoiceId
+    public val status: String get() = event.status
+    public val kind: WebhookKind get() = event.kind
+    public val walletStatus: String? get() = event.walletStatus
+    public val merchantId: String get() = event.merchantId
+    public val url: String get() = event.url
+    public val body: String get() = String(event.body, StandardCharsets.UTF_8)
 
     /** The raw body bytes, exactly as signed and sent (a copy). */
-    public fun bodyBytes(): ByteArray = bodyBytes.copyOf()
+    public fun bodyBytes(): ByteArray = event.body.copyOf()
 
     override fun toString(): String =
-        "RecordedWebhook(invoiceId=$invoiceId, status=$status, outcome=$outcome, attempts=$attempts, " +
+        "RecordedWebhook(invoiceId=$invoiceId, status=$status, kind=$kind, outcome=$outcome, attempts=$attempts, " +
             "responseStatus=$responseStatus, duplicate=$duplicate, signatureValid=$signatureValid)"
 }
 
@@ -61,7 +107,8 @@ public class RecordedWebhook internal constructor(
  *
  * @property method HTTP method.
  * @property path Path without the query, e.g. `/api/merchant/invoice/create`.
- * @property query Decoded query parameters.
+ * @property query Decoded query parameters (empty when the query could not be decoded).
+ * @property headers Request headers except `X-Token`, names in lower case, first value of each.
  * @property body Request body as UTF-8 text (empty for GET).
  * @property receivedAt When it arrived (fake clock).
  */
@@ -69,9 +116,13 @@ public class FakeRequest internal constructor(
     public val method: String,
     public val path: String,
     public val query: Map<String, String>,
+    public val headers: Map<String, String>,
     public val body: String,
     public val receivedAt: Instant,
 ) {
+    /** The first value of header [name] (case-insensitive), or `null`. `X-Token` is never available. */
+    public fun header(name: String): String? = headers[name.lowercase()]
+
     override fun toString(): String = "FakeRequest($method $path)"
 }
 
@@ -95,6 +146,7 @@ public class FakeRefund internal constructor(
  * A snapshot of an invoice held by [FakeMonobankAcquiring], for assertions.
  *
  * @property invoiceId Invoice id.
+ * @property merchantId The merchant that owns it.
  * @property status Current status (`created`, `processing`, `hold`, `success`, `failure`, `reversed`, `expired`).
  * @property amount Amount in minor units (kopiyky).
  * @property ccy ISO 4217 numeric currency.
@@ -114,6 +166,7 @@ public class FakeRefund internal constructor(
  */
 public class FakeInvoice internal constructor(
     public val invoiceId: String,
+    public val merchantId: String,
     public val status: String,
     public val amount: Long,
     public val ccy: Int,

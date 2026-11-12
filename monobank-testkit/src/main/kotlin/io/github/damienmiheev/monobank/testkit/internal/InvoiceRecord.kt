@@ -4,10 +4,10 @@ import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.node.ObjectNode
 import io.github.damienmiheev.monobank.testkit.FakeInvoice
 import io.github.damienmiheev.monobank.testkit.FakeRefund
-import java.security.SecureRandom
 import java.time.Instant
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
+import java.util.Random
 
 /** Invoice statuses as monobank sends them. */
 internal object Status {
@@ -50,6 +50,7 @@ internal class CardRecord(
     val walletId: String,
     val maskedPan: String,
     val country: String?,
+    val paymentSystem: String,
 )
 
 /** Order details taken from `merchantPaymInfo`. */
@@ -68,6 +69,7 @@ internal class InvoiceRecord(
     val viaWallet: Boolean,
     val order: OrderInfo,
     val webHookUrl: String?,
+    val redirectUrl: String?,
     val createdAt: Instant,
     val validUntil: Instant?,
     val saveCard: Boolean,
@@ -84,6 +86,9 @@ internal class InvoiceRecord(
     var cardToken: String? = null
     var walletStatus: String? = null
     var holdUntil: Instant? = null
+
+    /** The status before the invoice became `reversed` (`hold` for a released or lapsed hold). */
+    var reversedFrom: String? = null
     val cancels: MutableList<CancelRecord> = mutableListOf()
 
     /** Moves [modifiedAt] to [now], always strictly forward (monobank's `modifiedDate` only increases). */
@@ -154,7 +159,9 @@ internal class InvoiceRecord(
     /** The entry of `GET /api/merchant/statement`, or `null` when monobank would not list it. */
     fun statementJson(): ObjectNode? {
         val paid = paidAt ?: return null
-        val shown = STATEMENT_STATUS[status] ?: return null
+        // monobank's statement has no `reversed`: a reversed payment keeps its last status before reversal.
+        val shown = if (status == Status.REVERSED) reversedFrom ?: Status.SUCCESS else status
+        if (shown !in STATEMENT_STATUSES) return null
         val node =
             FakeJson
                 .obj()
@@ -164,11 +171,17 @@ internal class InvoiceRecord(
                 .put("date", FakeJson.date(paid))
                 .put("paymentScheme", "full")
                 .put("amount", amount)
-        if (status == Status.SUCCESS || status == Status.REVERSED) node.put("profitAmount", amount - (fee ?: 0))
+        if (shown == Status.SUCCESS) node.put("profitAmount", amount - (fee ?: 0))
         node.put("ccy", ccy)
         card?.takeIf { status != Status.FAILURE }?.let { node.put("approvalCode", it.approvalCode).put("rrn", it.rrn) }
         order.reference?.let { node.put("reference", it) }
         order.destination?.let { node.put("destination", it) }
+        statementRefunds(node)
+        order.metadata?.let { node.set<JsonNode>("metadata", it.deepCopy()) }
+        return node
+    }
+
+    private fun statementRefunds(node: ObjectNode) {
         val refunds = cancels.filter { it.status == Status.SUCCESS }
         if (refunds.isNotEmpty()) {
             val list = node.putArray("cancelList")
@@ -183,13 +196,12 @@ internal class InvoiceRecord(
                     .put("maskedPan", card?.maskedPan ?: "")
             }
         }
-        order.metadata?.let { node.set<JsonNode>("metadata", it.deepCopy()) }
-        return node
     }
 
-    fun snapshot(): FakeInvoice =
+    fun snapshot(merchantId: String): FakeInvoice =
         FakeInvoice(
             invoiceId = invoiceId,
+            merchantId = merchantId,
             status = status,
             amount = amount,
             ccy = ccy,
@@ -211,29 +223,20 @@ internal class InvoiceRecord(
     companion object {
         const val TERMINAL = "MI001088"
 
-        /** Statement statuses: monobank lists only paid or attempted payments. */
-        private val STATEMENT_STATUS =
-            mapOf(
-                Status.PROCESSING to Status.PROCESSING,
-                Status.HOLD to Status.HOLD,
-                Status.SUCCESS to Status.SUCCESS,
-                Status.FAILURE to Status.FAILURE,
-                Status.REVERSED to Status.SUCCESS,
-            )
+        /** Statement statuses (monobank's enum): only paid or attempted payments are listed. */
+        private val STATEMENT_STATUSES = setOf(Status.PROCESSING, Status.HOLD, Status.SUCCESS, Status.FAILURE)
     }
 }
 
-/** Random identifiers in monobank's formats. */
-internal object Ids {
-    private val random = SecureRandom()
-    private const val ALNUM = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
-    private const val HEX = "0123456789abcdef"
-    private val DAY = DateTimeFormatter.ofPattern("yyMMdd").withZone(ZoneOffset.UTC)
-
+/** Random identifiers in monobank's formats, from [random] (seedable for reproducible ids). */
+internal class Ids(
+    private val random: Random,
+) {
     private fun pick(
         alphabet: String,
         length: Int,
-    ): String = buildString { repeat(length) { append(alphabet[random.nextInt(alphabet.length)]) } }
+    ): String =
+        synchronized(random) { buildString { repeat(length) { append(alphabet[random.nextInt(alphabet.length)]) } } }
 
     /** Like `2210012MPLYwJjVUzchj`: date, then random characters. */
     fun invoiceId(now: Instant): String = DAY.format(now) + pick(ALNUM, 14)
@@ -245,4 +248,10 @@ internal object Ids {
     fun walletId(): String = pick(HEX, 32)
 
     fun digits(length: Int): String = pick("0123456789", length)
+
+    private companion object {
+        const val ALNUM = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+        const val HEX = "0123456789abcdef"
+        val DAY: DateTimeFormatter = DateTimeFormatter.ofPattern("yyMMdd").withZone(ZoneOffset.UTC)
+    }
 }

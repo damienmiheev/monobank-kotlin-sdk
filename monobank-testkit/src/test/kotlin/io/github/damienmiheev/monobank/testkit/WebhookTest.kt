@@ -11,7 +11,6 @@ import io.github.damienmiheev.monobank.acquiring.invoice.CreateInvoiceRequest
 import io.github.damienmiheev.monobank.acquiring.invoice.FinalizeInvoiceRequest
 import io.github.damienmiheev.monobank.acquiring.wallet.WalletPaymentRequest
 import io.github.damienmiheev.monobank.acquiring.webhook.VerificationResult
-import io.github.damienmiheev.monobank.acquiring.webhook.WebhookKeyProvider
 import io.github.damienmiheev.monobank.acquiring.webhook.WebhookParser
 import io.github.damienmiheev.monobank.acquiring.webhook.WebhookVerifier
 import io.github.damienmiheev.monobank.core.MonobankSignatureException
@@ -227,7 +226,7 @@ class WebhookTest {
 
     @Test
     fun `delayed webhooks arrive after the synchronous answer`() {
-        fake.setWebhookDelay(Duration.ofMillis(300))
+        fake.setWebhookDelay(Duration.ofSeconds(10))
         val token = fake.addCard("customer")
 
         val payment =
@@ -237,7 +236,11 @@ class WebhookTest {
 
         assertThat(payment.status).isEqualTo(OperationStatus.SUCCESS)
         assertThat(receiver.received).isEmpty()
-        assertThat(receiver.await(2).map { parse(it).invoiceId }).containsOnly(payment.invoiceId)
+        assertThat(fake.pendingWebhooks().map { it.status }).containsExactly("processing", "success")
+        // switching to manual holds back webhooks already waiting for their delay
+        fake.setWebhookDelivery(WebhookDelivery.MANUAL)
+        assertThat(fake.deliverWebhooksNow().map { it.invoiceId }).containsOnly(payment.invoiceId)
+        assertThat(receiver.received).hasSize(2)
     }
 
     @Test
@@ -290,32 +293,30 @@ class WebhookTest {
     }
 
     @Test
-    fun `key rotation - the SDK verifier re-fetches the new key, and a fresh client gets it directly`() {
+    fun `key rotation - the client's verifier re-fetches the new key and still accepts the previous one`() {
         fake.setWebhookDelivery(WebhookDelivery.MANUAL)
+        val client = clientFor(fake, keyRefreshInterval = Duration.ZERO)
         val invoiceId = create()
         fake.startPayment(invoiceId)
         val beforeRotation = fake.deliverWebhooksNow().single()
-        // a verifier backed by the SDK's own pubkey call, re-fetching on every mismatch
-        val verifier = WebhookVerifier(WebhookKeyProvider { mono.merchant.publicKey().key }, Duration.ZERO)
-        assertThat(verifier.verify(beforeRotation.xSign, beforeRotation.bodyBytes())).isTrue()
-        assertThat(mono.webhooks.verify(beforeRotation.xSign, beforeRotation.bodyBytes())).isTrue()
+        assertThat(client.webhooks.verify(beforeRotation.xSign, beforeRotation.bodyBytes())).isTrue()
 
         val newKey = fake.rotateKey()
         fake.payInvoice(invoiceId)
         val afterRotation = fake.deliverWebhooksNow().single()
 
-        assertThat(mono.merchant.publicKey().key).isEqualTo(newKey)
+        assertThat(client.merchant.publicKey().key).isEqualTo(newKey)
         assertThat(
             WebhookVerifier.ofPublicKey(newKey).verify(beforeRotation.xSign, beforeRotation.bodyBytes()),
         ).isFalse()
-        assertThat(verifier.check(afterRotation.xSign, afterRotation.bodyBytes())).isEqualTo(VerificationResult.VALID)
-        assertThat(verifier.currentPublicKey()).isEqualTo(newKey)
+        assertThat(client.webhooks.check(afterRotation.xSign, afterRotation.bodyBytes()))
+            .isEqualTo(VerificationResult.VALID)
+        assertThat(client.webhooks.currentPublicKey()).isEqualTo(newKey)
         // the previous key stays accepted for webhooks signed just before the rotation
-        assertThat(verifier.verify(beforeRotation.xSign, beforeRotation.bodyBytes())).isTrue()
-        // a client that has not cached the old key verifies with the new one at once
-        val fresh = clientFor(fake)
-        assertThat(fresh.webhooks.verify(afterRotation.xSign, afterRotation.bodyBytes())).isTrue()
-        assertThat(fresh.webhooks.currentPublicKey()).isEqualTo(newKey)
+        assertThat(client.webhooks.verify(beforeRotation.xSign, beforeRotation.bodyBytes())).isTrue()
+        // a redelivery of the old webhook is re-signed with the new key
+        val replayed = fake.redeliver(beforeRotation)
+        assertThat(WebhookVerifier.ofPublicKey(newKey).verify(replayed.xSign, replayed.bodyBytes())).isTrue()
         assertThat(WebhookParser.parse(afterRotation.body).status).isEqualTo(InvoiceStatus.SUCCESS)
     }
 

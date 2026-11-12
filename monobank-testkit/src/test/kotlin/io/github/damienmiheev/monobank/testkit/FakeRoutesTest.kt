@@ -231,7 +231,9 @@ class FakeRoutesTest {
         mono.invoices.remove(invoiceId)
 
         assertThat(mono.invoices.status(invoiceId).status).isEqualTo(InvoiceStatus.EXPIRED)
-        assertThat(apiError { mono.invoices.remove(invoiceId) }.statusCode).isEqualTo(400)
+        // removing again is idempotent: still expired, 200
+        mono.invoices.remove(invoiceId)
+        assertThat(mono.invoices.status(invoiceId).status).isEqualTo(InvoiceStatus.EXPIRED)
 
         val paying = create()
         fake.startPayment(paying)

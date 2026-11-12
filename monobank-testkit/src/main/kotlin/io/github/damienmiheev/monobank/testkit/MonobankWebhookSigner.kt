@@ -3,6 +3,7 @@ package io.github.damienmiheev.monobank.testkit
 import java.nio.charset.StandardCharsets
 import java.security.AlgorithmParameters
 import java.security.GeneralSecurityException
+import java.security.KeyFactory
 import java.security.KeyPair
 import java.security.KeyPairGenerator
 import java.security.MessageDigest
@@ -11,6 +12,8 @@ import java.security.interfaces.ECPrivateKey
 import java.security.interfaces.ECPublicKey
 import java.security.spec.ECGenParameterSpec
 import java.security.spec.ECParameterSpec
+import java.security.spec.PKCS8EncodedKeySpec
+import java.security.spec.X509EncodedKeySpec
 import java.util.Base64
 
 /**
@@ -134,6 +137,35 @@ public class MonobankWebhookSigner private constructor(
             requireP256(keyPair)
             return MonobankWebhookSigner(keyPair)
         }
+
+        /**
+         * A signer with a fixed key pair read from PEM text, e.g. test resources: [privateKeyPem] is a
+         * PKCS#8 `PRIVATE KEY`, [publicKeyPem] the matching X.509 `PUBLIC KEY` (`openssl ec -pubout`).
+         *
+         * @throws IllegalArgumentException when the PEMs are not a P-256 EC key pair.
+         */
+        @JvmStatic
+        public fun fromPem(
+            privateKeyPem: String,
+            publicKeyPem: String,
+        ): MonobankWebhookSigner {
+            val factory = KeyFactory.getInstance("EC")
+            val keyPair =
+                try {
+                    KeyPair(
+                        factory.generatePublic(X509EncodedKeySpec(pemBody(publicKeyPem))),
+                        factory.generatePrivate(PKCS8EncodedKeySpec(pemBody(privateKeyPem))),
+                    )
+                } catch (e: GeneralSecurityException) {
+                    throw IllegalArgumentException("not an EC key in PEM: ${e.message}", e)
+                }
+            return of(keyPair)
+        }
+
+        private fun pemBody(pem: String): ByteArray =
+            Base64.getMimeDecoder().decode(
+                pem.lineSequence().filterNot { it.trim().startsWith("-----") }.joinToString(""),
+            )
 
         /** Generates a P-256 (`prime256v1`) EC key pair, the kind monobank signs webhooks with. */
         @JvmStatic

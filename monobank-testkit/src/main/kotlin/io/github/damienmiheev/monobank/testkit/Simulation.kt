@@ -144,7 +144,10 @@ public class WalletPaymentOutcome private constructor(
     override fun toString(): String = "WalletPaymentOutcome($kind${errCode?.let { ", errCode=$it" } ?: ""})"
 
     public companion object {
-        /** The charge succeeds at once (status `success`; `hold` for a hold). */
+        /**
+         * The charge succeeds at once. The answer says `success`, also for a hold; `invoice/status`
+         * then says `success` (`hold` for a hold).
+         */
         @JvmStatic
         public fun success(): WalletPaymentOutcome = WalletPaymentOutcome(Kind.SUCCESS, null, null)
 
@@ -186,11 +189,15 @@ public enum class WebhookDelivery {
     MANUAL,
 }
 
-/** How refunds and hold releases (`POST /api/merchant/invoice/cancel`) complete. */
+/**
+ * How refunds and hold releases (`POST /api/merchant/invoice/cancel`) complete, and what the
+ * synchronous answer says. monobank documents all three answer statuses (`processing`, `success`,
+ * `failure`) but not when each is used, so the fake lets the test choose.
+ */
 public enum class RefundSettlement {
     /**
      * The answer says `processing`, and the refund completes (`success`) immediately afterwards,
-     * with a webhook.
+     * with a webhook. The default.
      */
     AUTOMATIC,
 
@@ -199,4 +206,10 @@ public enum class RefundSettlement {
      * [FakeMonobankAcquiring.settleRefund].
      */
     MANUAL,
+
+    /** The refund completes before the answer, which says `success`; a webhook follows. */
+    IMMEDIATE_SUCCESS,
+
+    /** The refund fails before the answer, which says `failure`; a webhook follows and nothing is refunded. */
+    IMMEDIATE_FAILURE,
 }

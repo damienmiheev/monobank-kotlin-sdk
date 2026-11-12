@@ -2,16 +2,25 @@ package io.github.damienmiheev.monobank.testkit
 
 import io.github.damienmiheev.monobank.core.MonobankClientOptions
 import io.github.damienmiheev.monobank.testkit.internal.AcquiringRoutes
+import io.github.damienmiheev.monobank.testkit.internal.Bank
 import io.github.damienmiheev.monobank.testkit.internal.FakeServer
 import io.github.damienmiheev.monobank.testkit.internal.FakeSettings
-import io.github.damienmiheev.monobank.testkit.internal.FakeState
+import io.github.damienmiheev.monobank.testkit.internal.HostedPages
+import io.github.damienmiheev.monobank.testkit.internal.Ids
 import io.github.damienmiheev.monobank.testkit.internal.MerchantInfo
-import io.github.damienmiheev.monobank.testkit.internal.Status
+import io.github.damienmiheev.monobank.testkit.internal.MerchantState
+import io.github.damienmiheev.monobank.testkit.internal.RuleAction
 import io.github.damienmiheev.monobank.testkit.internal.WebhookDispatcher
 import io.github.damienmiheev.monobank.testkit.internal.WebhookSettings
+import java.io.UncheckedIOException
 import java.math.BigDecimal
+import java.net.Inet6Address
+import java.net.InetAddress
+import java.security.SecureRandom
 import java.time.Duration
+import java.util.Random
 import java.util.concurrent.CountDownLatch
+import java.util.function.Predicate
 
 /**
  * An in-memory fake of monobank's acquiring API on a local HTTP port, for testing code that
@@ -19,44 +28,99 @@ import java.util.concurrent.CountDownLatch
  *
  * **A test double, not a guarantee.** It approximates monobank's *documented* behaviour (routes,
  * JSON shapes, status codes, `{"errCode","errText"}` error bodies, the invoice status machine,
- * signed webhooks). Where the documentation is silent, it makes a reasonable, documented choice.
- * Passing against the fake does not prove your integration works against monobank: also run it
- * against monobank's test token before going live.
+ * signed webhooks). Where the documentation is silent, it makes a choice, listed below. Passing
+ * against the fake does not prove your integration works against monobank: also run it against
+ * monobank's test token before going live.
  *
- * What it serves (with `X-Token` checked against the configured tokens: missing → 400, wrong → 403):
- * `GET /api/merchant/pubkey`, `GET /api/merchant/details`, `POST /api/merchant/invoice/create`,
- * `GET /api/merchant/invoice/status`, `POST /api/merchant/invoice/remove`, `POST /api/merchant/invoice/finalize`,
- * `POST /api/merchant/invoice/cancel`, `POST /api/merchant/wallet/payment`, `GET /api/merchant/wallet`,
- * `DELETE /api/merchant/wallet/card`, `GET /api/merchant/statement` (paths in [MonobankPaths]).
+ * ### Routes
+ * Served, with `X-Token` checked (missing → 400 `BAD_REQUEST`, as documented for `pubkey`; unknown →
+ * 403 `FORBIDDEN`): `GET pubkey`, `GET details`, `POST invoice/create`, `GET invoice/status`,
+ * `POST invoice/remove`, `POST invoice/finalize`, `POST invoice/cancel`, `POST wallet/payment`,
+ * `GET wallet`, `DELETE wallet/card`, `GET statement` (all under `/api/merchant/`, see [MonobankPaths]).
+ * **Not served** (they answer 404 `NOT_FOUND`, which looks like "not found", beware): `invoice/receipt`,
+ * `invoice/fiscal-checks`, `invoice/payment-direct`, `invoice/sync-payment`, QR, subscriptions,
+ * split receivers, submerchants, monopay keys, Tap-to-Phone, POS refunds. Apple Pay / Google Pay
+ * tokens in `wallet/payment` answer 400.
  *
- * How it behaves:
- * - Nobody pays the payment page: your test plays the customer with [payInvoice], [failInvoice],
- *   [startPayment] and [expireInvoice].
- * - Status changes send a webhook to the invoice's `webHookUrl`, signed by [signer] like monobank
- *   (`X-Sign`, ECDSA P-256 over the raw body), body identical to `invoice/status`; nothing is sent
- *   for `expired`. A paying customer produces `processing` then `success` (or `hold`, `failure`).
- *   A card-saving invoice then gets a separate card webhook with `walletData.status` `created`
- *   (or `failed`); that webhook keeps the invoice's status and `modifiedDate`.
+ * `pageUrl` and `tdsUrl` lead to a tiny page on the fake with "Pay" and "Decline" buttons (no token
+ * needed, like the real page) that plays the customer and then redirects to `redirectUrl`.
+ *
+ * ### Behaviour (documented by monobank)
+ * - Your test plays the customer with [payInvoice], [failInvoice], [startPayment], [expireInvoice].
+ * - Status changes send a webhook to the invoice's `webHookUrl`, signed like monobank (`X-Sign`,
+ *   ECDSA P-256 over the raw body, see [MonobankWebhookSigner]); the body is identical to
+ *   `invoice/status`. Nothing is sent for `expired`. A card-saving invoice also gets a card webhook
+ *   when `walletData.status` changes.
  * - `modifiedDate` only increases. Amounts are minor units (kopiyky). Unpaid invoices expire after
- *   `validity` (default 24 h, at most 30 days). A hold lapses (`reversed`, with a webhook) 9 days
- *   after it was placed, and finalizing it afterwards fails. Refunds lower `finalAmount`, and a
- *   fully refunded payment becomes `reversed`. Only payments that reached `processing` or later
- *   appear in the statement. Time comes from [clock], which tests can move with [advanceClock].
- * - Faults: [injectFault] (delay, timeout, dropped connection, 5xx, 429 with or without
- *   `Retry-After`, any canned answer), with or without the request being performed.
- * - Webhook faults: [dropNextWebhooks], [duplicateNextWebhooks], [corruptNextWebhookSignatures],
- *   [setWebhookDelay], manual delivery with [deliverWebhooksNow] / [deliverWebhooksInReverseOrder].
- * - Assertions: [requestCount], [requests], [sentWebhooks], [awaitWebhooks], [invoice], [invoices].
+ *   `validity` (default 24 h, clamped to 30 days). Holds work only in UAH and lapse after 9 days.
+ *   `finalAmount` drops with refunds. Only payments that reached `processing` appear in the statement.
+ *
+ * ### Where the fake invents behaviour (monobank does not document it)
+ * - A paying customer produces a `processing` webhook before the final one
+ *   ([Builder.sendProcessingWebhooks] turns it off).
+ * - The card webhook (`walletData` `new` → `created`/`failed`) is separate and keeps the invoice's
+ *   status and `modifiedDate`. The token is already in `walletData` while `new`, but can be charged
+ *   only once `created` (before that: 400 `TOKEN_NOT_FOUND`).
+ * - A `walletId` is generated when `saveCardData.walletId` is absent. Verification invoices end
+ *   `success` with `finalAmount` 0 and are listed in the statement.
+ * - `invoice/remove` turns a `created` invoice `expired`. Removing an already `expired` invoice answers
+ *   200 again (idempotent: the goal is reached); removing a paid or paying invoice answers 400 `BAD_REQUEST`.
+ * - `invoice/cancel` answers `processing` and completes at once ([RefundSettlement] chooses manual
+ *   completion, or an immediate `success`/`failure` answer). Errors: more than is left, or already
+ *   refunded → 400 `WRONG_CANCEL_AMOUNT`; a partial release of an unfinalized hold → 400
+ *   `HOLD_INVOICE_NOT_FINALIZED`; a second release while one is pending → 400 `WRONG_CANCEL_AMOUNT`;
+ *   an unpaid invoice → 500 `CANCEL_NOT_AVAILABLE`. A hold release makes the invoice `reversed`, `finalAmount` 0.
+ * - `invoice/finalize` on anything but an unfinalized hold (also a lapsed one, or one being released),
+ *   or for more than the hold → 400 `BAD_REQUEST`.
+ * - A hold lapses at exactly 9 days: `reversed`, `finalAmount` 0, with a webhook. Expirations and
+ *   lapses apply on the next request or control call, or [advanceClock] / [applyDueChanges].
+ * - `wallet/payment` answers `success` for a hold (its documented answer statuses lack `hold`);
+ *   `invoice/status` then says `hold`.
+ * - Statement: a `reversed` payment shows its last status before the reversal (`success` for a
+ *   refunded payment, `hold` for a released or lapsed hold, which never shows as `success`) with its
+ *   refunds in `cancelList`; `profitAmount` = amount − fee for `success` only. The fee is 1.3 %
+ *   ([Builder.feePercent]).
+ * - `merchantPaymInfo.basketOrder` must add up to `amount` (400 `INVALID_MERCHANT_PAYM_INFO`;
+ *   [Builder.validateBasketTotal] turns it off).
+ * - Webhooks are tried 3 times, 200 ms apart, until the receiver answers 200 ([Builder.webhookRetries]).
+ *   They go out one at a time, in order, on one thread: a slow receiver delays later webhooks.
+ * - Dates are RFC 3339 in UTC with milliseconds.
+ *
+ * ### Faults and webhook control
+ * [injectFault] (delay before or after processing, answer after webhooks, timeout, dropped
+ * connection, 5xx, 429 with or without `Retry-After`, any canned answer, each with or without the
+ * request being performed); [pause] / [resume] for "connection refused" (the client's
+ * `RequestOutcome.NOT_SENT`). Webhooks: manual delivery, delay, selective drop / duplicate / corrupt
+ * ([dropNextWebhooks], [dropPendingWebhooks], [deliverPendingWebhooks]), [redeliver], hand-built
+ * [sendSignedWebhook] / [sendWebhook].
+ *
+ * ### Merchants
+ * By default one merchant answers to [Builder.tokens] (all aliases of that merchant). Add more with
+ * [Builder.addMerchant]: each has its own tokens, key, invoices and wallets ([merchant]).
+ *
+ * ### Sharing one fake
+ * Faults are matched per path (and optionally per request, see [injectFault] with a predicate),
+ * counts and recorded webhooks are global, and [reset] clears everything. Use one fake per test
+ * class, or don't use global faults, global waits or [reset] from tests that run in parallel: match
+ * faults by request and wait with [awaitWebhooks] for an invoice id. [requests] and [sentWebhooks]
+ * grow until [reset].
+ *
+ * ### Containers (Testcontainers)
+ * The fake listens on 127.0.0.1 by default, so it is not reachable from other machines. For an
+ * application in a container, call `Testcontainers.exposeHostPorts(fake.port)` before starting it and
+ * give it `http://host.testcontainers.internal:<port>`; set [Builder.advertisedHost] to
+ * `host.testcontainers.internal` so `pageUrl`/`tdsUrl` match. Docker networks that reach the host
+ * through its bridge IP (`host.docker.internal` with `host-gateway`, docker-compose) need
+ * [Builder.bindAddress], which exposes a fake that accepts payments: test machines only.
  *
  * Kotlin:
  * ```kotlin
  * FakeMonobankAcquiring().start().use { fake ->
  *     val mono = MonobankAcquiring(AcquiringConfig.builder(fake.token).options(fake.clientOptions()).build())
- *     val invoice = mono.invoices.create(
- *         CreateInvoiceRequest.builder(4200).webHookUrl("http://127.0.0.1:8080/notification").build(),
- *     )
+ *     val receiver = startMyWebhookEndpoint() // e.g. a JDK HttpServer answering 200
+ *     val invoice = mono.invoices.create(CreateInvoiceRequest.builder(4200).webHookUrl(receiver.url).build())
  *     fake.payInvoice(invoice.invoiceId)
- *     val webhooks = fake.awaitWebhooks(2, Duration.ofSeconds(5)) // processing, success
+ *     val webhooks = fake.awaitWebhooks(invoice.invoiceId, 2, Duration.ofSeconds(5)) // processing, success
  *     check(mono.webhooks.verify(webhooks.last().xSign, webhooks.last().bodyBytes()))
  *     check(mono.invoices.status(invoice.invoiceId).status == InvoiceStatus.SUCCESS)
  * }
@@ -75,31 +139,22 @@ import java.util.concurrent.CountDownLatch
  * }
  * ```
  *
- * It models one merchant: every configured token sees the same invoices and the same key; start
- * two fakes for two merchants. Thread-safe: it serves concurrent requests, and the control methods
- * can be called from any thread. [close] stops the server and every thread it started.
+ * Thread-safe: it serves concurrent requests, and the control methods can be called from any
+ * thread. No method throws a checked exception. [close] stops the server and every thread it started.
  */
-@Suppress("TooManyFunctions")
+@Suppress("TooManyFunctions", "LargeClass")
 public class FakeMonobankAcquiring private constructor(
     builder: Builder,
 ) : AutoCloseable {
     /** A fake with default settings: token [DEFAULT_TOKEN], a new key, real time, automatic webhooks. */
     public constructor() : this(Builder())
 
-    /** Signs webhooks; its key is served by `GET /api/merchant/pubkey`. */
-    public val signer: MonobankWebhookSigner = builder.signer ?: MonobankWebhookSigner.generate()
-
     /** The fake's clock: invoice validity, holds and every reported date follow it. */
     public val clock: TestClock = builder.clock
 
-    /** The first accepted `X-Token`; give it to the client under test. */
-    public val token: String = builder.tokens.first()
-
-    private val tokens: Set<String> = builder.tokens.toSet()
     private val stopped = CountDownLatch(1)
     private val webhooks =
         WebhookDispatcher(
-            signer = signer,
             clock = clock,
             settings =
                 WebhookSettings(
@@ -111,8 +166,8 @@ public class FakeMonobankAcquiring private constructor(
             delay = builder.webhookDelay,
             stopped = stopped,
         )
-    private val state =
-        FakeState(
+    private val bank =
+        Bank(
             FakeSettings(
                 clock = clock,
                 feePercent = builder.feePercent,
@@ -120,20 +175,57 @@ public class FakeMonobankAcquiring private constructor(
                 validateBasketTotal = builder.validateBasketTotal,
                 refundSettlement = builder.refundSettlement,
             ),
+            Ids(builder.seed?.let { Random(it) } ?: SecureRandom()),
             webhooks::enqueue,
         )
+    private val merchantList: List<FakeMerchant>
+    private val bindAddress: InetAddress = builder.bindAddress
+    private val advertisedHost: String? = builder.advertisedHost
+
+    init {
+        val setups =
+            listOf(
+                MerchantSetup
+                    .builder(builder.tokens.first(), *builder.tokens.drop(1).toTypedArray())
+                    .details(builder.merchantId, builder.merchantName, builder.edrpou)
+                    .apply { builder.signer?.let { signer(it) } }
+                    .build(),
+            ) + builder.extraMerchants
+        val allTokens = setups.flatMap { it.tokens }
+        require(allTokens.toSet().size == allTokens.size) { "every token must belong to one merchant only" }
+        require(setups.map { it.merchantId }.toSet().size == setups.size) { "merchant ids must be unique" }
+        merchantList =
+            setups.map { setup ->
+                val state =
+                    MerchantState(
+                        bank,
+                        MerchantInfo(setup.merchantId, setup.merchantName, setup.edrpou),
+                        setup.tokens.toSet(),
+                        setup.signer,
+                    )
+                bank.merchants.add(state)
+                FakeMerchant(state, bank, webhooks)
+            }
+    }
+
+    /** The default merchant: the one configured by [Builder.tokens], [Builder.signer] and [Builder.merchant]. */
+    public val merchant: FakeMerchant = merchantList.first()
+
+    /** Signs the default merchant's webhooks; its key is served by `GET /api/merchant/pubkey`. */
+    public val signer: MonobankWebhookSigner get() = merchant.signer
+
+    /** The default merchant's first `X-Token`; give it to the client under test. */
+    public val token: String get() = merchant.token
+
     private val server =
         FakeServer(
-            routes =
-                AcquiringRoutes(
-                    state,
-                    signer,
-                    MerchantInfo(builder.merchantId, builder.merchantName, builder.edrpou),
-                ) { baseUrl },
-            validTokens = tokens,
+            routes = AcquiringRoutes(bank) { baseUrl },
+            pages = HostedPages(bank),
+            dispatcher = webhooks,
+            merchantsByToken = merchantList.flatMap { m -> m.state.tokens.map { it to m.state } }.toMap(),
             clock = clock,
             hangLimit = builder.hangLimit,
-            stopped = stopped,
+            bindAddress = bindAddress,
         )
     private val requestedPort = builder.port
     private val lifecycle = Any()
@@ -142,13 +234,27 @@ public class FakeMonobankAcquiring private constructor(
     private var boundPort: Int = -1
 
     @Volatile
+    private var paused = false
+
+    @Volatile
     private var closed = false
 
+    /** The merchant that accepts [token]. @throws IllegalArgumentException when no merchant does. */
+    public fun merchant(token: String): FakeMerchant =
+        requireNotNull(merchantList.firstOrNull { token in it.state.tokens }) { "no merchant accepts this token" }
+
+    /** Every merchant, the default one first. */
+    public fun merchants(): List<FakeMerchant> = merchantList
+
+    // ---- Lifecycle ----
+
     /**
-     * Starts serving on `127.0.0.1` (a random free port unless [Builder.port] set one).
+     * Starts serving (on 127.0.0.1 and a random free port unless [Builder.bindAddress] /
+     * [Builder.port] say otherwise).
      *
      * @return this fake, for chaining.
      * @throws IllegalStateException when it was already started or closed.
+     * @throws UncheckedIOException when the port cannot be bound (e.g. a fixed port in use).
      */
     public fun start(): FakeMonobankAcquiring =
         apply {
@@ -159,23 +265,67 @@ public class FakeMonobankAcquiring private constructor(
             }
         }
 
+    /**
+     * Stops listening, keeping every invoice, card and setting: clients now get "connection refused"
+     * (the SDK reports `RequestOutcome.NOT_SENT`). Requests in progress are cut off. [resume] listens
+     * again on the same port.
+     *
+     * @throws IllegalStateException when not started, already paused, or closed.
+     */
+    public fun pause() {
+        synchronized(lifecycle) {
+            check(!closed && boundPort >= 0 && !paused) { "the fake is not running" }
+            server.pause()
+            paused = true
+        }
+    }
+
+    /**
+     * Listens again on the same port after [pause].
+     *
+     * @throws IllegalStateException when not paused.
+     * @throws UncheckedIOException when the port was taken meanwhile.
+     */
+    public fun resume() {
+        synchronized(lifecycle) {
+            check(!closed && paused) { "the fake is not paused" }
+            server.start(boundPort)
+            paused = false
+        }
+    }
+
     /** The port it listens on. @throws IllegalStateException before [start]. */
     public val port: Int
         get() = boundPort.also { check(it >= 0) { "the fake is not started" } }
 
-    /** Base URL to give the client, e.g. `http://127.0.0.1:54321`. @throws IllegalStateException before [start]. */
+    /**
+     * Base URL the fake advertises (in `pageUrl`, `tdsUrl`), e.g. `http://127.0.0.1:54321`, or with
+     * [Builder.advertisedHost] e.g. `http://host.testcontainers.internal:54321`.
+     *
+     * @throws IllegalStateException before [start].
+     */
     public val baseUrl: String
-        get() = "http://127.0.0.1:$port"
+        get() = advertisedHost?.let { "http://$it:$port" } ?: localBaseUrl
 
-    /** Client options pointing at this fake (the SDK's defaults otherwise). */
+    /** URL for clients on this machine, e.g. `http://127.0.0.1:54321`. @throws IllegalStateException before [start]. */
+    public val localBaseUrl: String
+        get() {
+            val host = if (bindAddress.isAnyLocalAddress) "127.0.0.1" else literal(bindAddress)
+            return "http://$host:$port"
+        }
+
+    /** Client options pointing at this fake ([localBaseUrl]; the SDK's defaults otherwise). */
     public fun clientOptions(): MonobankClientOptions = clientOptionsBuilder().build()
 
-    /** A client options builder pointing at this fake, to adjust timeouts or retries. */
-    public fun clientOptionsBuilder(): MonobankClientOptions.Builder = MonobankClientOptions.builder().baseUrl(baseUrl)
+    /** A client options builder pointing at this fake ([localBaseUrl]), to adjust timeouts or retries. */
+    public fun clientOptionsBuilder(): MonobankClientOptions.Builder =
+        MonobankClientOptions.builder().baseUrl(localBaseUrl)
 
     /**
-     * Stops the server and the webhook sender, ends hanging requests, and waits for every thread
-     * the fake started to finish. Pending webhooks are discarded. Idempotent.
+     * Stops the server and the webhook sender, ends hanging requests, and waits (up to a few seconds)
+     * for every thread the fake started to finish; webhook deliveries in progress are cut off.
+     * Pending webhooks are discarded. Idempotent; never throws a checked exception (an interrupt is
+     * kept on the thread).
      */
     override fun close() {
         synchronized(lifecycle) {
@@ -188,16 +338,17 @@ public class FakeMonobankAcquiring private constructor(
     }
 
     /**
-     * Forgets every invoice, card, refund, recorded request and webhook, queued fault and queued
-     * wallet payment outcome. Keeps the key, tokens, settings and the clock.
+     * Forgets every invoice, card, refund, recorded request and webhook, queued and scheduled
+     * webhook, fault, webhook rule and queued wallet payment outcome of every merchant. Keeps the
+     * merchants, keys, tokens, settings and the clock.
      */
     public fun reset() {
-        state.reset()
+        bank.reset()
         server.reset()
         webhooks.reset()
     }
 
-    // ---- The customer and monobank's back office ----
+    // ---- The customer and monobank's back office (on the merchant that owns the invoice) ----
 
     /** The customer pays [invoiceId] successfully with the default card. See [payInvoice]. */
     public fun payInvoice(invoiceId: String): FakeInvoice = payInvoice(invoiceId, CustomerPayment.approved())
@@ -215,13 +366,7 @@ public class FakeMonobankAcquiring private constructor(
     public fun payInvoice(
         invoiceId: String,
         payment: CustomerPayment,
-    ): FakeInvoice =
-        state.locked {
-            val invoice = state.require(invoiceId)
-            if (invoice.status == Status.CREATED) state.beginPayment(invoice, payment)
-            state.completePayment(invoice, payment)
-            invoice.snapshot()
-        }
+    ): FakeInvoice = owner(invoiceId).payInvoice(invoiceId, payment)
 
     /** The customer's payment of [invoiceId] is declined (code `59`). See [payInvoice]. */
     public fun failInvoice(invoiceId: String): FakeInvoice = payInvoice(invoiceId, CustomerPayment.declined())
@@ -236,12 +381,7 @@ public class FakeMonobankAcquiring private constructor(
     public fun startPayment(
         invoiceId: String,
         payment: CustomerPayment = CustomerPayment.approved(),
-    ): FakeInvoice =
-        state.locked {
-            val invoice = state.require(invoiceId)
-            state.beginPayment(invoice, payment)
-            invoice.snapshot()
-        }
+    ): FakeInvoice = owner(invoiceId).startPayment(invoiceId, payment)
 
     /**
      * Expires [invoiceId] now (`created` or `processing` → `expired`), as when its validity runs
@@ -249,12 +389,7 @@ public class FakeMonobankAcquiring private constructor(
      *
      * @throws IllegalStateException when the invoice is in another status.
      */
-    public fun expireInvoice(invoiceId: String): FakeInvoice =
-        state.locked {
-            val invoice = state.require(invoiceId)
-            state.expire(invoice)
-            invoice.snapshot()
-        }
+    public fun expireInvoice(invoiceId: String): FakeInvoice = owner(invoiceId).expireInvoice(invoiceId)
 
     /**
      * Completes a `processing` refund of [invoiceId] (with [RefundSettlement.MANUAL]): the one
@@ -267,18 +402,7 @@ public class FakeMonobankAcquiring private constructor(
         invoiceId: String,
         extRef: String?,
         success: Boolean,
-    ): FakeInvoice =
-        state.locked {
-            val invoice = state.require(invoiceId)
-            val refund =
-                checkNotNull(
-                    invoice.cancels.firstOrNull {
-                        it.status == Status.PROCESSING && (extRef == null || it.extRef == extRef)
-                    },
-                ) { "invoice $invoiceId has no pending refund${extRef?.let { " with extRef $it" } ?: ""}" }
-            state.settle(invoice, refund, success)
-            invoice.snapshot()
-        }
+    ): FakeInvoice = owner(invoiceId).settleRefund(invoiceId, extRef, success)
 
     /**
      * A refund of [amount] (minor units) made outside the API, e.g. in monobank's web portal or a
@@ -289,53 +413,56 @@ public class FakeMonobankAcquiring private constructor(
     public fun refundExternally(
         invoiceId: String,
         amount: Long,
-    ): FakeInvoice =
-        state.locked {
-            val invoice = state.require(invoiceId)
-            state.refundExternally(invoice, amount)
-            invoice.snapshot()
-        }
+    ): FakeInvoice = owner(invoiceId).refundExternally(invoiceId, amount)
 
-    /**
-     * Queues the outcome of the next `POST /api/merchant/wallet/payment`. Outcomes are used in
-     * order; without one, a charge succeeds.
-     */
+    /** Queues the outcome of the default merchant's next `wallet/payment`; without one, a charge succeeds. */
     public fun enqueueWalletPaymentOutcome(outcome: WalletPaymentOutcome) {
-        state.locked { state.enqueueOutcome(outcome) }
+        merchant.enqueueWalletPaymentOutcome(outcome)
     }
 
     /**
-     * Saves a card into [walletId] directly, as if a card-saving payment had happened earlier, and
-     * returns its token. Saving the same [maskedPan] into the same wallet again returns the same token.
+     * Saves a Visa card into the default merchant's [walletId] directly and returns its token. Saving
+     * the same [maskedPan] into the same wallet again returns the same token.
      */
     @JvmOverloads
     public fun addCard(
         walletId: String,
         maskedPan: String = CustomerPayment.DEFAULT_MASKED_PAN,
-    ): String {
-        require(walletId.isNotBlank()) { "walletId must not be blank" }
-        return state.locked { state.addCard(walletId, maskedPan, "804").cardToken }
-    }
+    ): String = merchant.addCard(walletId, maskedPan)
 
-    /** Sets how later refunds complete. */
+    /** Sets how later refunds complete, for every merchant. */
     public fun setRefundSettlement(settlement: RefundSettlement) {
-        state.settings.refundSettlement = settlement
+        bank.settings.refundSettlement = settlement
     }
 
-    /** Moves [clock] forward; holds and invoices that are due expire on the next request or control call. */
+    /**
+     * Moves [clock] forward and applies what became due: unpaid invoices expire, holds lapse (with a
+     * webhook). The application under test keeps its own clock, so a statement window it computes from
+     * real time may no longer cover the fake's dates.
+     */
     public fun advanceClock(duration: Duration) {
         clock.advance(duration)
+        applyDueChanges()
     }
 
-    /** Rotates the webhook key (see [MonobankWebhookSigner.rotate]); returns the new public key. */
-    public fun rotateKey(): String = signer.rotate()
+    /** Applies expirations and hold lapses that are due by [clock], e.g. after moving a shared [TestClock]. */
+    public fun applyDueChanges() {
+        bank.locked { }
+    }
 
-    /** A snapshot of [invoiceId], or `null` when the fake has no such invoice. */
-    public fun invoice(invoiceId: String): FakeInvoice? =
-        state.locked { state.all().firstOrNull { it.invoiceId == invoiceId }?.snapshot() }
+    /** Rotates the default merchant's webhook key; returns the new public key. */
+    public fun rotateKey(): String = merchant.rotateKey()
 
-    /** Snapshots of every invoice, oldest first (including those created by `wallet/payment`). */
-    public fun invoices(): List<FakeInvoice> = state.locked { state.all().map { it.snapshot() } }
+    /** A snapshot of [invoiceId] (of any merchant), or `null` when the fake has no such invoice. */
+    public fun invoice(invoiceId: String): FakeInvoice? = merchantList.firstNotNullOfOrNull { it.invoice(invoiceId) }
+
+    /** Snapshots of every invoice of every merchant, oldest first per merchant. */
+    public fun invoices(): List<FakeInvoice> = merchantList.flatMap { it.invoices() }
+
+    private fun owner(invoiceId: String): FakeMerchant {
+        val state = bank.locked { bank.owner(invoiceId) }
+        return merchantList.first { it.state === state }
+    }
 
     // ---- Faults ----
 
@@ -349,16 +476,35 @@ public class FakeMonobankAcquiring private constructor(
 
     /**
      * Applies [fault] to the next [times] requests on [path] (a [MonobankPaths] constant, or
-     * [MonobankPaths.ANY] for every path). Faults queued for one path apply in order.
+     * [MonobankPaths.ANY] for every path). Faults queued for one path apply in order; path-specific
+     * faults take precedence over [MonobankPaths.ANY].
+     *
+     * @throws IllegalArgumentException for a path that is not a served route (or contains a query).
      */
     public fun injectFault(
         path: String,
         fault: Fault,
         times: Int,
     ) {
+        injectFault(path, fault, times) { true }
+    }
+
+    /**
+     * Applies [fault] to the next [times] requests on [path] that match [request], e.g. the one
+     * whose body carries your reference: `{ it.body.contains("\"order-42\"") }`. Lets tests that
+     * share a fake inject faults without catching each other's requests.
+     */
+    public fun injectFault(
+        path: String,
+        fault: Fault,
+        times: Int,
+        request: Predicate<FakeRequest>,
+    ) {
         require(times > 0) { "times must be positive" }
-        require(path == MonobankPaths.ANY || path.startsWith("/")) { "path must start with '/' or be '*'" }
-        server.faults.add(path, fault, times)
+        require(path == MonobankPaths.ANY || path in MonobankPaths.ROUTES) {
+            "path must be one of MonobankPaths (without a query), or MonobankPaths.ANY"
+        }
+        server.faults.add(path, fault, times, request)
     }
 
     /** Answers the next request on [path] with [status] and the JSON [body], without performing it. */
@@ -385,43 +531,120 @@ public class FakeMonobankAcquiring private constructor(
 
     // ---- Webhooks ----
 
-    /** Switches between automatic and manual webhook delivery. Switching to automatic sends what is queued. */
+    /**
+     * Switches between automatic and manual webhook delivery. Switching to manual also holds back
+     * webhooks already waiting for their delay; switching to automatic sends what is queued.
+     */
     public fun setWebhookDelivery(delivery: WebhookDelivery) {
         webhooks.setMode(delivery)
     }
 
-    /** Waits [delay] before each automatic webhook delivery. */
+    /** Waits [delay] before each later automatic webhook delivery. */
     public fun setWebhookDelay(delay: Duration) {
         require(!delay.isNegative) { "delay must not be negative" }
         webhooks.setDelay(delay)
     }
 
     /** Sends every queued webhook now, in order, on the calling thread; returns what was recorded. */
-    public fun deliverWebhooksNow(): List<RecordedWebhook> = webhooks.deliverAll(reversed = false)
+    public fun deliverWebhooksNow(): List<RecordedWebhook> = webhooks.deliverPending(false) { true }
 
     /** Sends every queued webhook now, newest first (out of order, as monobank may); returns what was recorded. */
-    public fun deliverWebhooksInReverseOrder(): List<RecordedWebhook> = webhooks.deliverAll(reversed = true)
+    public fun deliverWebhooksInReverseOrder(): List<RecordedWebhook> = webhooks.deliverPending(true) { true }
 
-    /** Webhooks waiting to be sent (manual delivery or a delay). */
-    public fun pendingWebhookCount(): Int = webhooks.pendingCount()
+    /** Sends the queued webhooks matching [filter] now, in order, on the calling thread; the rest stay queued. */
+    public fun deliverPendingWebhooks(filter: Predicate<PendingWebhook>): List<RecordedWebhook> =
+        webhooks.deliverPending(false, filter)
+
+    /**
+     * Drops the queued webhooks matching [filter] (recorded as [WebhookOutcome.DROPPED], never sent),
+     * e.g. the card webhook: `{ it.kind == WebhookKind.CARD }`.
+     */
+    public fun dropPendingWebhooks(filter: Predicate<PendingWebhook>): List<RecordedWebhook> =
+        webhooks.dropPending(filter)
+
+    /** Webhooks waiting to be sent (manual delivery or a delay), oldest first. */
+    public fun pendingWebhooks(): List<PendingWebhook> = webhooks.pending()
+
+    /** How many webhooks wait to be sent. */
+    public fun pendingWebhookCount(): Int = webhooks.pending().size
 
     /** The next [count] webhooks are lost: recorded as [WebhookOutcome.DROPPED] and never sent. */
     public fun dropNextWebhooks(count: Int) {
-        require(count > 0) { "count must be positive" }
-        webhooks.dropNext(count)
+        dropNextWebhooks(count) { true }
+    }
+
+    /**
+     * The next [count] webhooks matching [filter] are lost, e.g. a lost card webhook:
+     * `dropNextWebhooks(1) { it.kind == WebhookKind.CARD }`. Works with automatic delivery.
+     */
+    public fun dropNextWebhooks(
+        count: Int,
+        filter: Predicate<PendingWebhook>,
+    ) {
+        addRule(RuleAction.DROP, count, filter)
     }
 
     /** The next [count] webhooks are each sent twice with the same body. */
     public fun duplicateNextWebhooks(count: Int) {
-        require(count > 0) { "count must be positive" }
-        webhooks.duplicateNext(count)
+        duplicateNextWebhooks(count) { true }
+    }
+
+    /** The next [count] webhooks matching [filter] are each sent twice with the same body. */
+    public fun duplicateNextWebhooks(
+        count: Int,
+        filter: Predicate<PendingWebhook>,
+    ) {
+        addRule(RuleAction.DUPLICATE, count, filter)
     }
 
     /** The next [count] webhooks carry an `X-Sign` made with a different key, so verification fails. */
     public fun corruptNextWebhookSignatures(count: Int) {
-        require(count > 0) { "count must be positive" }
-        webhooks.corruptNext(count)
+        corruptNextWebhookSignatures(count) { true }
     }
+
+    /** The next [count] webhooks matching [filter] carry an `X-Sign` made with a different key. */
+    public fun corruptNextWebhookSignatures(
+        count: Int,
+        filter: Predicate<PendingWebhook>,
+    ) {
+        addRule(RuleAction.CORRUPT, count, filter)
+    }
+
+    private fun addRule(
+        action: RuleAction,
+        count: Int,
+        filter: Predicate<PendingWebhook>,
+    ) {
+        require(count > 0) { "count must be positive" }
+        webhooks.addRule(action, count, filter)
+    }
+
+    /**
+     * Sends a recorded webhook again now, on the calling thread: the same body bytes, signed with its
+     * merchant's current key (so a valid signature even when the original was corrupted), with
+     * retries. For "the receiver was down, then the webhook came again".
+     */
+    public fun redeliver(webhook: RecordedWebhook): RecordedWebhook = webhooks.redeliver(webhook.event)
+
+    /**
+     * POSTs [body] to [url] now, on the calling thread, signed with the default merchant's key (use
+     * [FakeMerchant.sendSignedWebhook] for another merchant). For hand-built cases: an unknown
+     * reference, a mismatched `invoiceId`, an amount that does not match, an unknown status.
+     */
+    public fun sendSignedWebhook(
+        url: String,
+        body: String,
+    ): RecordedWebhook = merchant.sendSignedWebhook(url, body)
+
+    /**
+     * POSTs [body] to [url] now with [xSign] exactly as given (`null`: no `X-Sign` header), e.g. a
+     * missing header or a signature that is not base64.
+     */
+    public fun sendWebhook(
+        url: String,
+        body: String,
+        xSign: String?,
+    ): RecordedWebhook = webhooks.sendRaw(merchant.customEvent(url, body), xSign)
 
     /** Every webhook sent, failed or dropped so far, in the order they finished. */
     public fun sentWebhooks(): List<RecordedWebhook> = webhooks.recorded()
@@ -429,15 +652,40 @@ public class FakeMonobankAcquiring private constructor(
     /**
      * Waits until at least [count] webhooks are recorded (sent, failed or dropped) and returns all of them.
      *
-     * @throws IllegalStateException when fewer arrive within [timeout].
+     * @throws IllegalStateException when fewer arrive within [timeout], or the thread is interrupted
+     *   (the interrupt flag is kept).
      */
     public fun awaitWebhooks(
         count: Int,
         timeout: Duration,
-    ): List<RecordedWebhook> = webhooks.await(count, timeout)
+    ): List<RecordedWebhook> = webhooks.await(count, timeout) { true }
+
+    /**
+     * Waits until at least [count] webhooks about [invoiceId] are recorded and returns them. Safe in a
+     * fake shared between tests.
+     *
+     * @throws IllegalStateException when fewer arrive within [timeout], or the thread is interrupted.
+     */
+    public fun awaitWebhooks(
+        invoiceId: String,
+        count: Int,
+        timeout: Duration,
+    ): List<RecordedWebhook> = webhooks.await(count, timeout) { it.invoiceId == invoiceId }
+
+    /**
+     * Waits until at least [count] recorded webhooks match [filter] and returns them.
+     *
+     * @throws IllegalStateException when fewer arrive within [timeout], or the thread is interrupted.
+     */
+    public fun awaitWebhooks(
+        count: Int,
+        timeout: Duration,
+        filter: Predicate<RecordedWebhook>,
+    ): List<RecordedWebhook> = webhooks.await(count, timeout, filter)
 
     override fun toString(): String =
-        "FakeMonobankAcquiring(baseUrl=${if (boundPort >= 0) baseUrl else "not started"}, closed=$closed)"
+        "FakeMonobankAcquiring(baseUrl=${if (boundPort >= 0) baseUrl else "not started"}, " +
+            "merchants=${merchantList.size}, paused=$paused, closed=$closed)"
 
     /** Settings for [FakeMonobankAcquiring]. */
     public class Builder internal constructor() {
@@ -445,9 +693,13 @@ public class FakeMonobankAcquiring private constructor(
         internal var signer: MonobankWebhookSigner? = null
         internal var clock: TestClock = TestClock.system()
         internal var port: Int = 0
+        internal var bindAddress: InetAddress = InetAddress.getByName("127.0.0.1")
+        internal var advertisedHost: String? = null
+        internal var seed: Long? = null
         internal var merchantId: String = "12o4Vv7EWy"
         internal var merchantName: String = "Fake Merchant"
         internal var edrpou: String = "4242424242"
+        internal val extraMerchants: MutableList<MerchantSetup> = mutableListOf()
         internal var webhookDelivery: WebhookDelivery = WebhookDelivery.AUTOMATIC
         internal var webhookDelay: Duration = Duration.ZERO
         internal var webhookMaxAttempts: Int = 3
@@ -459,15 +711,34 @@ public class FakeMonobankAcquiring private constructor(
         internal var feePercent: BigDecimal = BigDecimal("1.3")
         internal var hangLimit: Duration = Duration.ofMinutes(2)
 
-        /** Accepted `X-Token` values (default [DEFAULT_TOKEN]); the first is [FakeMonobankAcquiring.token]. */
+        /**
+         * Accepted `X-Token` values of the default merchant (default [DEFAULT_TOKEN]); they are aliases
+         * of one merchant, and the first is [FakeMonobankAcquiring.token]. For separate merchants, use [addMerchant].
+         */
         public fun tokens(vararg tokens: String): Builder =
             apply {
                 require(tokens.isNotEmpty() && tokens.all { it.isNotBlank() }) { "tokens must not be empty or blank" }
                 this.tokens = tokens.toList()
             }
 
-        /** The webhook signer, e.g. one with a fixed key (default: a newly generated key). */
+        /** The default merchant's webhook signer, e.g. one with a fixed key (default: a newly generated key). */
         public fun signer(signer: MonobankWebhookSigner): Builder = apply { this.signer = signer }
+
+        /** What `GET /api/merchant/details` returns for the default merchant. */
+        public fun merchant(
+            merchantId: String,
+            merchantName: String,
+            edrpou: String,
+        ): Builder =
+            apply {
+                require(merchantId.isNotBlank()) { "merchantId must not be blank" }
+                this.merchantId = merchantId
+                this.merchantName = merchantName
+                this.edrpou = edrpou
+            }
+
+        /** Adds another merchant with its own tokens, key, invoices and wallets. */
+        public fun addMerchant(setup: MerchantSetup): Builder = apply { extraMerchants.add(setup) }
 
         /** The clock (default [TestClock.system]). */
         public fun clock(clock: TestClock): Builder = apply { this.clock = clock }
@@ -479,17 +750,27 @@ public class FakeMonobankAcquiring private constructor(
                 this.port = port
             }
 
-        /** What `GET /api/merchant/details` returns. */
-        public fun merchant(
-            merchantId: String,
-            merchantName: String,
-            edrpou: String,
-        ): Builder =
+        /**
+         * The address to listen on (default 127.0.0.1). Anything but a loopback address makes the fake,
+         * which accepts payments with a known token, reachable from other machines: use it only on test
+         * machines, e.g. for docker-compose networks.
+         */
+        public fun bindAddress(address: InetAddress): Builder = apply { bindAddress = address }
+
+        /**
+         * The host the fake puts into the URLs it returns ([baseUrl], `pageUrl`, `tdsUrl`), e.g.
+         * `host.testcontainers.internal`. Default: the bind address.
+         */
+        public fun advertisedHost(host: String?): Builder =
             apply {
-                this.merchantId = merchantId
-                this.merchantName = merchantName
-                this.edrpou = edrpou
+                require(host == null || (host.isNotBlank() && host.none { it == '/' || it.isWhitespace() })) {
+                    "advertisedHost must be a host name"
+                }
+                advertisedHost = host
             }
+
+        /** Seeds the generator of invoice ids, card tokens and codes, for reproducible ids (default: random). */
+        public fun seed(seed: Long): Builder = apply { this.seed = seed }
 
         /** Automatic (default) or manual webhook delivery. */
         public fun webhookDelivery(delivery: WebhookDelivery): Builder = apply { webhookDelivery = delivery }
@@ -503,7 +784,7 @@ public class FakeMonobankAcquiring private constructor(
 
         /**
          * Webhook attempts (default 3, as monobank documents: it retries until the receiver answers
-         * 200) and the pause between them (default 200 ms).
+         * 200) and the pause between them (default 200 ms; monobank's spacing is not documented).
          */
         public fun webhookRetries(
             maxAttempts: Int,
@@ -523,7 +804,7 @@ public class FakeMonobankAcquiring private constructor(
                 webhookTimeout = timeout
             }
 
-        /** How refunds complete (default [RefundSettlement.AUTOMATIC]). */
+        /** How refunds complete and what `invoice/cancel` answers (default [RefundSettlement.AUTOMATIC]). */
         public fun refundSettlement(settlement: RefundSettlement): Builder = apply { refundSettlement = settlement }
 
         /** Whether a `processing` webhook precedes the final one (default `true`). */
@@ -542,7 +823,7 @@ public class FakeMonobankAcquiring private constructor(
                 feePercent = percent
             }
 
-        /** How long a [Fault.timeout] holds a request at most before closing it (default 2 minutes). */
+        /** How long a [Fault.timeout] (or [Fault.answerAfterWebhooks]) holds a request at most (default 2 minutes). */
         public fun hangLimit(limit: Duration): Builder =
             apply {
                 require(!limit.isNegative) { "hangLimit must not be negative" }
@@ -560,5 +841,8 @@ public class FakeMonobankAcquiring private constructor(
         /** Starts configuring a fake. */
         @JvmStatic
         public fun builder(): Builder = Builder()
+
+        private fun literal(address: InetAddress): String =
+            if (address is Inet6Address) "[${address.hostAddress.substringBefore('%')}]" else address.hostAddress
     }
 }
