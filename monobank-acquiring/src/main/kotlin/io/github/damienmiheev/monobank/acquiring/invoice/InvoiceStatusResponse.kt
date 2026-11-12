@@ -40,6 +40,8 @@ import java.time.OffsetDateTime
  * @property paymentInfo Card and transaction details.
  * @property walletData Saved card (when the invoice was created with card saving).
  * @property tipsInfo Tips details (legacy; only some merchants).
+ * @property payMethod How it was paid, e.g. `wallet` for a saved card. Sent by monobank but not in
+ *   its schema (seen live); prefer [PaymentInfo.paymentMethod].
  */
 @ConsistentCopyVisibility
 public data class InvoiceStatusResponse
@@ -60,6 +62,7 @@ public data class InvoiceStatusResponse
         @param:JsonProperty("paymentInfo") public val paymentInfo: PaymentInfo?,
         @param:JsonProperty("walletData") public val walletData: WalletData?,
         @param:JsonProperty("tipsInfo") public val tipsInfo: TipsInfo?,
+        @param:JsonProperty("payMethod") public val payMethod: String?,
     ) {
         /** Typed status; [InvoiceStatus.UNKNOWN] for a value this SDK version does not know (see [statusRaw]). */
         public val status: InvoiceStatus

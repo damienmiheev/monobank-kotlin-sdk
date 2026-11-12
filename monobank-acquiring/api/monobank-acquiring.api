@@ -759,6 +759,7 @@ public final class io/github/damienmiheev/monobank/acquiring/invoice/InvoiceStat
 	public final fun component13 ()Lio/github/damienmiheev/monobank/acquiring/invoice/PaymentInfo;
 	public final fun component14 ()Lio/github/damienmiheev/monobank/acquiring/invoice/WalletData;
 	public final fun component15 ()Lio/github/damienmiheev/monobank/acquiring/invoice/TipsInfo;
+	public final fun component16 ()Ljava/lang/String;
 	public final fun component2 ()Ljava/lang/String;
 	public final fun component3 ()J
 	public final fun component4 ()I
@@ -778,6 +779,7 @@ public final class io/github/damienmiheev/monobank/acquiring/invoice/InvoiceStat
 	public final fun getFinalAmount ()Ljava/lang/Long;
 	public final fun getInvoiceId ()Ljava/lang/String;
 	public final fun getModifiedDate ()Ljava/time/OffsetDateTime;
+	public final fun getPayMethod ()Ljava/lang/String;
 	public final fun getPaymentInfo ()Lio/github/damienmiheev/monobank/acquiring/invoice/PaymentInfo;
 	public final fun getReference ()Ljava/lang/String;
 	public final fun getStatus ()Lio/github/damienmiheev/monobank/acquiring/common/InvoiceStatus;

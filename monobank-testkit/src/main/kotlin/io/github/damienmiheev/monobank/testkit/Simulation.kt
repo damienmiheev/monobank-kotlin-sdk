@@ -145,8 +145,8 @@ public class WalletPaymentOutcome private constructor(
 
     public companion object {
         /**
-         * The charge succeeds at once. The answer says `success`, also for a hold; `invoice/status`
-         * then says `success` (`hold` for a hold).
+         * The charge succeeds at once: the answer says `success` and `invoice/status` says `success`.
+         * For a hold the answer says `processing` (verified live) and `invoice/status` says `hold`.
          */
         @JvmStatic
         public fun success(): WalletPaymentOutcome = WalletPaymentOutcome(Kind.SUCCESS, null, null)

@@ -72,7 +72,8 @@ class SpecConformanceTest {
         val objects = mutableSetOf<String>()
         flatten(node, "", emitted, objects)
         for ((name, value) in emitted) {
-            val field = fields[name]
+            // Fields monobank sends although the spec does not list them (seen live).
+            val field = fields[name] ?: KNOWN_EXTRAS["$route $name"]
             assertThat(field).describedAs("$route emits '$name', which the spec does not have").isNotNull()
             if (field!!.enum.isNotEmpty()) {
                 assertThat(value.asText()).describedAs("$route $name").isIn(field.enum)
@@ -155,7 +156,9 @@ class SpecConformanceTest {
         val cardToken = fake.invoice(invoiceId)!!.cardToken!!
         call("GET", "${MonobankPaths.WALLET}?walletId=w-1")
         val walletPayment = """{"cardToken":"$cardToken","amount":100,"ccy":980,"initiationKind":"merchant"}"""
-        call("POST", MonobankPaths.WALLET_PAYMENT, walletPayment)
+        val walletInvoice = call("POST", MonobankPaths.WALLET_PAYMENT, walletPayment).path("invoiceId").asText()
+        val walletStatus = call("GET", "${MonobankPaths.INVOICE_STATUS}?invoiceId=$walletInvoice")
+        assertThat(walletStatus.path("payMethod").asText()).isEqualTo("wallet")
         fake.enqueueWalletPaymentOutcome(WalletPaymentOutcome.threeDs())
         call("POST", MonobankPaths.WALLET_PAYMENT, walletPayment)
         fake.enqueueWalletPaymentOutcome(WalletPaymentOutcome.declined())
@@ -173,5 +176,11 @@ class SpecConformanceTest {
         // webhook bodies have the invoice/status shape
         val webhooks = fake.awaitWebhooks(invoiceId, 4, Duration.ofSeconds(5))
         webhooks.forEach { conforms("GET ${MonobankPaths.INVOICE_STATUS}", json.readTree(it.body)) }
+    }
+
+    private companion object {
+        /** `payMethod` is sent with a saved-card payment's status (verified live), not in the spec. */
+        val KNOWN_EXTRAS: Map<String, SpecField> =
+            mapOf("GET ${MonobankPaths.INVOICE_STATUS} payMethod" to SpecField(false, "string", setOf("wallet")))
     }
 }

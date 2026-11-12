@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode
 import java.math.BigDecimal
 import java.nio.charset.StandardCharsets
 import java.time.Instant
+import java.time.ZoneId
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
@@ -53,9 +54,23 @@ internal object FakeJson {
         return node as? ObjectNode ?: throw ApiError.badRequest("invalid request body")
     }
 
-    /** RFC 3339 in UTC with millisecond precision, e.g. `2024-05-01T09:30:00.123Z`. */
+    /**
+     * Dates of `invoice/status`, webhooks and the statement: whole seconds in UTC, e.g.
+     * `2026-11-12T17:04:33Z` (as monobank sends them, seen live).
+     */
     fun date(instant: Instant): String =
-        DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(instant.truncatedTo(ChronoUnit.MILLIS).atOffset(ZoneOffset.UTC))
+        DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(instant.truncatedTo(ChronoUnit.SECONDS).atOffset(ZoneOffset.UTC))
+
+    /**
+     * Dates of payment answers (`wallet/payment`, `invoice/cancel`): microseconds in Kyiv time, e.g.
+     * `2026-11-12T19:04:33.525289+02:00` (seen live on `wallet/payment`).
+     */
+    fun preciseDate(instant: Instant): String =
+        DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(
+            instant.truncatedTo(ChronoUnit.MICROS).atZone(KYIV).toOffsetDateTime(),
+        )
+
+    private val KYIV: ZoneId = ZoneId.of("Europe/Kyiv")
 
     fun utf8(bytes: ByteArray): String = String(bytes, StandardCharsets.UTF_8)
 }

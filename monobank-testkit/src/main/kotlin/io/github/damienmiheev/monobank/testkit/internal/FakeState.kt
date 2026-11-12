@@ -61,8 +61,8 @@ internal class Bank(
             block()
         }
 
-    /** The fake clock's time, in whole milliseconds: the precision of the dates it reports. */
-    fun now(): Instant = settings.clock.instant().truncatedTo(ChronoUnit.MILLIS)
+    /** The fake clock's time, in microseconds: the finest precision of the dates it reports. */
+    fun now(): Instant = settings.clock.instant().truncatedTo(ChronoUnit.MICROS)
 
     fun reset() = lock.withLock { merchants.forEach { it.reset() } }
 

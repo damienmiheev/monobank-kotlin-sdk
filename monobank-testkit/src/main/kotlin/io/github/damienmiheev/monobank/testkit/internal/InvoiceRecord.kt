@@ -121,9 +121,9 @@ internal class InvoiceRecord(
     var basket: List<BasketLine> = order.basket
     val cancels: MutableList<CancelRecord> = mutableListOf()
 
-    /** Moves [modifiedAt] to [now], always strictly forward (monobank's `modifiedDate` only increases). */
+    /** Moves [modifiedAt] to [now], never backwards (equal dates happen, also at monobank). */
     fun touch(now: Instant) {
-        modifiedAt = if (now.isAfter(modifiedAt)) now else modifiedAt.plusMillis(1)
+        modifiedAt = maxOf(now, modifiedAt)
     }
 
     /** Amount that can still be refunded: paid amount minus completed and pending refunds. */
@@ -144,6 +144,8 @@ internal class InvoiceRecord(
             cancels.forEach { list.add(cancelJson(it)) }
         }
         card?.let { node.set<JsonNode>("paymentInfo", paymentInfoJson(it)) }
+        // Not in the spec, but sent live for a saved-card payment.
+        if (card?.paymentMethod == "wallet") node.put("payMethod", "wallet")
         walletDataJson()?.let { node.set<JsonNode>("walletData", it) }
         return node
     }

@@ -56,7 +56,7 @@ import java.util.function.Predicate
  *   ECDSA P-256 over the raw body, see [MonobankWebhookSigner]); the body is identical to
  *   `invoice/status`. Nothing is sent for `expired`. A card-saving invoice also gets a card webhook
  *   when `walletData.status` changes.
- * - `modifiedDate` only increases. Amounts are minor units (kopiyky). Unpaid invoices expire after
+ * - `modifiedDate` never decreases. Amounts are minor units (kopiyky). Unpaid invoices expire after
  *   `validity` (default 24 h, clamped to 30 days). Holds work only in UAH and lapse after 9 days.
  *   `finalAmount` drops with refunds. Only payments that reached `processing` appear in the statement.
  *
@@ -70,11 +70,22 @@ import java.util.function.Predicate
  *   then `success`. Meanwhile `invoice/cancel` answers 404 `1004` "order not finished". A full finalize
  *   becomes `success` at once (not observed live).
  * - Fractional item `qty` is accepted in finalize and refund `items` (0.75 × 200 = 150, 0.25 × 200 = 50).
+ * - A saved-card hold (`wallet/payment` with `paymentType` hold, no 3-D Secure) answers `processing`
+ *   without `tdsUrl`, while `invoice/status` already says `hold` (the fake moves it at once, with
+ *   `processing` and `hold` webhooks). Its status has `paymentInfo.paymentMethod` `wallet` and a
+ *   top-level `payMethod` `wallet`, which the spec does not list.
+ * - Date precision: payment answers (`wallet/payment`, and by inference `invoice/cancel`) carry
+ *   microseconds in Kyiv time (`2026-11-12T19:04:33.525289+02:00`); `invoice/status`, and by inference
+ *   webhooks and the statement, send whole seconds in UTC (`2026-11-12T17:04:33Z`). So the answer's
+ *   `modifiedDate` can look later than the newer `hold` status: compare dates to the second (the SDK's
+ *   `isOlderThan` / `isNewerThan` do). `modifiedDate` never goes backwards, but two changes within one
+ *   second carry the same date, as at monobank.
  *
  * ### Where the fake invents behaviour (monobank does not document it)
  * - `wallet/payment` holds are accepted in any currency (monobank documents no limit there);
  *   `invoice/create` holds outside UAH get 400 `1001` "hold payments are allowed only for UAH",
  *   as verified on monobank's test merchant.
+ * - A saved-card debit without 3-D Secure answers `success` at once (not observed live; holds were).
  * - A paying customer produces a `processing` webhook before the final one
  *   ([Builder.sendProcessingWebhooks] turns it off).
  * - The card webhook (`walletData` `new` → `created`/`failed`) is separate and keeps the invoice's
@@ -93,8 +104,6 @@ import java.util.function.Predicate
  *   or for more than the hold → 400 `BAD_REQUEST`.
  * - A hold lapses at exactly 9 days: `reversed`, `finalAmount` 0, with a webhook. Expirations and
  *   lapses apply on the next request or control call, or [advanceClock] / [applyDueChanges].
- * - `wallet/payment` answers `success` for a hold (its documented answer statuses lack `hold`);
- *   `invoice/status` then says `hold`.
  * - Statement: a `reversed` payment shows its last status before the reversal (`success` for a
  *   refunded payment, `hold` for a released or lapsed hold, which never shows as `success`) with its
  *   refunds in `cancelList`; `profitAmount` = amount − fee for `success` only. The fee is 1.3 %
@@ -103,7 +112,6 @@ import java.util.function.Predicate
  *   [Builder.validateBasketTotal] turns it off).
  * - Webhooks are tried 3 times, 200 ms apart, until the receiver answers 200 ([Builder.webhookRetries]).
  *   They go out one at a time, in order, on one thread: a slow receiver delays later webhooks.
- * - Dates are RFC 3339 in UTC with milliseconds.
  * - Merchants with fiscal receipts or split payments ([Builder.fiscalization], [Builder.splitPayments]):
  *   the basket rules of `invoice/create` and the partial-finalize rule are verified against monobank's
  *   test merchant; the same rules on `wallet/payment`, the partial-`invoice/cancel` rule (400 `1001` without

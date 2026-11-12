@@ -32,7 +32,6 @@ import java.net.InetSocketAddress;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
@@ -129,8 +128,9 @@ class JavaPluginFlowTest {
         assertThat(sent).allMatch(w -> w.getOutcome() == WebhookOutcome.DELIVERED);
         assertThat(verified).hasSize(3);
         assertThat(rejected).isEmpty();
+        // dates are whole seconds, so several webhooks can share one: apply each that is not older
         InvoiceStatusResponse latest = verified.stream()
-                .max(Comparator.comparing(InvoiceStatusResponse::getModifiedDate))
+                .reduce((current, incoming) -> incoming.isOlderThan(current) ? current : incoming)
                 .orElseThrow();
         assertThat(latest.getStatus()).isEqualTo(InvoiceStatus.SUCCESS);
         assertThat(latest.getReference()).isEqualTo("kb-tx-1");

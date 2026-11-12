@@ -65,7 +65,7 @@ class WebhookTest {
         assertThat(received.map { parse(it).status }).containsExactly(InvoiceStatus.PROCESSING, InvoiceStatus.SUCCESS)
         val last = parse(received.last())
         assertThat(last).isEqualTo(mono.invoices.status(invoiceId))
-        assertThat(last.isNewerThan(parse(received.first()))).isTrue()
+        assertThat(last.isOlderThan(parse(received.first()))).isFalse()
         assertThat(received.last().text).isEqualTo(fake.invoice(invoiceId)!!.statusJson)
 
         val recorded = fake.awaitWebhooks(2, Duration.ofSeconds(5))

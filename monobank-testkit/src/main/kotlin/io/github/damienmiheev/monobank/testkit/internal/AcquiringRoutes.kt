@@ -181,8 +181,8 @@ internal class AcquiringRoutes(
                 FakeJson
                     .obj()
                     .put("status", refund.status)
-                    .put("createdDate", FakeJson.date(refund.createdAt))
-                    .put("modifiedDate", FakeJson.date(refund.modifiedAt))
+                    .put("createdDate", FakeJson.preciseDate(refund.createdAt))
+                    .put("modifiedDate", FakeJson.preciseDate(refund.modifiedAt))
             if (settlement == RefundSettlement.AUTOMATIC) merchant.settle(invoice, refund, true)
             HttpResult.json(answer)
         }
@@ -238,7 +238,10 @@ internal class AcquiringRoutes(
             outcome.failureReason ?: "",
         )
 
-    /** `wallet/payment` answers `processing`, `success` or `failure`; a hold is reported as `success`. */
+    /**
+     * `wallet/payment` answers `processing`, `success` or `failure`; a hold answers `processing` (verified
+     * live) while the invoice is already `hold`. Dates carry microseconds.
+     */
     private fun paymentAnswer(
         invoice: InvoiceRecord,
         threeDs: Boolean,
@@ -247,8 +250,11 @@ internal class AcquiringRoutes(
         if (threeDs) answer.put("tdsUrl", "${baseUrl()}${HostedPages.TDS}${invoice.invoiceId}")
         val status =
             when (invoice.status) {
-                Status.SUCCESS, Status.HOLD -> Status.SUCCESS
+                // Verified live: a saved-card hold answers `processing` (no tdsUrl) and is `hold` at once.
+                Status.SUCCESS -> Status.SUCCESS
+
                 Status.FAILURE -> Status.FAILURE
+
                 else -> Status.PROCESSING
             }
         answer.put("status", status)
@@ -256,8 +262,8 @@ internal class AcquiringRoutes(
         return answer
             .put("amount", invoice.amount)
             .put("ccy", invoice.ccy)
-            .put("createdDate", FakeJson.date(invoice.createdAt))
-            .put("modifiedDate", FakeJson.date(invoice.modifiedAt))
+            .put("createdDate", FakeJson.preciseDate(invoice.createdAt))
+            .put("modifiedDate", FakeJson.preciseDate(invoice.modifiedAt))
     }
 
     private fun wallet(
@@ -295,7 +301,7 @@ internal class AcquiringRoutes(
         val to = epochQuery(call, "to")
         return bank.locked {
             // `to` is in whole seconds: include the whole last second.
-            val until = to?.plusMillis(999) ?: merchant.now()
+            val until = to?.plusSeconds(1)?.minusNanos(1) ?: merchant.now()
             val answer = FakeJson.obj()
             val list = answer.putArray("list")
             merchant

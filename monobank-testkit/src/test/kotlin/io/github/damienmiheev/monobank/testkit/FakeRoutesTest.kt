@@ -212,16 +212,19 @@ class FakeRoutesTest {
     }
 
     @Test
-    fun `modifiedDate strictly increases even when the clock stands still`() {
+    fun `modifiedDate is whole seconds and never decreases - changes within one second share it`() {
         val invoiceId = create()
         val created = mono.invoices.status(invoiceId).modifiedDate!!
         fake.startPayment(invoiceId)
         val processing = mono.invoices.status(invoiceId).modifiedDate!!
+        clock.advance(Duration.ofMillis(1500))
         fake.payInvoice(invoiceId)
         val success = mono.invoices.status(invoiceId).modifiedDate!!
 
-        assertThat(processing).isAfter(created)
+        assertThat(processing).isEqualTo(created)
         assertThat(success).isAfter(processing)
+        assertThat(success.nano).isZero()
+        assertThat(fake.invoice(invoiceId)!!.statusJson).contains("\"modifiedDate\":\"2026-11-12T10:00:01Z\"")
     }
 
     @Test
@@ -535,7 +538,8 @@ class FakeRoutesTest {
         assertThat(mono.invoices.status(tds.invoiceId).status).isEqualTo(InvoiceStatus.EXPIRED)
 
         val hold = charge(PaymentType.HOLD)
-        assertThat(hold.status).isEqualTo(OperationStatus.SUCCESS)
+        assertThat(hold.status).isEqualTo(OperationStatus.PROCESSING) // verified live
+        assertThat(hold.tdsUrl).isNull()
         assertThat(mono.invoices.status(hold.invoiceId).status).isEqualTo(InvoiceStatus.HOLD)
         assertThat(fake.invoices().filter { it.viaWallet }).hasSize(4)
     }
