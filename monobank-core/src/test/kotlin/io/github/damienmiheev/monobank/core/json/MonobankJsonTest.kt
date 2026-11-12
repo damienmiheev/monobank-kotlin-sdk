@@ -102,3 +102,20 @@ class MonobankJsonEdgeCasesTest {
             .isInstanceOf(MonobankSerializationException::class.java)
     }
 }
+
+class MonobankJsonPrimitivesTest {
+    class Money
+        @com.fasterxml.jackson.annotation.JsonCreator
+        constructor(
+            @param:com.fasterxml.jackson.annotation.JsonProperty("amount") val amount: Long,
+        )
+
+    @Test
+    fun `a missing or null amount fails instead of becoming 0`() {
+        assertThatThrownBy { MonobankJson.read("{}".toByteArray(), Money::class.java) }
+            .isInstanceOf(MonobankSerializationException::class.java)
+        assertThatThrownBy { MonobankJson.read("""{"amount":null}""".toByteArray(), Money::class.java) }
+            .isInstanceOf(MonobankSerializationException::class.java)
+        assertThat(MonobankJson.read("""{"amount":0}""".toByteArray(), Money::class.java).amount).isZero()
+    }
+}

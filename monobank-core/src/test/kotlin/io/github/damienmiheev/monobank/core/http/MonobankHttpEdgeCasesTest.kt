@@ -185,3 +185,55 @@ class MonobankHttpEdgeCasesTest {
         ).doesNotContain("super-secret-token", "tok-123", "tok-secret-456", "4444111122223333", "cardToken")
     }
 }
+
+class DefaultRetryAfterTest {
+    @Test
+    fun `a module default wait applies to 429 without Retry-After and stops pointless retries`() {
+        val server = MockWebServer()
+        server.start()
+        try {
+            server.enqueue(MockResponse().setResponseCode(429))
+            val sleeps = mutableListOf<Duration>()
+            val http =
+                MonobankHttp(
+                    options = MonobankClientOptions.builder().baseUrl(server.url("/").toString()).build(),
+                    defaultBaseUrl = "https://example.invalid",
+                    module = "test",
+                    authenticator = { emptyMap() },
+                    errorDecoder =
+                        object : ErrorDecoder {
+                            override fun decode(body: ByteArray) = ApiError(null, null)
+                        },
+                    sleeper = { sleeps += it },
+                    defaultRetryAfter = Duration.ofSeconds(60),
+                )
+            assertThatThrownBy { http.execute(ApiRequest(HttpMethod.GET, "/x", idempotent = true)) }
+                .isInstanceOfSatisfying(MonobankRateLimitException::class.java) {
+                    assertThat(it.retryAfter).isEqualTo(Duration.ofSeconds(60))
+                }
+            assertThat(server.requestCount).isEqualTo(1)
+            assertThat(sleeps).isEmpty()
+        } finally {
+            server.shutdown()
+        }
+    }
+}
+
+class HeaderSafetyTest {
+    @Test
+    fun `credentials with control characters are refused without echoing them`() {
+        assertThat(
+            io.github.damienmiheev.monobank.core.Redaction
+                .requireHeaderSafe("abc-123_XYZ", "token"),
+        ).isEqualTo("abc-123_XYZ")
+        assertThatThrownBy {
+            io.github.damienmiheev.monobank.core.Redaction
+                .requireHeaderSafe("sec\u0001ret", "token")
+        }.isInstanceOf(IllegalArgumentException::class.java)
+            .hasMessageNotContaining("sec")
+        assertThatThrownBy {
+            io.github.damienmiheev.monobank.core.Redaction
+                .requireHeaderSafe("a b", "token")
+        }.isInstanceOf(IllegalArgumentException::class.java)
+    }
+}

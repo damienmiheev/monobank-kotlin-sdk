@@ -42,6 +42,8 @@ public object MonobankJson {
             .builder()
             .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
             .enable(DeserializationFeature.READ_UNKNOWN_ENUM_VALUES_USING_DEFAULT_VALUE)
+            // A missing or null amount must fail loudly, never be read as 0.
+            .enable(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES)
             .disable(DeserializationFeature.ADJUST_DATES_TO_CONTEXT_TIME_ZONE)
             .disable(SerializationFeature.FAIL_ON_EMPTY_BEANS)
             .disable(MapperFeature.AUTO_DETECT_IS_GETTERS)

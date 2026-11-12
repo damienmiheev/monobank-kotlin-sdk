@@ -40,6 +40,11 @@ public class MonobankHttp(
     private val authenticator: RequestAuthenticator,
     private val errorDecoder: ErrorDecoder,
     private val sleeper: Sleeper = Sleeper.SYSTEM,
+    /**
+     * Wait assumed for a 429 that has no `Retry-After` header. APIs with fixed limits (the
+     * personal API allows one call per 60 s) set it, so the SDK does not retry into another 429.
+     */
+    private val defaultRetryAfter: Duration? = null,
 ) {
     private val logger = LoggerFactory.getLogger(MonobankHttp::class.java)
     private val baseUrl: String = (options.baseUrl?.toString() ?: defaultBaseUrl).trimEnd('/')
@@ -241,12 +246,14 @@ public class MonobankHttp(
     }
 
     private fun retryAfter(response: ApiResponse): Duration? {
-        val raw = response.header("Retry-After") ?: response.header("x-rate-limit-retry-after-seconds") ?: return null
+        val raw =
+            response.header("Retry-After") ?: response.header("x-rate-limit-retry-after-seconds")
+                ?: return defaultRetryAfter
         return raw
             .trim()
             .toLongOrNull()
             ?.takeIf { it >= 0 }
-            ?.let { Duration.ofSeconds(it) }
+            ?.let { Duration.ofSeconds(it) } ?: defaultRetryAfter
     }
 
     private companion object {
