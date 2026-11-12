@@ -218,7 +218,7 @@ class InvoiceOperationsTest : AcquiringTestSupport() {
         enqueueFixture("POST_api_merchant_invoice_payment_direct.response.json")
         val request =
             PaymentDirectRequest
-                .builder(4200, CardData.of("4242424242424242", "0642", "123"))
+                .builder(4200, CardData.of("4242424242424242", "0642", "123"), InitiationKind.CLIENT)
                 .ccy(980)
                 .merchantPaymInfo(MerchantPaymInfo.builder().reference("ref-1").build())
                 .webHookUrl("https://shop.example/hook")
@@ -256,7 +256,13 @@ class InvoiceOperationsTest : AcquiringTestSupport() {
 
     @Test
     fun `payment-direct never prints card data and is not retried`() {
-        val request = PaymentDirectRequest.builder(100, CardData.of("4242424242424242", "0642", "987")).build()
+        val request =
+            PaymentDirectRequest
+                .builder(
+                    100,
+                    CardData.of("4242424242424242", "0642", "987"),
+                    InitiationKind.CLIENT,
+                ).build()
         val text = request.toString()
         assertThat(text).doesNotContain("4242424242424242").doesNotContain("0642").doesNotContain("987")
         assertThat(text).contains("***4242")
@@ -273,7 +279,9 @@ class InvoiceOperationsTest : AcquiringTestSupport() {
                "createdDate":"2024-05-01T12:30:00+03:00","modifiedDate":"2024-05-01T12:30:00+03:00"}""",
         )
         val response =
-            mono.invoices.paymentDirect(PaymentDirectRequest.builder(1, CardData.of("4111", "0130", "1")).build())
+            mono.invoices.paymentDirect(
+                PaymentDirectRequest.builder(1, CardData.of("4111", "0130", "1"), InitiationKind.CLIENT).build(),
+            )
         assertThat(response.isThreeDsRequired).isTrue()
     }
 
@@ -282,7 +290,7 @@ class InvoiceOperationsTest : AcquiringTestSupport() {
         assertThatThrownBy { CardData.of("4242", "642", "1") }.isInstanceOf(IllegalArgumentException::class.java)
         assertThatThrownBy {
             PaymentDirectRequest
-                .builder(1, CardData.of("4242", "0642", "1"))
+                .builder(1, CardData.of("4242", "0642", "1"), InitiationKind.CLIENT)
                 .paymentType(PaymentType.VERIFICATION)
                 .build()
         }.isInstanceOf(IllegalArgumentException::class.java)

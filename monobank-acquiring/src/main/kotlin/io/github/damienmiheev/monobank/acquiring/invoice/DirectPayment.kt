@@ -140,12 +140,15 @@ public data class PaymentDirectRequest internal constructor(
          * Starts a request.
          *
          * @param amount Amount in minor units (kopiyky).
+         * @param initiationKind Who starts the payment. Optional in monobank's schema, but the live
+         *   API refuses a request without it (400 `1001` "invalid 'initiationKind'"), so it is required here.
          */
         @JvmStatic
         public fun builder(
             amount: Long,
             cardData: CardData,
-        ): Builder = Builder(amount, cardData)
+            initiationKind: InitiationKind,
+        ): Builder = Builder(amount, cardData).initiationKind(initiationKind)
     }
 }
 

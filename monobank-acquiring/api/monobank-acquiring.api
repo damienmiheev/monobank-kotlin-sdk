@@ -792,7 +792,7 @@ public final class io/github/damienmiheev/monobank/acquiring/invoice/InvoiceStat
 
 public final class io/github/damienmiheev/monobank/acquiring/invoice/PaymentDirectRequest {
 	public static final field Companion Lio/github/damienmiheev/monobank/acquiring/invoice/PaymentDirectRequest$Companion;
-	public static final fun builder (JLio/github/damienmiheev/monobank/acquiring/invoice/CardData;)Lio/github/damienmiheev/monobank/acquiring/invoice/PaymentDirectRequest$Builder;
+	public static final fun builder (JLio/github/damienmiheev/monobank/acquiring/invoice/CardData;Lio/github/damienmiheev/monobank/acquiring/common/InitiationKind;)Lio/github/damienmiheev/monobank/acquiring/invoice/PaymentDirectRequest$Builder;
 	public final fun component1 ()J
 	public final fun component2 ()Ljava/lang/Integer;
 	public final fun component3 ()Lio/github/damienmiheev/monobank/acquiring/invoice/CardData;
@@ -828,7 +828,7 @@ public final class io/github/damienmiheev/monobank/acquiring/invoice/PaymentDire
 }
 
 public final class io/github/damienmiheev/monobank/acquiring/invoice/PaymentDirectRequest$Companion {
-	public final fun builder (JLio/github/damienmiheev/monobank/acquiring/invoice/CardData;)Lio/github/damienmiheev/monobank/acquiring/invoice/PaymentDirectRequest$Builder;
+	public final fun builder (JLio/github/damienmiheev/monobank/acquiring/invoice/CardData;Lio/github/damienmiheev/monobank/acquiring/common/InitiationKind;)Lio/github/damienmiheev/monobank/acquiring/invoice/PaymentDirectRequest$Builder;
 }
 
 public final class io/github/damienmiheev/monobank/acquiring/invoice/PaymentInfo {

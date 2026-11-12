@@ -52,7 +52,9 @@ class SpecCoverageTest : AcquiringTestSupport() {
                 m.wallet.payment(WalletPaymentRequest.builder("t", 1, 980, InitiationKind.MERCHANT).build())
             },
             "POST /api/merchant/invoice/payment-direct" to { m ->
-                m.invoices.paymentDirect(PaymentDirectRequest.builder(1, CardData.of("4242", "0642", "1")).build())
+                m.invoices.paymentDirect(
+                    PaymentDirectRequest.builder(1, CardData.of("4242", "0642", "1"), InitiationKind.CLIENT).build(),
+                )
             },
             "GET /api/merchant/submerchant/list" to { m -> m.merchant.submerchants() },
             "GET /api/merchant/invoice/receipt" to { m -> m.invoices.receipt("i") },

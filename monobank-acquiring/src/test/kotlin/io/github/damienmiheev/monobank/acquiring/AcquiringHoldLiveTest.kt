@@ -2,6 +2,7 @@ package io.github.damienmiheev.monobank.acquiring
 
 import io.github.damienmiheev.monobank.acquiring.common.BasketItem
 import io.github.damienmiheev.monobank.acquiring.common.FiscalizationItem
+import io.github.damienmiheev.monobank.acquiring.common.InitiationKind
 import io.github.damienmiheev.monobank.acquiring.common.InvoiceStatus
 import io.github.damienmiheev.monobank.acquiring.common.MerchantPaymInfo
 import io.github.damienmiheev.monobank.acquiring.common.PaymentType
@@ -59,7 +60,7 @@ class AcquiringHoldLiveTest {
             step("payment-direct hold 2.00 UAH") {
                 mono.invoices.paymentDirect(
                     PaymentDirectRequest
-                        .builder(200, CardData.of("4242424242424242", "1230", "123"))
+                        .builder(200, CardData.of("4242424242424242", "1230", "123"), InitiationKind.CLIENT)
                         .ccy(CurrencyCodes.UAH)
                         .paymentType(PaymentType.HOLD)
                         .merchantPaymInfo(
