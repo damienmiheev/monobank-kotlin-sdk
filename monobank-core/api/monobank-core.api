@@ -139,7 +139,3 @@ public final class io/github/damienmiheev/monobank/core/SdkInfo {
 	public static final fun getVersion ()Ljava/lang/String;
 }
 
-public final class io/github/damienmiheev/monobank/core/http/MonobankHttp$Sleeper$Companion {
-	public final fun getSYSTEM ()Lio/github/damienmiheev/monobank/core/http/MonobankHttp$Sleeper;
-}
-

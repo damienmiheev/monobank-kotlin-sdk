@@ -67,6 +67,7 @@ public class MonobankHttp(
         /** Sleeps for [duration]. */
         public fun sleep(duration: Duration)
 
+        @InternalMonobankApi
         public companion object {
             /** Uses [Thread.sleep]. */
             public val SYSTEM: Sleeper = Sleeper { Thread.sleep(it.toMillis()) }
