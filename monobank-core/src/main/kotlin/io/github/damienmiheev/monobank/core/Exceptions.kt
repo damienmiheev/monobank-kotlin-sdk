@@ -24,7 +24,7 @@ public sealed class MonobankException(
  * @property responseBody Raw response body. It never contains card data, but may contain
  *   personal data from your own request; do not log it blindly.
  * @property traceId monobank's request trace id from the response headers (`trace-id`,
- *   `X-Request-Id`), when sent. Quote it to monobank support.
+ *   `request_trace_id`), when sent. Quote it to monobank support.
  */
 public sealed class MonobankApiException(
     public val statusCode: Int,

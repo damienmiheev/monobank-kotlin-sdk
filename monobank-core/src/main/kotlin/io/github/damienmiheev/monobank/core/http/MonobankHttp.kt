@@ -241,7 +241,7 @@ public class MonobankHttp(
                 }
             }
         exception.traceId =
-            listOf("trace-id", "x-trace-id", "X-Request-Id", "request_trace_id").firstNotNullOfOrNull(response::header)
+            listOf("trace-id", "x-trace-id", "request_trace_id").firstNotNullOfOrNull(response::header)
         return exception
     }
 
