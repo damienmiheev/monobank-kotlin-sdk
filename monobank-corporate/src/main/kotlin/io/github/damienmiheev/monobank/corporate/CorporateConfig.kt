@@ -2,6 +2,7 @@ package io.github.damienmiheev.monobank.corporate
 
 import io.github.damienmiheev.monobank.core.ExperimentalMonobankApi
 import io.github.damienmiheev.monobank.core.MonobankClientOptions
+import io.github.damienmiheev.monobank.core.Redaction
 import java.time.Clock
 
 /**
@@ -12,7 +13,7 @@ import java.time.Clock
  *
  * The signing switches ([signatureEncoding], [signQueryString]) exist because monobank's docs
  * leave these details open and the SDK's choice has not been confirmed live yet. Keep the
- * defaults unless monobank answers HTTP 403 to correctly registered keys.
+ * defaults unless monobank answers HTTP 401 or 403 to a correctly registered and approved key.
  *
  * **Experimental:** the corporate API's request signing has not been confirmed against the
  * live monobank service yet; this API may change in a minor release.
@@ -56,7 +57,7 @@ public class CorporateConfig private constructor(
          */
         public fun keyId(keyId: String?): Builder =
             apply {
-                if (keyId != null) requireHeaderValue(keyId, "keyId")
+                if (keyId != null) Redaction.requireHeaderSafe(keyId, "keyId")
                 this.keyId = keyId
             }
 
@@ -64,10 +65,17 @@ public class CorporateConfig private constructor(
         public fun signatureEncoding(encoding: SignatureEncoding): Builder = apply { signatureEncoding = encoding }
 
         /**
-         * Whether the URL that is signed includes the query string, e.g.
-         * `/personal/signature/status?requestId=...` instead of `/personal/signature/status`.
-         * The docs only say "URL", and community clients sign the path alone, which is the
-         * default (`false`). Affects only `signature/status` and `signature/cancel`.
+         * Whether the signed URL includes the query string: `/personal/signature/status?requestId=...`
+         * instead of `/personal/signature/status`. Affects only `signature/status` and
+         * `signature/cancel`, the only calls with a query string.
+         *
+         * Unconfirmed either way. The docs describe `X-Sign` as "Sign (X-Time | URL)" for every
+         * call, never define URL and show no signed example; these are the only documented calls
+         * with a query string. (Their path keys in the spec contain the query, but monobank's
+         * acquiring spec writes query strings into path keys too.) The one open-source client
+         * found that implements these calls signs the path alone; that is the default (`false`).
+         * If `signatures.status` or `signatures.cancel` get HTTP 401/403 while other calls work,
+         * set this to `true`.
          */
         public fun signQueryString(sign: Boolean): Builder = apply { signQueryString = sign }
 
@@ -80,7 +88,7 @@ public class CorporateConfig private constructor(
         /** Builds the config. */
         public fun build(): CorporateConfig {
             val effectiveKeyId = keyId ?: signer.keyId
-            requireHeaderValue(effectiveKeyId, "keyId")
+            Redaction.requireHeaderSafe(effectiveKeyId, "keyId")
             return CorporateConfig(signer, effectiveKeyId, signatureEncoding, signQueryString, clock, options)
         }
     }
@@ -98,13 +106,5 @@ public class CorporateConfig private constructor(
         /** Starts a config for a [CorporateKey] or your own [CorporateSigner] (for example a KMS key). */
         @JvmStatic
         public fun builder(signer: CorporateSigner): Builder = Builder(signer)
-
-        internal fun requireHeaderValue(
-            value: String,
-            name: String,
-        ) {
-            require(value.isNotBlank()) { "$name must not be blank" }
-            require(value.none { it == '\r' || it == '\n' }) { "$name must be one line" }
-        }
     }
 }

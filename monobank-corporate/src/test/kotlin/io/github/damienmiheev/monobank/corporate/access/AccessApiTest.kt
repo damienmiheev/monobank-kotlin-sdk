@@ -92,4 +92,29 @@ class AccessApiTest : CorporateTestSupport() {
         assertThat(server.requestCount).isEqualTo(2)
         assertThatThrownBy { mono.access.status("") }.isInstanceOf(IllegalArgumentException::class.java)
     }
+
+    @Test
+    fun `a 401 that is not 'unauthorized yet' is thrown, not reported as pending`() {
+        enqueueJson("""{"errorDescription":"Invalid signature"}""", status = 401)
+        enqueueJson("", status = 401)
+        enqueueJson("""{"errorDescription":"request is UNAUTHORIZED YET"}""", status = 401)
+
+        assertThatThrownBy { mono.access.status("r1") }
+            .isInstanceOfSatisfying(MonobankAuthException::class.java) {
+                assertThat(it.statusCode).isEqualTo(401)
+                assertThat(it.errorText).isEqualTo("Invalid signature")
+                assertThat(it.responseBody).contains("Invalid signature")
+                assertThat(it.outcome).isEqualTo(RequestOutcome.REJECTED)
+            }
+        assertThatThrownBy { mono.access.status("r1") }
+            .isInstanceOfSatisfying(MonobankAuthException::class.java) { assertThat(it.errorText).isNull() }
+        assertThat(mono.access.status("r1")).isEqualTo(AccessRequestStatus.PENDING)
+        assertThat(server.requestCount).isEqualTo(3)
+    }
+
+    @Test
+    fun `status enum keeps room for future states`() {
+        assertThat(AccessRequestStatus.values().map { it.name })
+            .containsExactly("APPROVED", "PENDING", "NOT_FOUND", "UNKNOWN")
+    }
 }

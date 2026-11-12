@@ -40,7 +40,7 @@ class JavaInteropTest {
         String pem = resource("/keys/test-sec1.pem");
         CorporateKey key = CorporateKey.fromPem(pem);
         assertThat(key.getKeyId()).isEqualTo("9cfcc2eee16244c5d22082930e9a00e9d2ce441e");
-        assertThat(key.getPublicKeyPemBase64()).startsWith("LS0tLS1CRUdJTiBQVUJMSUMgS0VZ");
+        assertThat(key.getPublicKey().getPublicKeyPemBase64()).startsWith("LS0tLS1CRUdJTiBQVUJMSUMgS0VZ");
         assertThat(key.sign(new byte[] {1, 2, 3})).hasSize(64);
 
         try (MockWebServer server = new MockWebServer()) {
@@ -66,7 +66,7 @@ class JavaInteropTest {
 
             server.enqueue(new MockResponse().setBody("[]"));
             ClientApi client = mono.client("req-1");
-            assertThat(client.statement(ClientApi.DEFAULT_ACCOUNT, Instant.ofEpochSecond(1))).isEmpty();
+            assertThat(client.statement(ClientApi.DEFAULT_ACCOUNT, Instant.now().minusSeconds(3600))).isEmpty();
 
             server.enqueue(new MockResponse().setResponseCode(403).setBody("{\"errorDescription\":\"Forbidden\"}"));
             try {
@@ -77,7 +77,7 @@ class JavaInteropTest {
         }
 
         RegistrationRequest registration = RegistrationRequest.builder()
-                .pubkey(key)
+                .pubkey(key.getPublicKey())
                 .name("Company")
                 .description("PFM")
                 .contactPerson("Roman")
@@ -85,7 +85,7 @@ class JavaInteropTest {
                 .email("a@example.com")
                 .logo(new byte[] {1})
                 .build();
-        assertThat(registration.getPubkey()).isEqualTo(key.getPublicKeyPemBase64());
+        assertThat(registration.getPubkey()).isEqualTo(key.getPublicKey().getPublicKeyPemBase64());
 
         CreateSignatureRequest signature = CreateSignatureRequest.builder(Collections.singletonList(
                         SignDocument.builder("Agreement", "a421fd")

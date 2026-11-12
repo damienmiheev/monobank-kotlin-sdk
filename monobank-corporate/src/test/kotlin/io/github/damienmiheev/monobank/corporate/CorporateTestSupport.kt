@@ -34,6 +34,9 @@ abstract class CorporateTestSupport {
     protected lateinit var clock: FakeClock
     protected lateinit var mono: MonobankCorporate
 
+    /** Waits between retries, recorded instead of slept. */
+    protected val sleeps: MutableList<Duration> = java.util.Collections.synchronizedList(mutableListOf())
+
     @BeforeEach
     fun startServer() {
         server = MockWebServer()
@@ -65,7 +68,7 @@ abstract class CorporateTestSupport {
                             .build(),
                     ),
             ).build()
-        return MonobankCorporate(config, CorporateHttp(config) { })
+        return MonobankCorporate(config, CorporateHttp(config) { sleeps += it })
     }
 
     protected fun enqueueJson(
@@ -144,7 +147,7 @@ abstract class CorporateTestSupport {
         fun resource(name: String): String =
             requireNotNull(CorporateTestSupport::class.java.getResource(name)) { "missing resource $name" }.readText()
 
-        fun CorporateKey.publicPoint(): ECPoint = DOMAIN.curve.decodePoint(publicKeyUncompressed())
+        fun CorporateKey.publicPoint(): ECPoint = DOMAIN.curve.decodePoint(publicKey.uncompressed())
 
         /** Verifies a 64-byte `r‖s` ECDSA-SHA256 signature with BouncyCastle's own verifier. */
         fun verify(

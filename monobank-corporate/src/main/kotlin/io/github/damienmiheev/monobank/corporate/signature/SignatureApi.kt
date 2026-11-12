@@ -8,8 +8,9 @@ import io.github.damienmiheev.monobank.corporate.internal.SigningRules
  * monoKEP: ask monobank clients to sign documents with their qualified electronic signature.
  * A signing request lives 3 days.
  *
- * All calls are signed `X-Time | URL`. By default the URL signed is the path without the query
- * string; see `CorporateConfig.Builder.signQueryString`.
+ * All calls are signed `X-Time | URL`. By default the URL signed for `status` and `cancel` is the
+ * path without the query string. That reading is unconfirmed; if these two calls get HTTP 401/403
+ * while others work, set `CorporateConfig.Builder.signQueryString(true)`.
  *
  * **Experimental:** the corporate API's request signing has not been confirmed against the
  * live monobank service yet; this API may change in a minor release.

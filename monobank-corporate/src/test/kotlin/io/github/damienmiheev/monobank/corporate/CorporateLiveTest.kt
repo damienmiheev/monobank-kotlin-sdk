@@ -52,7 +52,7 @@ class CorporateLiveTest {
     @Test
     fun `registration status answers for the key and returns its key id`() {
         val mono = mono()
-        val status = mono.company.registrationStatus(mono.config.signer as CorporateKey)
+        val status = mono.company.registrationStatus((mono.config.signer as CorporateKey).publicKey)
         assertThat(status.status).isNotEqualTo(RegistrationStatus.UNKNOWN)
         if (status.status == RegistrationStatus.APPROVED) assertThat(status.keyId).isEqualTo(mono.config.keyId)
     }
@@ -78,13 +78,37 @@ class CorporateLiveTest {
         assertThat(client.statement(ClientApi.DEFAULT_ACCOUNT, to.minus(Duration.ofDays(1)), to)).isNotNull()
     }
 
+    /**
+     * Settles which URL `signature/status` signs: sends a status request for an unknown id with
+     * and without the query string signed. 400/404 means monobank accepted the signature;
+     * 401/403 means it did not. Exactly one setting should be accepted; the default is the one
+     * without the query string.
+     */
     @Test
-    fun `unknown signing request is rejected by monobank, not by the signature check`() {
+    fun `signature status shows which query-string setting monobank accepts`() {
+        val pem = env("MONOBANK_CORP_PRIVATE_KEY_PEM")
+        assumeTrue(pem != null, "MONOBANK_CORP_PRIVATE_KEY_PEM is not set")
+        val accepted =
+            listOf(false, true).associateWith { signQuery ->
+                val mono = MonobankCorporate(CorporateConfig.builder(pem!!).signQueryString(signQuery).build())
+                val error = runCatching { mono.signatures.status("sdk-live-test-unknown-request") }.exceptionOrNull()
+                val status = (error as? MonobankApiException)?.statusCode
+                println("signQueryString=$signQuery -> ${status ?: error ?: "200"}")
+                status != 401 && status != 403
+            }
+        assertThat(accepted[CorporateConfig.builder(pem!!).build().signQueryString])
+            .`as`("default signQueryString accepted; results: %s", accepted)
+            .isTrue()
+    }
+
+    /**
+     * Checks the company endpoints with an `X-Request-Id` (sent, not signed). A 401/403 here while
+     * `settings are readable with the signed request` passes means monobank signs any
+     * `X-Request-Id` it receives; then never pass `requestId` to `settings`/`setWebhook`.
+     */
+    @Test
+    fun `settings with an unsigned request id`() {
         val mono = mono()
-        val error = runCatching { mono.signatures.status("sdk-live-test-unknown-request") }.exceptionOrNull()
-        // 403 would mean the signature (or the query-string choice) was rejected.
-        if (error is MonobankApiException) {
-            assertThat(error.statusCode).isNotEqualTo(403)
-        }
+        assertThat(mono.company.settings(requestId()).permission).isNotBlank()
     }
 }

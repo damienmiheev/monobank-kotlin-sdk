@@ -3,11 +3,15 @@ package io.github.damienmiheev.monobank.corporate.access
 import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.annotation.JsonProperty
 import io.github.damienmiheev.monobank.core.ExperimentalMonobankApi
+import io.github.damienmiheev.monobank.core.MonobankAuthException
 import io.github.damienmiheev.monobank.core.http.ApiRequest
+import io.github.damienmiheev.monobank.core.http.ApiResponse
 import io.github.damienmiheev.monobank.core.http.HttpMethod
 import io.github.damienmiheev.monobank.corporate.internal.CorporateAuthenticator
+import io.github.damienmiheev.monobank.corporate.internal.CorporateErrorDecoder
 import io.github.damienmiheev.monobank.corporate.internal.CorporateHttp
 import io.github.damienmiheev.monobank.corporate.internal.SigningRules
+import java.nio.charset.StandardCharsets
 
 /**
  * Answer of `POST /personal/auth/request`: a new request for access to one client's data.
@@ -45,6 +49,13 @@ public enum class AccessRequestStatus {
 
     /** monobank does not know the request (HTTP 404): it expired (after 24 hours) or never existed. */
     NOT_FOUND,
+
+    /**
+     * Not returned by this SDK version. Reserved so that a `when` over this enum keeps compiling
+     * when later versions report more states (for example a declined request); treat it like
+     * [PENDING].
+     */
+    UNKNOWN,
 }
 
 /**
@@ -90,8 +101,12 @@ public class AccessApi internal constructor(
      * `GET /personal/auth/request` with `X-Request-Id`, signed `X-Time | X-Request-Id | URL`.
      * Safe to retry.
      *
-     * @throws io.github.damienmiheev.monobank.core.MonobankAuthException on HTTP 403 (the key is
-     *   wrong, not approved, or the signature was rejected).
+     * HTTP 401 means [AccessRequestStatus.PENDING] only when monobank's `errorDescription` says the
+     * request is "unauthorized yet", as documented; any other 401 (for example a rejected
+     * signature) is thrown, so a signing problem never looks like a client who has not answered.
+     *
+     * @throws MonobankAuthException on HTTP 403, or on a 401 that is not "unauthorized yet" (the
+     *   key is wrong or not approved, or the signature was rejected).
      */
     public fun status(requestId: String): AccessRequestStatus {
         CorporateHttp.requireHeaderValue(requestId, "requestId")
@@ -106,15 +121,29 @@ public class AccessApi internal constructor(
                 ),
             )
         return when (response.statusCode) {
-            HTTP_UNAUTHORIZED -> AccessRequestStatus.PENDING
+            HTTP_UNAUTHORIZED -> pendingOrThrow(response)
             HTTP_NOT_FOUND -> AccessRequestStatus.NOT_FOUND
             else -> AccessRequestStatus.APPROVED
         }
+    }
+
+    private fun pendingOrThrow(response: ApiResponse): AccessRequestStatus {
+        val text = runCatching { CorporateErrorDecoder.decode(response.body).text }.getOrNull()
+        if (text != null && text.contains(PENDING_TEXT, ignoreCase = true)) return AccessRequestStatus.PENDING
+        throw MonobankAuthException(
+            HTTP_UNAUTHORIZED,
+            null,
+            text,
+            response.body.toString(StandardCharsets.UTF_8),
+        )
     }
 
     private companion object {
         const val CALLBACK_HEADER = "X-Callback"
         const val HTTP_UNAUTHORIZED = 401
         const val HTTP_NOT_FOUND = 404
+
+        /** Documented 401 text while the client has not answered: "Request is unauthorized yet". */
+        const val PENDING_TEXT = "unauthorized yet"
     }
 }

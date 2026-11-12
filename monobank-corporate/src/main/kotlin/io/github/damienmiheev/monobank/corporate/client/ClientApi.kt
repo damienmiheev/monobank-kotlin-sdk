@@ -1,6 +1,7 @@
 package io.github.damienmiheev.monobank.corporate.client
 
 import io.github.damienmiheev.monobank.core.ExperimentalMonobankApi
+import io.github.damienmiheev.monobank.core.http.UrlEncoding
 import io.github.damienmiheev.monobank.corporate.internal.CorporateAuthenticator
 import io.github.damienmiheev.monobank.corporate.internal.CorporateHttp
 import io.github.damienmiheev.monobank.corporate.internal.SigningRules
@@ -49,8 +50,10 @@ public class ClientApi internal constructor(
      *
      * @param account Account id from [info], or [DEFAULT_ACCOUNT] for the default UAH account.
      * @param from Start of the period.
-     * @param to End of the period; `null` means now (as monobank's clock sees it).
-     * @throws IllegalArgumentException for a blank account, [to] before [from], or a longer range.
+     * @param to End of the period; `null` means now (as monobank's clock sees it). The range is
+     *   then checked against the config's clock.
+     * @throws IllegalArgumentException for a blank, `.` or `..` account, [to] before [from], or a
+     *   longer range.
      */
     @JvmOverloads
     public fun statement(
@@ -59,16 +62,16 @@ public class ClientApi internal constructor(
         to: Instant? = null,
     ): List<StatementItem> {
         require(account.isNotBlank()) { "account must not be blank (use \"$DEFAULT_ACCOUNT\" for the default account)" }
-        if (to != null) {
-            require(!to.isBefore(from)) { "to must not be before from" }
-            require(to.epochSecond - from.epochSecond <= MAX_RANGE_SECONDS) {
-                "statement range must be at most $MAX_RANGE_SECONDS seconds (31 days + 1 hour)"
-            }
+        if (to != null) require(!to.isBefore(from)) { "to must not be before from" }
+        // With no end time monobank uses its current time, so the range ends now.
+        val end = to ?: http.clock.instant()
+        require(end.epochSecond - from.epochSecond <= MAX_RANGE_SECONDS) {
+            "statement range must be at most $MAX_RANGE_SECONDS seconds (31 days + 1 hour)"
         }
         val path =
             buildString {
                 append(SigningRules.STATEMENT_PREFIX)
-                append(CorporateHttp.encodeSegment(account))
+                append(UrlEncoding.pathSegment(account))
                 append('/').append(from.epochSecond)
                 if (to != null) append('/').append(to.epochSecond)
             }

@@ -2,6 +2,7 @@ package io.github.damienmiheev.monobank.corporate.internal
 
 import io.github.damienmiheev.monobank.core.MonobankException
 import io.github.damienmiheev.monobank.core.MonobankSerializationException
+import io.github.damienmiheev.monobank.core.Redaction
 import io.github.damienmiheev.monobank.core.RequestOutcome
 import io.github.damienmiheev.monobank.core.http.ApiError
 import io.github.damienmiheev.monobank.core.http.ApiRequest
@@ -12,8 +13,9 @@ import io.github.damienmiheev.monobank.core.http.MonobankHttp
 import io.github.damienmiheev.monobank.core.http.RequestAuthenticator
 import io.github.damienmiheev.monobank.core.json.MonobankJson
 import io.github.damienmiheev.monobank.corporate.CorporateConfig
-import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
+import java.time.Clock
+import java.time.Duration
 import java.util.Base64
 
 /**
@@ -112,19 +114,32 @@ internal class CorporateAuthenticator(
         }
     }
 
-    private fun sign(data: ByteArray): ByteArray =
-        try {
-            Secp256k1.encode(config.signer.sign(data), config.signatureEncoding)
-        } catch (e: MonobankException) {
-            throw e
-        } catch (e: RuntimeException) {
-            // A custom signer (KMS, HSM) failed or returned garbage: nothing was sent.
-            throw MonobankSerializationException(
-                "Could not sign the corporate API request: ${e.javaClass.simpleName}: ${e.message}",
+    private fun sign(data: ByteArray): ByteArray {
+        val signature =
+            try {
+                config.signer.sign(data)
+            } catch (e: MonobankException) {
+                throw e
+            } catch (e: RuntimeException) {
+                // A custom signer (KMS, HSM) failed, perhaps only for now: nothing was sent, so
+                // the request may be retried.
+                throw MonobankSerializationException(
+                    "Could not sign the corporate API request: ${e.javaClass.simpleName}: ${e.message}",
+                    e,
+                    RequestOutcome.NOT_SENT,
+                )
+            }
+        return try {
+            SignatureCodec.encode(signature, config.signatureEncoding)
+        } catch (e: IllegalArgumentException) {
+            // Wrong output format: a bug in the signer that retrying cannot fix, so not a
+            // (retryable) MonobankException.
+            throw IllegalStateException(
+                "${config.signer.javaClass.name} returned an unusable signature: ${e.message}",
                 e,
-                RequestOutcome.NOT_SENT,
             )
         }
+    }
 
     companion object {
         const val KEY_ID_HEADER = "X-Key-Id"
@@ -143,20 +158,27 @@ internal class CorporateAuthenticator(
 
 /** Thin JSON helpers over [MonobankHttp] for the corporate API. */
 internal class CorporateHttp(
-    config: CorporateConfig,
-    sleeper: MonobankHttp.Sleeper = MonobankHttp.Sleeper.SYSTEM,
+    private val config: CorporateConfig,
+    private val sleeper: MonobankHttp.Sleeper = MonobankHttp.Sleeper.SYSTEM,
 ) {
-    private val http =
-        MonobankHttp(
-            options = config.options,
-            defaultBaseUrl = DEFAULT_BASE_URL,
-            module = "corporate",
-            authenticator = CorporateAuthenticator(config),
-            errorDecoder = CorporateErrorDecoder,
-            sleeper = sleeper,
-        )
+    /** The config's clock, for checks that depend on the current time. */
+    val clock: Clock = config.clock
 
-    fun execute(request: ApiRequest): ApiResponse = http.execute(request)
+    private val http = transport(config, sleeper, defaultRetryAfter = null)
+
+    /**
+     * Transport for client-info and statement. No limits are documented for the corporate API,
+     * but the personal API allows these calls once per 60 s and community reports say the same
+     * of corporate statements. So a 429 without `Retry-After` is taken to mean "wait 60 s"; with
+     * a `RetryPolicy.maxBackoff` below that it is thrown at once rather than retried into
+     * another 429. Created on first use.
+     */
+    private val clientDataHttp by lazy { transport(config, sleeper, defaultRetryAfter = RATE_LIMIT_WAIT) }
+
+    private fun transportFor(path: String): MonobankHttp =
+        if (path == SigningRules.CLIENT_INFO || path.startsWith(SigningRules.STATEMENT_PREFIX)) clientDataHttp else http
+
+    fun execute(request: ApiRequest): ApiResponse = transportFor(request.path).execute(request)
 
     fun <T> get(
         path: String,
@@ -164,7 +186,7 @@ internal class CorporateHttp(
         query: List<Pair<String, String?>> = emptyList(),
         headers: Map<String, String> = emptyMap(),
     ): T {
-        val response = http.execute(ApiRequest(HttpMethod.GET, path, query, headers, idempotent = true))
+        val response = execute(ApiRequest(HttpMethod.GET, path, query, headers, idempotent = true))
         return MonobankJson.read(response.body, type)
     }
 
@@ -192,7 +214,7 @@ internal class CorporateHttp(
         idempotent: Boolean,
         headers: Map<String, String>,
     ): ApiResponse =
-        http.execute(
+        execute(
             ApiRequest(
                 HttpMethod.POST,
                 path,
@@ -206,22 +228,37 @@ internal class CorporateHttp(
         path: String,
         query: List<Pair<String, String?>>,
     ) {
-        http.execute(ApiRequest(HttpMethod.DELETE, path, query, idempotent = true))
+        execute(ApiRequest(HttpMethod.DELETE, path, query, idempotent = true))
     }
 
     companion object {
         const val DEFAULT_BASE_URL = "https://api.monobank.ua"
 
-        /** Encodes one path segment (`/` and everything else unsafe become `%XX`). */
-        fun encodeSegment(value: String): String = URLEncoder.encode(value, StandardCharsets.UTF_8).replace("+", "%20")
+        /** Wait assumed for a 429 without `Retry-After` on client-info and statement. */
+        val RATE_LIMIT_WAIT: Duration = Duration.ofSeconds(60)
 
-        /** Validates a value that goes into an HTTP header. */
+        private fun transport(
+            config: CorporateConfig,
+            sleeper: MonobankHttp.Sleeper,
+            defaultRetryAfter: Duration?,
+        ): MonobankHttp =
+            MonobankHttp(
+                options = config.options,
+                defaultBaseUrl = DEFAULT_BASE_URL,
+                module = "corporate",
+                authenticator = CorporateAuthenticator(config),
+                errorDecoder = CorporateErrorDecoder,
+                sleeper = sleeper,
+                defaultRetryAfter = defaultRetryAfter,
+            )
+
+        /** Validates a value that goes into an HTTP header (non-blank, printable ASCII). */
         fun requireHeaderValue(
             value: String,
             name: String,
         ) {
             require(value.isNotBlank()) { "$name must not be blank" }
-            require(value.none { it == '\r' || it == '\n' }) { "$name must be one line" }
+            Redaction.requireHeaderSafe(value, name)
         }
     }
 }

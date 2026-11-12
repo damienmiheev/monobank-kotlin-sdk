@@ -1,7 +1,7 @@
 package io.github.damienmiheev.monobank.corporate.company
 
 import io.github.damienmiheev.monobank.core.ExperimentalMonobankApi
-import io.github.damienmiheev.monobank.corporate.CorporateKey
+import io.github.damienmiheev.monobank.corporate.CorporatePublicKey
 import io.github.damienmiheev.monobank.corporate.internal.CorporateAuthenticator
 import io.github.damienmiheev.monobank.corporate.internal.CorporateHttp
 import io.github.damienmiheev.monobank.corporate.internal.SigningRules
@@ -39,7 +39,7 @@ public class CompanyApi internal constructor(
      * safe to retry.
      *
      * @param pubkey Base64 of the PEM public key, exactly as sent to [register]
-     *   (see [CorporateKey.publicKeyPemBase64]).
+     *   (see [CorporatePublicKey.publicKeyPemBase64]).
      */
     public fun registrationStatus(pubkey: String): RegistrationStatusResponse {
         require(pubkey.isNotBlank()) { "pubkey must not be blank" }
@@ -51,8 +51,8 @@ public class CompanyApi internal constructor(
         )
     }
 
-    /** State of the application filed with [key]'s public key ([CorporateKey.publicKeyPemBase64]). */
-    public fun registrationStatus(key: CorporateKey): RegistrationStatusResponse =
+    /** State of the application filed with [key] (sends [CorporatePublicKey.publicKeyPemBase64]). */
+    public fun registrationStatus(key: CorporatePublicKey): RegistrationStatusResponse =
         registrationStatus(key.publicKeyPemBase64)
 
     /**
@@ -60,10 +60,12 @@ public class CompanyApi internal constructor(
      *
      * `GET /personal/corp/settings`. Safe to retry.
      *
-     * The docs list `X-Request-Id` as a required header here but sign the call as
+     * The docs list `X-Request-Id` as a required header here but describe `X-Sign` as
      * `X-Time | URL` and do not say what the id is; community clients send none. By default no
      * `X-Request-Id` is sent. Pass [requestId] (one of your clients' access request ids) only if
-     * monobank rejects the call without it; it is then sent but, as documented, not signed.
+     * monobank rejects the call without it; it is then sent but, as the `X-Sign` text says, not
+     * signed. If monobank instead signs every `X-Request-Id` it receives, that call fails with
+     * HTTP 401/403: leave [requestId] out. Unconfirmed against the live service.
      */
     @JvmOverloads
     public fun settings(requestId: String? = null): CompanySettings =

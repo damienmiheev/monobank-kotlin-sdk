@@ -3,6 +3,8 @@ package io.github.damienmiheev.monobank.corporate.internal
 import io.github.damienmiheev.monobank.corporate.SignatureEncoding
 import org.bouncycastle.asn1.ASN1Encoding
 import org.bouncycastle.asn1.ASN1Integer
+import org.bouncycastle.asn1.ASN1ObjectIdentifier
+import org.bouncycastle.asn1.ASN1Primitive
 import org.bouncycastle.asn1.ASN1Sequence
 import org.bouncycastle.asn1.DERSequence
 import org.bouncycastle.asn1.sec.SECObjectIdentifiers
@@ -13,6 +15,7 @@ import org.bouncycastle.crypto.digests.SHA256Digest
 import org.bouncycastle.crypto.ec.CustomNamedCurves
 import org.bouncycastle.crypto.params.ECDomainParameters
 import org.bouncycastle.crypto.params.ECPrivateKeyParameters
+import org.bouncycastle.crypto.params.ECPublicKeyParameters
 import org.bouncycastle.crypto.signers.ECDSASigner
 import org.bouncycastle.crypto.signers.HMacDSAKCalculator
 import org.bouncycastle.math.ec.ECPoint
@@ -83,59 +86,46 @@ internal object Secp256k1 {
         d: BigInteger,
         data: ByteArray,
     ): ByteArray {
+        val signer = ECDSASigner(HMacDSAKCalculator(SHA256Digest()))
+        signer.init(true, ECPrivateKeyParameters(d, domain))
+        val (r, s) = signer.generateSignature(sha256(data))
+        return SignatureCodec.rawOf(r, s)
+    }
+
+    /** `true` when [signature] (`r‖s` or DER) is a valid ECDSA-SHA256 signature of [data] by [point]. */
+    fun verify(
+        point: ECPoint,
+        data: ByteArray,
+        signature: ByteArray,
+    ): Boolean {
+        val (r, s) = runCatching { SignatureCodec.parse(signature) }.getOrNull() ?: return false
+        val verifier = ECDSASigner()
+        verifier.init(false, ECPublicKeyParameters(point, domain))
+        return verifier.verifySignature(sha256(data), r, s)
+    }
+
+    /**
+     * Requires [parameters], when present, to name secp256k1.
+     *
+     * @throws IllegalArgumentException for another curve or explicit parameters.
+     */
+    fun checkCurve(parameters: ASN1Primitive?) {
+        if (parameters == null) return
+        require(parameters is ASN1ObjectIdentifier) {
+            "explicit EC parameters are not supported; use the named curve secp256k1"
+        }
+        require(parameters == SECObjectIdentifiers.secp256k1) {
+            "the key is on curve $parameters, but monobank requires secp256k1 (${SECObjectIdentifiers.secp256k1})"
+        }
+    }
+
+    private fun sha256(data: ByteArray): ByteArray {
         val digest = SHA256Digest()
         digest.update(data, 0, data.size)
         val hash = ByteArray(digest.digestSize)
         digest.doFinal(hash, 0)
-        val signer = ECDSASigner(HMacDSAKCalculator(SHA256Digest()))
-        signer.init(true, ECPrivateKeyParameters(d, domain))
-        val (r, s) = signer.generateSignature(hash)
-        return rawOf(r, s)
+        return hash
     }
-
-    /**
-     * Converts a signature from a signer (64-byte `r‖s` or DER) to [encoding].
-     *
-     * @throws IllegalArgumentException when [signature] is neither.
-     */
-    fun encode(
-        signature: ByteArray,
-        encoding: SignatureEncoding,
-    ): ByteArray {
-        val (r, s) = parse(signature)
-        return when (encoding) {
-            SignatureEncoding.P1363 -> rawOf(r, s)
-            SignatureEncoding.DER -> DERSequence(arrayOf(ASN1Integer(r), ASN1Integer(s))).getEncoded(ASN1Encoding.DER)
-        }
-    }
-
-    /** Splits a 64-byte `r‖s` or a DER signature into `(r, s)` and range-checks both. */
-    fun parse(signature: ByteArray): Pair<BigInteger, BigInteger> {
-        val (r, s) =
-            if (signature.size == RAW_SIGNATURE_BYTES) {
-                BigInteger(1, signature.copyOfRange(0, FIELD_BYTES)) to
-                    BigInteger(1, signature.copyOfRange(FIELD_BYTES, RAW_SIGNATURE_BYTES))
-            } else {
-                val sequence =
-                    try {
-                        ASN1Sequence.getInstance(signature)
-                    } catch (e: IllegalArgumentException) {
-                        throw IllegalArgumentException("signature is neither 64-byte r||s nor DER", e)
-                    }
-                require(sequence.size() == 2) { "DER signature must hold exactly r and s" }
-                ASN1Integer.getInstance(sequence.getObjectAt(0)).value to
-                    ASN1Integer.getInstance(sequence.getObjectAt(1)).value
-            }
-        require(r.signum() > 0 && r < domain.n && s.signum() > 0 && s < domain.n) {
-            "signature values are out of range for secp256k1"
-        }
-        return r to s
-    }
-
-    private fun rawOf(
-        r: BigInteger,
-        s: BigInteger,
-    ): ByteArray = BigIntegers.asUnsignedByteArray(FIELD_BYTES, r) + BigIntegers.asUnsignedByteArray(FIELD_BYTES, s)
 
     private const val PEM_LINE = 64
     private const val BYTE_MASK = 0xff

@@ -6,6 +6,7 @@ import io.github.damienmiheev.monobank.core.RetryPolicy
 import io.github.damienmiheev.monobank.corporate.company.RegistrationRequest
 import io.github.damienmiheev.monobank.corporate.internal.CorporateAuthenticator
 import io.github.damienmiheev.monobank.corporate.internal.Secp256k1
+import io.github.damienmiheev.monobank.corporate.internal.SignatureCodec
 import io.github.damienmiheev.monobank.corporate.signature.CreateSignatureRequest
 import io.github.damienmiheev.monobank.corporate.signature.SignDocument
 import org.assertj.core.api.Assertions.assertThat
@@ -98,11 +99,11 @@ class RequestSigningTest : CorporateTestSupport() {
         val signer = RecordingSigner()
         enqueueJson("[]")
 
-        client(signer = signer).client("req").statement("acc/1 x", Instant.ofEpochSecond(10), null)
+        client(signer = signer).client("req").statement("acc/1 x", Instant.ofEpochSecond(TIME - 10), null)
 
         val request = server.takeRequest()
-        assertThat(request.path).isEqualTo("/personal/statement/acc%2F1%20x/10")
-        assertThat(signer.signed).containsExactly("1554466347req/personal/statement/acc%2F1%20x/10")
+        assertThat(request.path).isEqualTo("/personal/statement/acc%2F1%20x/${TIME - 10}")
+        assertThat(signer.signed).containsExactly("1554466347req/personal/statement/acc%2F1%20x/${TIME - 10}")
     }
 
     @Test
@@ -143,7 +144,7 @@ class RequestSigningTest : CorporateTestSupport() {
         val sequence = ASN1Sequence.getInstance(der)
         val r = ASN1Integer.getInstance(sequence.getObjectAt(0)).value
         val s = ASN1Integer.getInstance(sequence.getObjectAt(1)).value
-        val raw = Secp256k1.encode(der, SignatureEncoding.P1363)
+        val raw = SignatureCodec.encode(der, SignatureEncoding.P1363)
         assertThat(raw.copyOfRange(0, 32)).isEqualTo(
             org.bouncycastle.util.BigIntegers
                 .asUnsignedByteArray(32, r),
@@ -163,7 +164,7 @@ class RequestSigningTest : CorporateTestSupport() {
                 override val keyId: String = "custom-key-id"
 
                 override fun sign(data: ByteArray): ByteArray =
-                    Secp256k1.encode(TEST_KEY.sign(data), SignatureEncoding.DER)
+                    SignatureCodec.encode(TEST_KEY.sign(data), SignatureEncoding.DER)
             }
         enqueueJson("{}")
 
@@ -187,7 +188,13 @@ class RequestSigningTest : CorporateTestSupport() {
         val signer = RecordingSigner()
         val mono = client(signer = signer, retryPolicy = RetryPolicy.of(2, Duration.ZERO, Duration.ZERO))
         enqueueJson("""{"errorDescription":"busy"}""", status = 503)
-        enqueueJson("""{"errorDescription":"slow down"}""", status = 429)
+        server.enqueue(
+            okhttp3.mockwebserver
+                .MockResponse()
+                .setResponseCode(429)
+                .setHeader("Retry-After", "0")
+                .setBody("""{"errorDescription":"slow down"}"""),
+        )
         enqueueFixture("GET_personal_client_info.response.json")
 
         mono.client("req-1").info()
@@ -203,34 +210,77 @@ class RequestSigningTest : CorporateTestSupport() {
     }
 
     @Test
-    fun `a failing or broken signer surfaces as a not-sent serialization error`() {
+    fun `a failing signer surfaces as a not-sent error and is retried`() {
+        var calls = 0
         val failing =
             object : CorporateSigner {
                 override val keyId: String = "k"
 
-                override fun sign(data: ByteArray): ByteArray = throw IllegalStateException("KMS unavailable")
+                override fun sign(data: ByteArray): ByteArray {
+                    calls++
+                    throw IllegalStateException("KMS unavailable")
+                }
             }
+
+        assertThatThrownBy { client(signer = failing).company.settings() }
+            .isInstanceOfSatisfying(MonobankSerializationException::class.java) {
+                assertThat(it.outcome).isEqualTo(RequestOutcome.NOT_SENT)
+                assertThat(it.message).startsWith("Could not sign").contains("KMS unavailable")
+            }
+        assertThat(calls).isEqualTo(3)
+        assertThat(server.requestCount).isZero()
+    }
+
+    @Test
+    fun `a signer returning an unusable format fails at once without retries`() {
+        var calls = 0
         val garbage =
             object : CorporateSigner {
                 override val keyId: String = "k"
 
-                override fun sign(data: ByteArray): ByteArray = ByteArray(10)
+                override fun sign(data: ByteArray): ByteArray {
+                    calls++
+                    // r‖s‖v, as some Ethereum-style signers return.
+                    return TEST_KEY.sign(data) + 27
+                }
             }
 
-        listOf(failing, garbage).forEach { signer ->
-            assertThatThrownBy { client(signer = signer, retryPolicy = RetryPolicy.NONE).company.settings() }
-                .isInstanceOfSatisfying(MonobankSerializationException::class.java) {
-                    assertThat(it.outcome).isEqualTo(RequestOutcome.NOT_SENT)
-                    assertThat(it.message).startsWith("Could not sign")
-                }
-        }
+        assertThatThrownBy { client(signer = garbage).company.settings() }
+            .isInstanceOf(IllegalStateException::class.java)
+            .hasMessageContaining("unusable signature")
+        assertThat(calls).isEqualTo(1)
         assertThat(server.requestCount).isZero()
+    }
+
+    @Test
+    fun `a 429 without Retry-After waits the 60 s rate-limit window, capped by the policy`() {
+        val mono = client(retryPolicy = RetryPolicy.of(1, Duration.ZERO, Duration.ofMinutes(5)))
+        enqueueJson("""{"errorDescription":"Too many requests"}""", status = 429)
+        enqueueJson("[]")
+
+        mono.client("r").statement("0", Instant.ofEpochSecond(TIME - 60))
+
+        assertThat(sleeps).containsExactly(Duration.ofSeconds(60))
+    }
+
+    @Test
+    fun `with the default policy a 429 on client data is thrown at once, other calls still retry`() {
+        val mono = client(retryPolicy = RetryPolicy.DEFAULT)
+        enqueueJson("""{"errorDescription":"Too many requests"}""", status = 429)
+        enqueueJson("""{"errorDescription":"Too many requests"}""", status = 429)
+        enqueueJson("{}")
+
+        assertThatThrownBy { mono.client("r").info() }
+            .isInstanceOf(io.github.damienmiheev.monobank.core.MonobankRateLimitException::class.java)
+        mono.company.setWebhook("https://example.com/hook")
+
+        assertThat(server.requestCount).isEqualTo(3)
     }
 
     private fun registration(): RegistrationRequest =
         RegistrationRequest
             .builder()
-            .pubkey(TEST_KEY)
+            .pubkey(TEST_KEY.publicKey)
             .name("n")
             .description("d")
             .contactPerson("c")

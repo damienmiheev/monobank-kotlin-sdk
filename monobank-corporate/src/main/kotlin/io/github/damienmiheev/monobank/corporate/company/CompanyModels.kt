@@ -5,7 +5,7 @@ import com.fasterxml.jackson.annotation.JsonEnumDefaultValue
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.fasterxml.jackson.annotation.JsonValue
 import io.github.damienmiheev.monobank.core.ExperimentalMonobankApi
-import io.github.damienmiheev.monobank.corporate.CorporateKey
+import io.github.damienmiheev.monobank.corporate.CorporatePublicKey
 import java.util.Base64
 
 /**
@@ -18,7 +18,7 @@ import java.util.Base64
  * live monobank service yet; this API may change in a minor release.
  *
  * @property pubkey Base64 of the PEM public key file (`openssl ec -pubout` output), see
- *   [CorporateKey.publicKeyPemBase64]. The same string identifies the application in
+ *   [CorporatePublicKey.publicKeyPemBase64]. The same string identifies the application in
  *   [CompanyApi.registrationStatus].
  * @property name Company name.
  * @property description What the service does and why it needs the API. Community reports say
@@ -57,8 +57,8 @@ public data class RegistrationRequest internal constructor(
         /** Base64 of the PEM public key file. */
         public fun pubkey(pubkey: String): Builder = apply { this.pubkey = pubkey }
 
-        /** Uses [CorporateKey.publicKeyPemBase64] of [key]. */
-        public fun pubkey(key: CorporateKey): Builder = apply { pubkey = key.publicKeyPemBase64 }
+        /** Uses [CorporatePublicKey.publicKeyPemBase64] of [key] (`CorporateKey.publicKey` for a PEM key). */
+        public fun pubkey(key: CorporatePublicKey): Builder = apply { pubkey = key.publicKeyPemBase64 }
 
         /** Company name. */
         public fun name(name: String): Builder = apply { this.name = name }

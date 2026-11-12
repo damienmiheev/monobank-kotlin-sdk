@@ -57,7 +57,7 @@ class CompanyApiTest : CorporateTestSupport() {
     @Test
     fun `registration request helpers encode the key and the logo`() {
         val request = minimalRegistration()
-        assertThat(request.pubkey).isEqualTo(TEST_KEY.publicKeyPemBase64)
+        assertThat(request.pubkey).isEqualTo(TEST_KEY.publicKey.publicKeyPemBase64)
         assertThat(Base64.getDecoder().decode(request.logo)).containsExactly(1, 2, 3)
         assertThat(request.toString()).doesNotContain(request.pubkey).doesNotContain(request.logo).contains("chars")
         assertThatThrownBy { RegistrationRequest.builder().name("x").build() }
@@ -69,7 +69,7 @@ class CompanyApiTest : CorporateTestSupport() {
     fun `registration status posts the key and reads status and key id`() {
         enqueueJson("""{"status":"Approved","keyId":"$TEST_KEY_ID"}""")
 
-        val status = mono.company.registrationStatus(TEST_KEY)
+        val status = mono.company.registrationStatus(TEST_KEY.publicKey)
 
         assertThat(status.status).isEqualTo(RegistrationStatus.APPROVED)
         assertThat(status.keyId).isEqualTo(TEST_KEY_ID)
@@ -78,7 +78,7 @@ class CompanyApiTest : CorporateTestSupport() {
         assertThat(request.path).isEqualTo("/personal/auth/registration/status")
         val body = MonobankJson.mapper.readTree(request.body.readUtf8())
         assertThat(body.fieldNames().asSequence().toList()).containsExactly("pubkey")
-        assertThat(body.path("pubkey").asText()).isEqualTo(TEST_KEY.publicKeyPemBase64)
+        assertThat(body.path("pubkey").asText()).isEqualTo(TEST_KEY.publicKey.publicKeyPemBase64)
     }
 
     @Test
@@ -202,7 +202,7 @@ class CompanyApiTest : CorporateTestSupport() {
     private fun minimalRegistration(): RegistrationRequest =
         RegistrationRequest
             .builder()
-            .pubkey(TEST_KEY)
+            .pubkey(TEST_KEY.publicKey)
             .name("ТОВ \"Ворона\"")
             .description("PFM")
             .contactPerson("Роман")

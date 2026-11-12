@@ -95,10 +95,10 @@ class ClientApiTest : CorporateTestSupport() {
     fun `statement without an end time leaves it out of the path`() {
         enqueueJson("""[{"id":"x","time":1,"amount":1,"currencyCode":980}]""")
 
-        val item = mono.client(requestId).statement("acc1", Instant.ofEpochSecond(100)).single()
+        val item = mono.client(requestId).statement("acc1", Instant.ofEpochSecond(TIME - 100)).single()
 
         val request = takeSignedRequest(::timeRequestIdAndPath)
-        assertThat(request.path).isEqualTo("/personal/statement/acc1/100")
+        assertThat(request.path).isEqualTo("/personal/statement/acc1/${TIME - 100}")
         assertThat(item.description).isNull()
         assertThat(item.balance).isNull()
     }
@@ -128,7 +128,7 @@ class ClientApiTest : CorporateTestSupport() {
                 assertThat(it.statusCode).isEqualTo(401)
                 assertThat(it.errorText).isEqualTo("Request is unauthorized yet")
             }
-        assertThatThrownBy { mono.client(requestId).statement("0", Instant.ofEpochSecond(1)) }
+        assertThatThrownBy { mono.client(requestId).statement("0", Instant.ofEpochSecond(TIME - 1)) }
             .isInstanceOfSatisfying(MonobankNotFoundException::class.java) {
                 assertThat(it.errorText).isEqualTo("Data is not exist")
             }
@@ -139,5 +139,27 @@ class ClientApiTest : CorporateTestSupport() {
         assertThatThrownBy { mono.client("") }.isInstanceOf(IllegalArgumentException::class.java)
         assertThatThrownBy { mono.client("a\r\nX-Evil: 1") }.isInstanceOf(IllegalArgumentException::class.java)
         assertThat(mono.client("r").toString()).isEqualTo("ClientApi(requestId=r)")
+    }
+
+    @Test
+    fun `dot segments are rejected instead of sent`() {
+        val client = mono.client(requestId)
+        val from = Instant.ofEpochSecond(TIME - 10)
+        assertThatThrownBy { client.statement("..", from, null) }.isInstanceOf(IllegalArgumentException::class.java)
+        assertThatThrownBy { client.statement(".", from, null) }.isInstanceOf(IllegalArgumentException::class.java)
+        assertThat(server.requestCount).isZero()
+    }
+
+    @Test
+    fun `without an end time the range is checked against the config clock`() {
+        val client = mono.client(requestId)
+        assertThatThrownBy { client.statement("0", Instant.ofEpochSecond(TIME - ClientApi.MAX_RANGE_SECONDS - 1)) }
+            .isInstanceOf(IllegalArgumentException::class.java)
+            .hasMessageContaining("31 days")
+        assertThat(server.requestCount).isZero()
+
+        enqueueJson("[]")
+        client.statement("0", Instant.ofEpochSecond(TIME - ClientApi.MAX_RANGE_SECONDS))
+        assertThat(server.takeRequest().path).isEqualTo("/personal/statement/0/${TIME - ClientApi.MAX_RANGE_SECONDS}")
     }
 }

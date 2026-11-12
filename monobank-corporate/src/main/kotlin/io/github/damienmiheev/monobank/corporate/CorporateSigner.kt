@@ -38,14 +38,15 @@ public enum class SignatureEncoding {
     /**
      * 64 bytes: `r` and `s`, each a 32-byte big-endian integer (IEEE P1363). The default: the
      * `X-Sign` example in monobank's docs decodes to exactly 64 bytes, and the python-monobank
-     * reference client sends this format.
+     * client (`ecdsa` library, default `sigencode_string`) sends this format.
      */
     P1363,
 
     /**
-     * ASN.1 DER `SEQUENCE { r INTEGER, s INTEGER }` (70–72 bytes), what `openssl dgst -sign`
-     * and most JCA/Go ECDSA APIs produce. Some community clients send this format; switch to it
-     * if monobank rejects [P1363] signatures with HTTP 403.
+     * ASN.1 DER `SEQUENCE { r INTEGER, s INTEGER }` (usually 70–72 bytes): what `openssl dgst
+     * -sign`, JCA `SHA256withECDSA`, Go `ecdsa.SignASN1` and AWS KMS produce. Several open-source
+     * monobank clients send DER (their source shows it); whether monobank accepts it is not
+     * confirmed. Try it if monobank rejects [P1363] signatures with HTTP 401 or 403.
      */
     DER,
 }
