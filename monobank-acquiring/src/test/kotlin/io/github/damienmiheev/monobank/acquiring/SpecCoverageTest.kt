@@ -53,7 +53,13 @@ class SpecCoverageTest : AcquiringTestSupport() {
             },
             "POST /api/merchant/invoice/payment-direct" to { m ->
                 m.invoices.paymentDirect(
-                    PaymentDirectRequest.builder(1, CardData.of("4242", "0642", "1"), InitiationKind.CLIENT).build(),
+                    PaymentDirectRequest
+                        .builder(
+                            1,
+                            CardData.of("4242", "0642", "1"),
+                            InitiationKind.CLIENT,
+                            "https://shop.example/return",
+                        ).build(),
                 )
             },
             "GET /api/merchant/submerchant/list" to { m -> m.merchant.submerchants() },

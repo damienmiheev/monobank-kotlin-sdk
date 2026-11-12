@@ -140,15 +140,23 @@ public data class PaymentDirectRequest internal constructor(
          * Starts a request.
          *
          * @param amount Amount in minor units (kopiyky).
-         * @param initiationKind Who starts the payment. Optional in monobank's schema, but the live
-         *   API refuses a request without it (400 `1001` "invalid 'initiationKind'"), so it is required here.
+         * @param initiationKind Who starts the payment.
+         * @param redirectUrl Where the customer returns after 3-D Secure.
+         *
+         * Both are optional in monobank's schema, but the live API refuses a request without them
+         * (400 `1001` "invalid 'initiationKind'" / "invalid 'redirectUrl'"), so they are required here.
+         * The answer is usually `processing` with a [PaymentResponse.tdsUrl] the customer must open.
          */
         @JvmStatic
         public fun builder(
             amount: Long,
             cardData: CardData,
             initiationKind: InitiationKind,
-        ): Builder = Builder(amount, cardData).initiationKind(initiationKind)
+            redirectUrl: String,
+        ): Builder {
+            require(redirectUrl.isNotBlank()) { "redirectUrl must not be blank" }
+            return Builder(amount, cardData).initiationKind(initiationKind).redirectUrl(redirectUrl)
+        }
     }
 }
 

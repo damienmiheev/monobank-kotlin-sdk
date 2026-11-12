@@ -218,14 +218,18 @@ class InvoiceOperationsTest : AcquiringTestSupport() {
         enqueueFixture("POST_api_merchant_invoice_payment_direct.response.json")
         val request =
             PaymentDirectRequest
-                .builder(4200, CardData.of("4242424242424242", "0642", "123"), InitiationKind.CLIENT)
-                .ccy(980)
+                .builder(
+                    4200,
+                    CardData.of("4242424242424242", "0642", "123"),
+                    InitiationKind.CLIENT,
+                    "https://shop.example/return",
+                ).ccy(980)
                 .merchantPaymInfo(MerchantPaymInfo.builder().reference("ref-1").build())
                 .webHookUrl("https://shop.example/hook")
                 .paymentType(PaymentType.HOLD)
                 .saveCardData(SaveCardData.saveTo("w1"))
                 .redirectUrl("https://shop.example/back")
-                .initiationKind(InitiationKind.CLIENT)
+                .initiationKind(InitiationKind.CLIENT, "https://shop.example/return")
                 .build()
 
         val response = mono.invoices.paymentDirect(request)
@@ -280,7 +284,13 @@ class InvoiceOperationsTest : AcquiringTestSupport() {
         )
         val response =
             mono.invoices.paymentDirect(
-                PaymentDirectRequest.builder(1, CardData.of("4111", "0130", "1"), InitiationKind.CLIENT).build(),
+                PaymentDirectRequest
+                    .builder(
+                        1,
+                        CardData.of("4111", "0130", "1"),
+                        InitiationKind.CLIENT,
+                        "https://shop.example/return",
+                    ).build(),
             )
         assertThat(response.isThreeDsRequired).isTrue()
     }
@@ -290,7 +300,7 @@ class InvoiceOperationsTest : AcquiringTestSupport() {
         assertThatThrownBy { CardData.of("4242", "642", "1") }.isInstanceOf(IllegalArgumentException::class.java)
         assertThatThrownBy {
             PaymentDirectRequest
-                .builder(1, CardData.of("4242", "0642", "1"), InitiationKind.CLIENT)
+                .builder(1, CardData.of("4242", "0642", "1"), InitiationKind.CLIENT, "https://shop.example/return")
                 .paymentType(PaymentType.VERIFICATION)
                 .build()
         }.isInstanceOf(IllegalArgumentException::class.java)

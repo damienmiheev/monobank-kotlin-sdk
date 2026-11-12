@@ -60,8 +60,12 @@ class AcquiringHoldLiveTest {
             step("payment-direct hold 2.00 UAH") {
                 mono.invoices.paymentDirect(
                     PaymentDirectRequest
-                        .builder(200, CardData.of("4242424242424242", "1230", "123"), InitiationKind.CLIENT)
-                        .ccy(CurrencyCodes.UAH)
+                        .builder(
+                            200,
+                            CardData.of("4242424242424242", "1230", "123"),
+                            InitiationKind.CLIENT,
+                            "https://shop.example/return",
+                        ).ccy(CurrencyCodes.UAH)
                         .paymentType(PaymentType.HOLD)
                         .merchantPaymInfo(
                             MerchantPaymInfo
@@ -83,9 +87,12 @@ class AcquiringHoldLiveTest {
                         ).build(),
                 )
             } ?: return
-        log("tdsUrl present: ${paid.tdsUrl != null}")
+        if (paid.tdsUrl != null) {
+            log("3-D Secure: open this link in your browser and confirm, then wait here: ${paid.tdsUrl}")
+            System.out.flush()
+        }
 
-        val held = waitFor(mono, paid.invoiceId) { it == InvoiceStatus.HOLD || it.isFinal }
+        val held = waitFor(mono, paid.invoiceId, attempts = 120) { it == InvoiceStatus.HOLD || it.isFinal }
         log("status after payment: $held")
         if (held != InvoiceStatus.HOLD) return
 
@@ -127,10 +134,11 @@ class AcquiringHoldLiveTest {
     private fun waitFor(
         mono: MonobankAcquiring,
         invoiceId: String,
+        attempts: Int = 20,
         done: (InvoiceStatus) -> Boolean,
     ): InvoiceStatus {
         var status = mono.invoices.status(invoiceId).status
-        repeat(20) {
+        repeat(attempts) {
             if (done(status)) return status
             Thread.sleep(1_500)
             status = mono.invoices.status(invoiceId).status
