@@ -229,7 +229,7 @@ class InvoiceOperationsTest : AcquiringTestSupport() {
                 .paymentType(PaymentType.HOLD)
                 .saveCardData(SaveCardData.saveTo("w1"))
                 .redirectUrl("https://shop.example/back")
-                .initiationKind(InitiationKind.CLIENT, "https://shop.example/return")
+                .initiationKind(InitiationKind.CLIENT)
                 .build()
 
         val response = mono.invoices.paymentDirect(request)
@@ -266,6 +266,7 @@ class InvoiceOperationsTest : AcquiringTestSupport() {
                     100,
                     CardData.of("4242424242424242", "0642", "987"),
                     InitiationKind.CLIENT,
+                    "https://shop.example/return",
                 ).build()
         val text = request.toString()
         assertThat(text).doesNotContain("4242424242424242").doesNotContain("0642").doesNotContain("987")
