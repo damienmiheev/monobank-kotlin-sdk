@@ -33,3 +33,14 @@ class MinorUnitsTest {
         assertThatThrownBy { MinorUnits.toMajor(1, 1) }.isInstanceOf(IllegalArgumentException::class.java)
     }
 }
+
+class MinorUnitsEdgeCasesTest {
+    @Test
+    fun `trailing zeros are fine, overflow and no-minor-unit currencies are refused`() {
+        assertThat(MinorUnits.toMinor(BigDecimal("42.000"), CurrencyCodes.UAH)).isEqualTo(4200)
+        assertThatThrownBy {
+            MinorUnits.toMinor(BigDecimal("1e30"), CurrencyCodes.UAH)
+        }.isInstanceOf(ArithmeticException::class.java)
+        assertThatThrownBy { MinorUnits.fractionDigits(959) }.isInstanceOf(IllegalArgumentException::class.java) // XAU
+    }
+}

@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Proves the SDK works for a Kill Bill plugin: Kill Bill's parent POM forces its own Jackson
+  (2.13.x) and slf4j versions, and Kill Bill 0.24 runs on Java 11. CI installs the SDK into
+  ~/.m2 (./gradlew publishToMavenLocal) and runs `mvn verify` here on JDK 11.
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>org.kill-bill.billing</groupId>
+        <artifactId>killbill-oss-parent</artifactId>
+        <version>0.146.67</version>
+    </parent>
+
+    <groupId>example</groupId>
+    <artifactId>monobank-sdk-killbill-consumer</artifactId>
+    <version>1.0-SNAPSHOT</version>
+    <packaging>jar</packaging>
+
+    <properties>
+        <monobank.sdk.version>1.0.0-SNAPSHOT</monobank.sdk.version>
+        <project.build.targetJdk>11</project.build.targetJdk>
+        <!-- This is a test harness, not a Kill Bill module: skip the parent's code-quality gates. -->
+        <check.skip-enforcer>true</check.skip-enforcer>
+        <check.skip-spotbugs>true</check.skip-spotbugs>
+        <check.skip-dependency>true</check.skip-dependency>
+        <check.skip-dependency-scope>true</check.skip-dependency-scope>
+        <check.skip-dependency-versions>true</check.skip-dependency-versions>
+        <check.skip-duplicate-finder>true</check.skip-duplicate-finder>
+        <check.skip-rat>true</check.skip-rat>
+        <check.skip-jacoco>true</check.skip-jacoco>
+        <check.skip-pmd>true</check.skip-pmd>
+        <check.skip-checkstyle>true</check.skip-checkstyle>
+        <check.skip-license>true</check.skip-license>
+        <check.skip-javadoc>true</check.skip-javadoc>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>io.github.damienmiheev</groupId>
+            <artifactId>monobank-acquiring</artifactId>
+            <version>${monobank.sdk.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-simple</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>5.14.4</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.5.4</version>
+                <configuration>
+                    <!-- The parent configures TestNG; this project uses JUnit 5. -->
+                    <groups combine.self="override"/>
+                    <excludedGroups combine.self="override"/>
+                    <properties combine.self="override"/>
+                    <suiteXmlFiles combine.self="override"/>
+                    <systemPropertyVariables>
+                        <expectedJacksonDatabind>${jackson-databind.version}</expectedJacksonDatabind>
+                    </systemPropertyVariables>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>

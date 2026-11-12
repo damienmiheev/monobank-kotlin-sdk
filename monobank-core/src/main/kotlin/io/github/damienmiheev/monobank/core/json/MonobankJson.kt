@@ -89,21 +89,29 @@ public object MonobankJson {
     ): T =
         try {
             block() ?: throw MonobankSerializationException("monobank returned an empty body for $what", null, outcome)
+        } catch (e: MonobankSerializationException) {
+            throw e
         } catch (e: IOException) {
             throw MonobankSerializationException("Could not decode monobank response as $what", e, outcome)
-        } catch (e: IllegalArgumentException) {
-            // Kotlin's null checks on non-null constructor parameters.
+        } catch (
+            @Suppress("TooGenericExceptionCaught") e: RuntimeException,
+        ) {
+            // Kotlin null checks on non-null constructor parameters, date parsing, unexpected shapes.
             throw MonobankSerializationException(
                 "Could not decode monobank response as $what: ${e.message}",
                 e,
                 outcome,
             )
-        } catch (e: NullPointerException) {
-            throw MonobankSerializationException(
-                "Could not decode monobank response as $what: ${e.message}",
-                e,
-                outcome,
-            )
+        }
+
+    /** "Europe/Kyiv" exists only in tzdata 2022b+ (JDK 11.0.17+); older JDKs know "Europe/Kiev". */
+    private val KYIV: java.time.ZoneId =
+        try {
+            java.time.ZoneId.of("Europe/Kyiv")
+        } catch (
+            @Suppress("SwallowedException") e: java.time.DateTimeException,
+        ) {
+            java.time.ZoneId.of("Europe/Kiev")
         }
 
     private fun timeModule(): SimpleModule =
@@ -130,9 +138,11 @@ public object MonobankJson {
                 try {
                     java.time.LocalDateTime
                         .parse(text, DateTimeFormatter.ISO_LOCAL_DATE_TIME)
-                        .atZone(java.time.ZoneId.of("Europe/Kyiv"))
+                        .atZone(KYIV)
                         .toOffsetDateTime()
-                } catch (ignored: DateTimeParseException) {
+                } catch (
+                    @Suppress("SwallowedException") ignored: DateTimeParseException,
+                ) {
                     throw ctxt.weirdStringException(text, OffsetDateTime::class.java, e.message)
                 }
             }
@@ -163,9 +173,17 @@ public object MonobankJson {
                 JsonToken.VALUE_STRING -> {
                     val text = p.text.trim()
                     when {
-                        text.isEmpty() -> null
-                        text.all { it.isDigit() } -> Instant.ofEpochSecond(text.toLong())
-                        else -> Instant.parse(text)
+                        text.isEmpty() -> {
+                            null
+                        }
+
+                        text.trimStart('-').let { d -> d.isNotEmpty() && d.all { it in '0'..'9' } } -> {
+                            Instant.ofEpochSecond(text.toLong())
+                        }
+
+                        else -> {
+                            Instant.parse(text)
+                        }
                     }
                 }
 

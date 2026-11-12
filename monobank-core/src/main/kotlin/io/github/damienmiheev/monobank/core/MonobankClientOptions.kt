@@ -14,8 +14,8 @@ import java.time.Duration
  * @property connectTimeout TCP/TLS connect timeout.
  * @property requestTimeout Timeout for one whole request (sending it and reading the answer).
  * @property retryPolicy When failed requests are retried.
- * @property httpClient Your own [HttpClient] (for a proxy, custom TLS or executor). When set,
- *   [connectTimeout] is ignored because it belongs to the client.
+ * @property httpClient Your own [HttpClient] (for a proxy, custom TLS or executor). It must not
+ *   follow redirects. When set, [connectTimeout] is ignored because it belongs to the client.
  * @property userAgentSuffix Appended to the SDK's `User-Agent`, for example `my-shop/2.1`.
  */
 public class MonobankClientOptions private constructor(
@@ -51,12 +51,26 @@ public class MonobankClientOptions private constructor(
         internal var httpClient: HttpClient? = null
         internal var userAgentSuffix: String? = null
 
-        /** Overrides the API host, e.g. `http://localhost:8080` in tests. */
-        public fun baseUrl(baseUrl: String): Builder =
+        /**
+         * Overrides the API host, e.g. a proxy or `http://localhost:8080` in tests. Plain `http` is
+         * allowed only for loopback hosts, so credentials never travel unencrypted. `null` restores the default.
+         */
+        public fun baseUrl(baseUrl: String?): Builder =
             apply {
-                val uri = URI.create(baseUrl.trimEnd('/'))
-                require(uri.scheme == "https" || uri.scheme == "http") { "baseUrl must be an http(s) URL" }
-                this.baseUrl = uri
+                if (baseUrl == null) {
+                    this.baseUrl = null
+                } else {
+                    val uri = URI.create(baseUrl.trimEnd('/'))
+                    require(uri.scheme == "https" || uri.scheme == "http") { "baseUrl must be an http(s) URL" }
+                    require(uri.host != null) { "baseUrl must have a host" }
+                    require(uri.rawQuery == null && uri.rawFragment == null) {
+                        "baseUrl must not have a query or fragment"
+                    }
+                    require(uri.scheme == "https" || uri.host in LOOPBACK_HOSTS) {
+                        "Plain http is allowed only for localhost; use https for ${uri.host}"
+                    }
+                    this.baseUrl = uri
+                }
             }
 
         /** Sets the connect timeout (default 10 s). */
@@ -77,7 +91,14 @@ public class MonobankClientOptions private constructor(
         public fun retryPolicy(policy: RetryPolicy): Builder = apply { retryPolicy = policy }
 
         /** Uses your own [HttpClient]. */
-        public fun httpClient(client: HttpClient?): Builder = apply { httpClient = client }
+        public fun httpClient(client: HttpClient?): Builder =
+            apply {
+                require(client == null || client.followRedirects() == HttpClient.Redirect.NEVER) {
+                    "The HttpClient must use HttpClient.Redirect.NEVER, " +
+                        "so credentials are never re-sent to another host"
+                }
+                httpClient = client
+            }
 
         /** Appends a product token to the `User-Agent` header. */
         public fun userAgentSuffix(suffix: String?): Builder =
@@ -93,6 +114,8 @@ public class MonobankClientOptions private constructor(
     }
 
     public companion object {
+        private val LOOPBACK_HOSTS = setOf("localhost", "127.0.0.1", "[::1]", "::1")
+
         /** Default options: production host, 10 s connect, 30 s request timeout, [RetryPolicy.DEFAULT]. */
         @JvmField
         public val DEFAULT: MonobankClientOptions = Builder().build()

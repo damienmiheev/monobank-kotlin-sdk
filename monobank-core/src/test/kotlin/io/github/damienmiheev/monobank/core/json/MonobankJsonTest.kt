@@ -76,3 +76,29 @@ class MonobankJsonTest {
         assertThat(json).isEqualTo("""{"amount":100,"color":"red"}""")
     }
 }
+
+class MonobankJsonEdgeCasesTest {
+    class Dates
+        @com.fasterxml.jackson.annotation.JsonCreator
+        constructor(
+            @param:com.fasterxml.jackson.annotation.JsonProperty("day") val day: java.time.LocalDate?,
+            @param:com.fasterxml.jackson.annotation.JsonProperty("time") val time: Instant?,
+        )
+
+    @Test
+    fun `reads dates and epoch seconds given as strings`() {
+        val dates = MonobankJson.read("""{"day":"2024-02-29","time":"1700000000"}""".toByteArray(), Dates::class.java)
+        assertThat(dates.day).isEqualTo(java.time.LocalDate.of(2024, 2, 29))
+        assertThat(dates.time).isEqualTo(Instant.ofEpochSecond(1_700_000_000))
+        val negative = MonobankJson.read("""{"time":"-5"}""".toByteArray(), Dates::class.java)
+        assertThat(negative.time).isEqualTo(Instant.ofEpochSecond(-5))
+    }
+
+    @Test
+    fun `any decoding failure becomes a serialization exception`() {
+        assertThatThrownBy { MonobankJson.read("""{"day":"not-a-date"}""".toByteArray(), Dates::class.java) }
+            .isInstanceOf(MonobankSerializationException::class.java)
+        assertThatThrownBy { MonobankJson.read("""{"time":true}""".toByteArray(), Dates::class.java) }
+            .isInstanceOf(MonobankSerializationException::class.java)
+    }
+}

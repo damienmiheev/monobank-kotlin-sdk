@@ -25,6 +25,7 @@ include(
     ":monobank-personal",
     ":monobank-corporate",
     ":monobank-installments",
+    ":monobank-testkit",
     ":monobank-bom",
     ":relocation",
 )

@@ -40,3 +40,26 @@ class OptionsTest {
         assertThat(SdkInfo.version).isNotEqualTo("unknown").doesNotContain("\${")
     }
 }
+
+class RetryPolicyBuilderTest {
+    @Test
+    fun `builder defaults equal DEFAULT and validate bounds`() {
+        assertThat(RetryPolicy.builder().build()).isEqualTo(RetryPolicy.DEFAULT)
+        assertThat(
+            RetryPolicy.DEFAULT
+                .toBuilder()
+                .maxRetries(0)
+                .build()
+                .maxRetries,
+        ).isZero()
+        assertThatThrownBy {
+            RetryPolicy
+                .builder()
+                .maxRetries(
+                    11,
+                ).build()
+        }.isInstanceOf(IllegalArgumentException::class.java)
+        assertThatThrownBy { RetryPolicy.builder().maxBackoff(Duration.ofDays(2)).build() }
+            .isInstanceOf(IllegalArgumentException::class.java)
+    }
+}

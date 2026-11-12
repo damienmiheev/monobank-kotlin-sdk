@@ -28,7 +28,7 @@ public object CurrencyCodes {
  * APIs use for every amount — and major units (hryvnias, dollars).
  *
  * The number of minor-unit digits comes from ISO 4217 via [java.util.Currency]: 2 for UAH,
- * USD and EUR, 0 for JPY, 3 for KWD.
+ * USD and EUR, 0 for JPY, 3 for KWD. The table is the running JDK's ISO 4217 data.
  */
 public object MinorUnits {
     private val byNumericCode: Map<Int, Currency> by lazy {
@@ -43,7 +43,9 @@ public object MinorUnits {
     @JvmStatic
     public fun fractionDigits(currencyCode: Int): Int {
         val currency = requireNotNull(byNumericCode[currencyCode]) { "Unknown ISO 4217 currency code: $currencyCode" }
-        return currency.defaultFractionDigits.coerceAtLeast(0)
+        val digits = currency.defaultFractionDigits
+        require(digits >= 0) { "Currency $currencyCode (${currency.currencyCode}) has no minor unit" }
+        return digits
     }
 
     /**

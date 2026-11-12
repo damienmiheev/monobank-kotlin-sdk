@@ -46,8 +46,12 @@ public class MonobankHttp(
     private val client: HttpClient =
         options.httpClient ?: HttpClient
             .newBuilder()
-            .connectTimeout(options.connectTimeout)
+            // A connect timeout longer than the request timeout would let the request timer fire
+            // during connect, and a request that was never sent would be reported as UNKNOWN.
+            .connectTimeout(minOf(options.connectTimeout, options.requestTimeout))
             .followRedirects(HttpClient.Redirect.NEVER)
+            // HTTP/1.1: JDK 11's HTTP/2 client had stalls fixed only in later updates.
+            .version(HttpClient.Version.HTTP_1_1)
             .build()
     private val userAgent: String =
         listOfNotNull(SdkInfo.userAgent(module), options.userAgentSuffix).joinToString(" ")
@@ -78,7 +82,24 @@ public class MonobankHttp(
                     e
                 }
             val retryAfter = (failure as? MonobankRateLimitException)?.retryAfter
-            if (attempt >= policy.maxRetries || !isRetryable(request, failure)) throw failure
+            val canRetry =
+                attempt < policy.maxRetries &&
+                    isRetryable(request, failure) &&
+                    // Waiting less than monobank asked would only earn another 429.
+                    (retryAfter == null || retryAfter <= policy.maxBackoff) &&
+                    !Thread.currentThread().isInterrupted
+            if (!canRetry) {
+                if (attempt > 0) {
+                    logger.warn(
+                        "monobank {} {} failed after {} attempts: {}",
+                        request.method,
+                        request.path,
+                        attempt + 1,
+                        failure.javaClass.simpleName,
+                    )
+                }
+                throw failure
+            }
             attempt++
             val wait = backoff(attempt, retryAfter)
             logger.debug("monobank {} {} retry {} in {} ms", request.method, request.path, attempt, wait.toMillis())
@@ -119,9 +140,13 @@ public class MonobankHttp(
     ): Duration {
         val policy = options.retryPolicy
         if (retryAfter != null) return minOf(retryAfter, policy.maxBackoff)
-        val base = policy.initialBackoff.toMillis() shl (attempt - 1).coerceAtMost(MAX_SHIFT)
+        val maxMillis = policy.maxBackoff.toMillis()
+        val shift = (attempt - 1).coerceIn(0, MAX_SHIFT)
+        val initial = policy.initialBackoff.toMillis()
+        // Saturating exponential growth (backoff is capped at one hour, so no overflow).
+        val base = if (initial > (maxMillis shr shift)) maxMillis else minOf(initial shl shift, maxMillis)
         val jittered = base / 2 + ThreadLocalRandom.current().nextLong(base / 2 + 1)
-        return minOf(Duration.ofMillis(jittered), policy.maxBackoff)
+        return Duration.ofMillis(jittered)
     }
 
     private fun executeOnce(request: ApiRequest): ApiResponse {
@@ -156,9 +181,9 @@ public class MonobankHttp(
                 .timeout(options.requestTimeout)
                 .header("User-Agent", userAgent)
                 .header("Accept", "application/json")
-        request.contentType?.let { builder.header("Content-Type", it) }
-        request.headers.forEach { (name, value) -> builder.header(name, value) }
-        authenticator.headers(request).forEach { (name, value) -> builder.header(name, value) }
+        request.contentType?.let { builder.setHeader("Content-Type", it) }
+        request.headers.forEach { (name, value) -> builder.setHeader(name, value) }
+        authenticator.headers(request).forEach { (name, value) -> builder.setHeader(name, value) }
         val publisher =
             request.body?.let { HttpRequest.BodyPublishers.ofByteArray(it) } ?: HttpRequest.BodyPublishers.noBody()
         return builder.method(request.method.name, publisher).build()

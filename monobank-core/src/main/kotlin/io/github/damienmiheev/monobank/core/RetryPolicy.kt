@@ -24,9 +24,39 @@ public class RetryPolicy private constructor(
     public val maxBackoff: Duration,
 ) {
     init {
-        require(maxRetries >= 0) { "maxRetries must be >= 0" }
+        require(maxRetries in 0..MAX_RETRIES) { "maxRetries must be in 0..$MAX_RETRIES" }
         require(!initialBackoff.isNegative) { "initialBackoff must not be negative" }
         require(maxBackoff >= initialBackoff) { "maxBackoff must be >= initialBackoff" }
+        require(maxBackoff <= MAX_BACKOFF) { "maxBackoff must be at most $MAX_BACKOFF" }
+    }
+
+    /** Returns a builder pre-filled with this policy. */
+    public fun toBuilder(): Builder =
+        Builder()
+            .maxRetries(maxRetries)
+            .initialBackoff(initialBackoff)
+            .maxBackoff(maxBackoff)
+
+    /** Builder for [RetryPolicy]; starts from [DEFAULT]'s values. */
+    public class Builder internal constructor() {
+        private var maxRetries: Int = 2
+        private var initialBackoff: Duration = Duration.ofMillis(500)
+        private var maxBackoff: Duration = Duration.ofSeconds(10)
+
+        /** Retries after the first attempt (0..10). */
+        public fun maxRetries(maxRetries: Int): Builder = apply { this.maxRetries = maxRetries }
+
+        /** First wait; doubled on each retry, with jitter. */
+        public fun initialBackoff(backoff: Duration): Builder = apply { initialBackoff = backoff }
+
+        /**
+         * Longest single wait (at most 1 hour). When monobank asks to wait longer via `Retry-After`,
+         * the SDK does not retry and throws the rate-limit exception instead.
+         */
+        public fun maxBackoff(backoff: Duration): Builder = apply { maxBackoff = backoff }
+
+        /** Builds the policy. */
+        public fun build(): RetryPolicy = RetryPolicy(maxRetries, initialBackoff, maxBackoff)
     }
 
     override fun equals(other: Any?): Boolean =
@@ -41,6 +71,9 @@ public class RetryPolicy private constructor(
         "RetryPolicy(maxRetries=$maxRetries, initialBackoff=$initialBackoff, maxBackoff=$maxBackoff)"
 
     public companion object {
+        private const val MAX_RETRIES = 10
+        private val MAX_BACKOFF: Duration = Duration.ofHours(1)
+
         /** No retries at all. */
         @JvmField
         public val NONE: RetryPolicy = RetryPolicy(0, Duration.ZERO, Duration.ZERO)
@@ -48,6 +81,10 @@ public class RetryPolicy private constructor(
         /** Two retries, starting at 500 ms, at most 10 s per wait. */
         @JvmField
         public val DEFAULT: RetryPolicy = RetryPolicy(2, Duration.ofMillis(500), Duration.ofSeconds(10))
+
+        /** Starts a policy with [DEFAULT]'s values. */
+        @JvmStatic
+        public fun builder(): Builder = Builder()
 
         /** Creates a policy. */
         @JvmStatic

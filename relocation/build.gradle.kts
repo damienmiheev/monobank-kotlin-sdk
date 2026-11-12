@@ -1,6 +1,6 @@
 import com.vanniktech.maven.publish.MavenPublishBaseExtension
 
-// Final release of the old coordinates app.spilki:monobank-acquiring-sdk. It contains only a
+// Final release (0.1.0) of the old coordinates app.spilki:monobank-acquiring-sdk. It contains only a
 // POM that relocates users to io.github.damienmiheev:monobank-acquiring. Published by hand
 // (see RELEASING.md), never together with the SDK.
 plugins {
@@ -10,15 +10,22 @@ plugins {
 
 val newVersion = rootProject.property("VERSION_NAME") as String
 
+// Higher than every app.spilki version ever built (0.0.1-0.0.3 released, 0.1.0-SNAPSHOT in development),
+// so `latest` resolution of the old coordinates lands on the relocation.
+val RELOCATION_VERSION = "0.1.0"
+check(!newVersion.endsWith("SNAPSHOT") || gradle.startParameter.taskNames.none { "MavenCentral" in it }) {
+    "The relocation must point to a released version, not $newVersion"
+}
+
 group = "app.spilki"
-version = "0.0.4"
+version = RELOCATION_VERSION
 
 publishing {
     publications {
         create<MavenPublication>("relocation") {
             groupId = "app.spilki"
             artifactId = "monobank-acquiring-sdk"
-            version = "0.0.4"
+            version = RELOCATION_VERSION
             pom {
                 packaging = "pom"
                 name.set("monobank-acquiring-sdk (relocated)")

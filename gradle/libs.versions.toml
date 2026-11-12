@@ -1,11 +1,18 @@
 [versions]
 kotlin = "2.4.21"
-# Latest Jackson 2.x, but the SDK only uses APIs present in 2.13
-# (Kill Bill's parent POM pins 2.13.4). The testJackson213 task proves it.
-jackson = "2.23.0"
+# Published runtime floors, deliberately not the newest releases: a library's declared version
+# becomes a minimum for Gradle consumers, so it must not force-upgrade applications.
+# - Jackson 2.18: widely used, no known CVEs. The code only uses APIs present in 2.13
+#   (Kill Bill's parent POM pins 2.13.4); testJackson213 proves it.
+# - slf4j-api 1.7.36: Kill Bill 0.24 ships SLF4J 1.7; the code calls only 1.7 API.
+jackson = "2.18.12"
+jackson-annotations = "2.18.12"
 jackson-min = "2.13.4"
 jackson-databind-min = "2.13.4.2"
-slf4j = "2.0.20"
+slf4j = "1.7.36"
+slf4j-test = "2.0.20"
+# kotlin-stdlib published with the modules: Kotlin consumers need 2.1+.
+kotlin-stdlib = "2.2.21"
 bouncycastle = "1.87"
 detekt = "2.0.0-alpha.6"
 ktlint-plugin = "14.2.0"
@@ -18,9 +25,8 @@ mockwebserver = "4.12.0"
 assertj = "3.27.7"
 
 [libraries]
-jackson-bom = { module = "com.fasterxml.jackson:jackson-bom", version.ref = "jackson" }
-jackson-databind = { module = "com.fasterxml.jackson.core:jackson-databind" }
-jackson-annotations = { module = "com.fasterxml.jackson.core:jackson-annotations" }
+jackson-databind = { module = "com.fasterxml.jackson.core:jackson-databind", version.ref = "jackson" }
+jackson-annotations = { module = "com.fasterxml.jackson.core:jackson-annotations", version.ref = "jackson-annotations" }
 slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "slf4j" }
 bouncycastle = { module = "org.bouncycastle:bcprov-jdk18on", version.ref = "bouncycastle" }
 
@@ -30,7 +36,7 @@ junit-jupiter-params = { module = "org.junit.jupiter:junit-jupiter-params" }
 junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
 assertj-core = { module = "org.assertj:assertj-core", version.ref = "assertj" }
 mockwebserver = { module = "com.squareup.okhttp3:mockwebserver", version.ref = "mockwebserver" }
-slf4j-simple = { module = "org.slf4j:slf4j-simple", version.ref = "slf4j" }
+slf4j-simple = { module = "org.slf4j:slf4j-simple", version.ref = "slf4j-test" }
 
 [bundles]
 test = ["junit-jupiter", "junit-jupiter-params", "assertj-core", "mockwebserver", "slf4j-simple"]

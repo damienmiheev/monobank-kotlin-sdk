@@ -26,6 +26,7 @@ val libraryModules =
         "monobank-personal",
         "monobank-corporate",
         "monobank-installments",
+        "monobank-testkit",
     )
 
 apiValidation {
@@ -42,6 +43,7 @@ val catalog = libs
 val ktlintVersion: String = libs.versions.ktlint.engine.get()
 val jacksonMinVersion: String = libs.versions.jackson.min.get()
 val jacksonDatabindMinVersion: String = libs.versions.jackson.databind.min.get()
+val kotlinStdlibVersion: String = libs.versions.kotlin.stdlib.get()
 
 configure(subprojects.filter { it.name in libraryModules }) {
     apply(plugin = "org.jetbrains.kotlin.jvm")
@@ -53,6 +55,8 @@ configure(subprojects.filter { it.name in libraryModules }) {
 
     configure<KotlinJvmProjectExtension> {
         explicitApi()
+        // Publish a kotlin-stdlib older Kotlin compilers can read (the compiler itself is newer).
+        coreLibrariesVersion = kotlinStdlibVersion
         jvmToolchain(21)
         compilerOptions {
             // Bytecode and JDK API surface of Java 11: Kill Bill 0.24 runs on JDK 11.
@@ -70,6 +74,8 @@ configure(subprojects.filter { it.name in libraryModules }) {
     }
 
     dependencies {
+        // Aligns all SDK modules to one version, so mixing module versions can't break at runtime.
+        "api"(platform(project(":monobank-bom")))
         "testImplementation"(platform(catalog.junit.bom))
         "testImplementation"(catalog.bundles.test)
         "testRuntimeOnly"(catalog.junit.platform.launcher)
@@ -77,7 +83,18 @@ configure(subprojects.filter { it.name in libraryModules }) {
 
     tasks.withType<Test>().configureEach {
         useJUnitPlatform {
-            excludeTags("live")
+            // Live tests only run in liveTest (below).
+            if (name != "liveTest") excludeTags("live")
+        }
+        // CI runs the plain test task on the newest JDK as well: -PtestJavaVersion=25
+        providers.gradleProperty("testJavaVersion").orNull?.let { version ->
+            if (name == "test") {
+                javaLauncher.set(
+                    project.extensions.getByType<JavaToolchainService>().launcherFor {
+                        languageVersion.set(JavaLanguageVersion.of(version))
+                    },
+                )
+            }
         }
         testLogging {
             events("failed")
@@ -161,6 +178,7 @@ configure(subprojects.filter { it.name != "relocation" }) {
         configure<MavenPublishBaseExtension> {
             // Uploads to the Central Portal; the release is confirmed by hand in the portal UI.
             publishToMavenCentral(automaticRelease = false)
+            // Required for every non-SNAPSHOT version: a release without a key fails instead of going out unsigned.
             signAllPublications()
         }
     }

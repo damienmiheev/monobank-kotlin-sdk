@@ -1,0 +1,16 @@
+name: Feature or API change
+description: A new monobank endpoint/field, or a change on monobank's side
+labels: [enhancement]
+body:
+  - type: input
+    id: docs
+    attributes:
+      label: Link to monobank's documentation
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What should the SDK do?
+    validations:
+      required: true

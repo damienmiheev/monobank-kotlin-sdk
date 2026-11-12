@@ -1,0 +1,22 @@
+version: 2
+updates:
+  - package-ecosystem: gradle
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      build-tools:
+        patterns: ["*"]
+    ignore:
+      # The SDK deliberately stays on Jackson 2.x (Kill Bill uses 2.x) and JUnit 5 (JUnit 6 needs Java 17).
+      - dependency-name: "tools.jackson*"
+      - dependency-name: "org.junit:junit-bom"
+        versions: [">=6"]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+  - package-ecosystem: maven
+    directory: /consumer-tests/killbill-maven
+    schedule:
+      interval: monthly

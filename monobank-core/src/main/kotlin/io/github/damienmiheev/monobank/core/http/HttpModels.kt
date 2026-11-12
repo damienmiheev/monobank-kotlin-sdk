@@ -30,6 +30,9 @@ public class ApiRequest(
 ) {
     init {
         require(path.startsWith("/")) { "path must start with /" }
+        require(path.none { it == '?' || it == '#' || it.isWhitespace() || it.code < SPACE }) {
+            "path must not contain a query, fragment or whitespace; encode ids with UrlEncoding.pathSegment"
+        }
     }
 
     /** Path plus encoded query string, as sent on the wire. */
@@ -43,6 +46,8 @@ public class ApiRequest(
 }
 
 /** A raw HTTP answer. */
+private const val SPACE = 0x20
+
 @InternalMonobankApi
 public class ApiResponse(
     public val statusCode: Int,
@@ -89,9 +94,20 @@ public interface ErrorDecoder {
 }
 
 @InternalMonobankApi
-internal object UrlEncoding {
-    fun encode(value: String): String =
+public object UrlEncoding {
+    /** Encodes a query name or value (spaces as `%20`). */
+    public fun encode(value: String): String =
         java.net.URLEncoder
             .encode(value, Charsets.UTF_8)
             .replace("+", "%20")
+
+    /**
+     * Encodes one path segment, e.g. an account or order id placed into a URL path, so it can't
+     * add segments, a query or a fragment.
+     */
+    public fun pathSegment(value: String): String {
+        require(value.isNotEmpty()) { "path segment must not be empty" }
+        require(value != "." && value != "..") { "path segment must not be . or .." }
+        return encode(value)
+    }
 }
