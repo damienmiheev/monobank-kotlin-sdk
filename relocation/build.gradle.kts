@@ -53,9 +53,8 @@ publishing {
                         artifactId.set("monobank-acquiring")
                         version.set(newVersion)
                         message.set(
-                            "Moved to io.github.damienmiheev:monobank-acquiring. Packages were renamed from " +
-                                "app.spilki.monobank.acquiring to io.github.damienmiheev.monobank.acquiring; see " +
-                                "https://github.com/damienmiheev/monobank-kotlin-sdk#migrating-from-appspilki",
+                            "Moved to io.github.damienmiheev:monobank-acquiring. Packages and the API changed; " +
+                                "see https://github.com/damienmiheev/monobank-kotlin-sdk#migrating-from-appspilki",
                         )
                     }
                 }

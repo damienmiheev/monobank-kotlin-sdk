@@ -317,7 +317,7 @@ internal class FakeServer(
     private fun decode(value: String): String = URLDecoder.decode(value, StandardCharsets.UTF_8)
 
     private companion object {
-        const val SHUTDOWN_SECONDS = 5L
-        const val TOKEN_HEADER = "X-Token"
+        private const val SHUTDOWN_SECONDS = 5L
+        private const val TOKEN_HEADER = "X-Token"
     }
 }

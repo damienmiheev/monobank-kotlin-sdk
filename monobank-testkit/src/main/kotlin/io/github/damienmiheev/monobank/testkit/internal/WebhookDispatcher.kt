@@ -372,7 +372,7 @@ internal class WebhookDispatcher(
     }
 
     private companion object {
-        const val HTTP_OK = 200
-        const val SHUTDOWN_SECONDS = 5L
+        private const val HTTP_OK = 200
+        private const val SHUTDOWN_SECONDS = 5L
     }
 }

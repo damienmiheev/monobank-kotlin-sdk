@@ -19,15 +19,41 @@ public data class Discount internal constructor(
     @get:JsonProperty("tax") public val tax: List<Int>?,
 ) {
     public companion object {
-        /** Creates a discount without tax codes. */
+        private val HUNDRED = BigDecimal(100)
+        private const val MAX_PERCENT_DECIMALS = 2
+
+        /**
+         * A percentage discount or surcharge, e.g. `percent(DISCOUNT, BigDecimal("12.5"))`.
+         *
+         * @param percent Greater than 0, at most 100, at most 2 decimals (monobank ignores more).
+         */
         @JvmStatic
         @JvmOverloads
-        public fun of(
+        public fun percent(
             type: DiscountType,
-            mode: DiscountMode,
-            value: BigDecimal,
+            percent: BigDecimal,
             tax: List<Int>? = null,
-        ): Discount = Discount(type, mode, value, tax)
+        ): Discount {
+            require(percent.signum() > 0 && percent <= HUNDRED) { "percent must be in (0, 100]" }
+            require(percent.stripTrailingZeros().scale() <= MAX_PERCENT_DECIMALS) { "percent has more than 2 decimals" }
+            return Discount(type, DiscountMode.PERCENT, percent, tax?.toList())
+        }
+
+        /**
+         * A fixed-amount discount or surcharge.
+         *
+         * @param amountMinor Amount in minor units (kopiyky): `300` is 3.00 UAH. Must be positive.
+         */
+        @JvmStatic
+        @JvmOverloads
+        public fun value(
+            type: DiscountType,
+            amountMinor: Long,
+            tax: List<Int>? = null,
+        ): Discount {
+            require(amountMinor > 0) { "amountMinor must be positive (kopiyky)" }
+            return Discount(type, DiscountMode.VALUE, BigDecimal.valueOf(amountMinor), tax?.toList())
+        }
     }
 }
 
@@ -77,7 +103,7 @@ public data class BasketItem internal constructor(
         private var discounts: List<Discount>? = null
 
         /** Total for all units, in minor units. */
-        public fun total(total: Long?): Builder = apply { this.total = total }
+        public fun total(total: Long): Builder = apply { this.total = total }
 
         /** Product image URL. */
         public fun icon(icon: String?): Builder = apply { this.icon = icon }

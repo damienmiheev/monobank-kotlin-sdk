@@ -54,7 +54,7 @@ class WalletApiTest : AcquiringTestSupport() {
                         .destination("Підписка")
                         .comment("c")
                         .customerEmails(listOf("a@b.c"))
-                        .discounts(listOf(Discount.of(DiscountType.DISCOUNT, DiscountMode.PERCENT, BigDecimal("10"))))
+                        .discounts(listOf(Discount.percent(DiscountType.DISCOUNT, BigDecimal("10"))))
                         .basketOrder(
                             listOf(
                                 BasketItem
@@ -230,5 +230,54 @@ class WalletApiTest : AcquiringTestSupport() {
         assertThat(metadata.path("n").asInt()).isEqualTo(5)
         assertThat(metadata.path("ok").asBoolean()).isTrue()
         assertThat(metadata.path("s").asText()).isEqualTo("v")
+    }
+}
+
+class DiscountTest {
+    @org.junit.jupiter.api.Test
+    fun `discount factories are unambiguous about units and validate input`() {
+        val value =
+            io.github.damienmiheev.monobank.acquiring.common.Discount
+                .value(io.github.damienmiheev.monobank.acquiring.common.DiscountType.DISCOUNT, 300)
+        org.assertj.core.api.Assertions
+            .assertThat(
+                value.mode,
+            ).isEqualTo(io.github.damienmiheev.monobank.acquiring.common.DiscountMode.VALUE)
+        org.assertj.core.api.Assertions
+            .assertThat(
+                String(
+                    io.github.damienmiheev.monobank.core.json.MonobankJson
+                        .write(value),
+                ),
+            ).contains("\"value\":300")
+        val pct =
+            io.github.damienmiheev.monobank.acquiring.common.Discount
+                .percent(
+                    io.github.damienmiheev.monobank.acquiring.common.DiscountType.EXTRA_CHARGE,
+                    java.math.BigDecimal("10").stripTrailingZeros(),
+                )
+        org.assertj.core.api.Assertions
+            .assertThat(
+                String(
+                    io.github.damienmiheev.monobank.core.json.MonobankJson
+                        .write(pct),
+                ),
+            ).contains("\"value\":10")
+            .doesNotContain("E+")
+        listOf("0", "-1", "100.01", "12.345").forEach { bad ->
+            org.assertj.core.api.Assertions
+                .assertThatThrownBy {
+                    io.github.damienmiheev.monobank.acquiring.common.Discount
+                        .percent(
+                            io.github.damienmiheev.monobank.acquiring.common.DiscountType.DISCOUNT,
+                            java.math.BigDecimal(bad),
+                        )
+                }.isInstanceOf(IllegalArgumentException::class.java)
+        }
+        org.assertj.core.api.Assertions
+            .assertThatThrownBy {
+                io.github.damienmiheev.monobank.acquiring.common.Discount
+                    .value(io.github.damienmiheev.monobank.acquiring.common.DiscountType.DISCOUNT, 0)
+            }.isInstanceOf(IllegalArgumentException::class.java)
     }
 }

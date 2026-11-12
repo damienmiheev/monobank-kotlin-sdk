@@ -44,7 +44,7 @@ On a clean checkout of the release commit:
 1. `./gradlew clean check publishToMavenLocal -x :relocation:publishToMavenLocal --console=plain` passes. `check` includes the unit
    tests on JDK 21 and JDK 11 (`testJdk11`), the tests against Jackson 2.13 (`testJackson213`),
    detekt, ktlint and the public API dump (`apiCheck`).
-2. CI is green on the commit: `build`, `newest-jdk`, `killbill-consumer`, `workflow-lint`, `codeql`.
+2. CI is green on the commit: `build`, `newest-jdk`, `killbill-consumer`, `workflow-lint`, `codeql`, `codeql-actions`.
 3. Live tests against monobank: Actions → "Live tests (monobank test mode)" (secrets live in the
    `monobank-test` environment), or by hand with test credentials (never committed):
    ```bash

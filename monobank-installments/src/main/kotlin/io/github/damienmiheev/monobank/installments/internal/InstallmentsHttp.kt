@@ -57,7 +57,7 @@ internal class HmacSigner(
     override fun toString(): String = "HmacSigner(***)"
 
     private companion object {
-        const val ALGORITHM = "HmacSHA256"
+        private const val ALGORITHM = "HmacSHA256"
     }
 }
 

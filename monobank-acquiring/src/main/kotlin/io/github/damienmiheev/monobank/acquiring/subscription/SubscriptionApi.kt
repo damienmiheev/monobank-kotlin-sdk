@@ -229,6 +229,6 @@ public class SubscriptionApi internal constructor(
     }
 
     private companion object {
-        const val PATH = "/api/merchant/subscription/"
+        private const val PATH = "/api/merchant/subscription/"
     }
 }

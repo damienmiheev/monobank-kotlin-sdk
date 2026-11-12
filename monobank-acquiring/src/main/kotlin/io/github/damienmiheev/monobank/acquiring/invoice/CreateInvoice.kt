@@ -99,7 +99,7 @@ public data class CreateInvoiceRequest internal constructor(
         public fun webHookUrl(url: String?): Builder = apply { webHookUrl = url }
 
         /** Invoice lifetime in seconds. */
-        public fun validity(seconds: Long?): Builder = apply { validity = seconds }
+        public fun validity(seconds: Long): Builder = apply { validity = seconds }
 
         /** Debit, hold or verification. */
         public fun paymentType(type: PaymentType?): Builder = apply { paymentType = type }

@@ -6,6 +6,7 @@ import com.fasterxml.jackson.core.JsonParser
 import com.fasterxml.jackson.core.JsonProcessingException
 import com.fasterxml.jackson.core.JsonToken
 import com.fasterxml.jackson.core.StreamReadFeature
+import com.fasterxml.jackson.core.StreamWriteFeature
 import com.fasterxml.jackson.core.type.TypeReference
 import com.fasterxml.jackson.databind.DeserializationContext
 import com.fasterxml.jackson.databind.DeserializationFeature
@@ -53,6 +54,8 @@ public object MonobankJson {
             .disable(DeserializationFeature.ACCEPT_FLOAT_AS_INT)
             // Jackson would otherwise copy parts of the body (card tokens, personal data) into error messages.
             .disable(StreamReadFeature.INCLUDE_SOURCE_IN_LOCATION)
+            // Decimals are sent as written (`10`, `1.50`), never in exponent form (`1E+1`).
+            .enable(StreamWriteFeature.WRITE_BIGDECIMAL_AS_PLAIN)
             .defaultPropertyInclusion(
                 JsonInclude.Value.construct(JsonInclude.Include.NON_NULL, JsonInclude.Include.NON_NULL),
             ).addModule(timeModule())

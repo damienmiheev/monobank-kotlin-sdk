@@ -39,7 +39,7 @@ public data class CancelInvoiceRequest internal constructor(
         public fun extRef(extRef: String?): Builder = apply { this.extRef = extRef }
 
         /** Partial refund amount in minor units (kopiyky); `null` for a full refund. */
-        public fun amount(amount: Long?): Builder = apply { this.amount = amount }
+        public fun amount(amount: Long): Builder = apply { this.amount = amount }
 
         /** Refunded products, for the return receipt. */
         public fun items(items: List<FiscalizationItem>?): Builder = apply { this.items = items }

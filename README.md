@@ -204,7 +204,7 @@ It approximates monobank's documented behaviour; also run your own tests against
 ```kotlin
 val mono = MonobankPersonal.create(System.getenv("MONOBANK_PERSONAL_TOKEN"))
 val me = mono.client.info()
-val items = mono.statements.listAll(me.accounts.first().id, Instant.now().minus(Duration.ofDays(90)), Instant.now())
+val items = mono.statements.listAll(me.accounts.orEmpty().first().id, Instant.now().minus(Duration.ofDays(90)), Instant.now())
 val rates = MonobankPersonal.publicOnly().bank.currency()
 ```
 
@@ -239,34 +239,50 @@ val order = chast.orders.create(createOrderRequest)
 
 Amounts are `BigDecimal` hryvnias. Requests and callbacks are signed with HMAC-SHA256.
 
-## Migrating from `app.spilki:monobank-acquiring-sdk`
+## Migrating from app.spilki
 
 The SDK moved to the owner's account and namespace. `app.spilki:monobank-acquiring-sdk:0.1.0` is a
 relocation POM that points Maven and Gradle to `io.github.damienmiheev:monobank-acquiring:1.0.0`,
-but the **package names changed**, so code needs these edits:
+but the **packages were restructured and the API changed**, so code needs these edits.
+
+Packages: `app.spilki.monobank.acquiring` → `io.github.damienmiheev.monobank.acquiring`; the `model.`
+and `api.` levels are gone (e.g. `model.invoice.CreateInvoiceRequest` → `invoice.CreateInvoiceRequest`,
+`model.common.InvoiceStatus` → `common.InvoiceStatus`, `webhook.WebhookParser` stays `webhook.WebhookParser`),
+and exceptions moved to `io.github.damienmiheev.monobank.core`.
 
 | 0.0.x | 1.0.0 |
 |---|---|
 | `implementation("app.spilki:monobank-acquiring-sdk:0.0.3")` | `implementation("io.github.damienmiheev:monobank-acquiring:1.0.0")` |
-| `app.spilki.monobank.acquiring.*` | `io.github.damienmiheev.monobank.acquiring.*` |
 | `MonobankAcquiring(MonobankAcquiringConfig(token = t))` | `MonobankAcquiring(AcquiringConfig.builder(t).build())` or `MonobankAcquiring.create(t)` |
+| `MonobankAcquiringConfig(baseUrl, connectTimeoutMs, readTimeoutMs, cmsName, cmsVersion)` | `AcquiringConfig.builder(t).cmsName(..).cmsVersion(..).options(MonobankClientOptions.builder().baseUrl(..).connectTimeout(Duration).requestTimeout(Duration).build())` |
 | `CreateInvoiceRequest(amount = 4200, ccy = 980, ...)` | `CreateInvoiceRequest.builder(4200).ccy(980)...build()` |
-| `WalletPaymentRequest(cardToken, amount, ccy, ...)` | `WalletPaymentRequest.builder(cardToken, amount, ccy, InitiationKind.MERCHANT)...build()` |
+| `WalletPaymentRequest(cardToken, amount, ccy, ...)` | `WalletPaymentRequest.builder(cardToken, amount, ccy, InitiationKind.MERCHANT)...build()` (answer: `PaymentResponse`) |
 | `CancelInvoiceRequest(invoiceId, amount = x)` | `CancelInvoiceRequest.builder(invoiceId).amount(x).build()` |
-| `model.common.InvoiceStatus` | `common.InvoiceStatus` (unknown values → `UNKNOWN`) |
-| `webhooks.verify(sign, body)` | same; or `check(...)` to tell an invalid signature from an unavailable key |
-| `WebhookParser.parse(json)` | `webhook.WebhookParser.parse(json)` |
-| `e.errCode` / `e.errText` | `e.errorCode` / `e.errorText`, plus `e.outcome` and `e.traceId` |
+| `FinalizeInvoiceRequest(invoiceId, amount)` | `FinalizeInvoiceRequest.of(invoiceId, amount)` (amount is now required) |
+| `invoices.receipt(id)` returned the raw JSON bytes | returns the decoded **PDF** bytes (same signature: check your callers) |
+| `merchant.statement(fromEpochSeconds, toEpochSeconds)` | `merchant.statement(Instant, Instant?)`; also `statementEntries`, `findByReference` |
+| `monopay.importPubKey / deletePubKey / listPubKeys` | `monopay.importKey / deleteKey / keys` |
+| `qr.employees()` | `employees.list()` (deprecated: legacy docs only) |
+| `submerchants.list()` | `merchant.submerchants()` |
+| `terminals.list()` | `terminals.list()` (returns `T2pTerminal`) |
+| `wallet.deleteCard(cardToken, walletId)` | `wallet.deleteCard(cardToken)` |
 | `subscriptions.status(subId)` | `subscriptions.status(subscriptionId)` |
+| `subscriptions.payments(subId)` / `list(walletId)` | `payments(SubscriptionPaymentsQuery)` / `list(SubscriptionListQuery)`, returning a `Page` |
+| `subscriptions.edit(EditSubscriptionRequest(...))` | `edit(EditSubscriptionRequest.cancel(id[, refund]))` (cancel is the only documented edit) |
+| `webhooks.verify(sign, body)` | same; or `check(...)` to tell an invalid signature from an unavailable key |
+| `e.errCode` / `e.errText` | `e.errorCode` / `e.errorText`, plus `e.outcome` and `e.traceId` |
 
 0.0.x could not read list answers (statement, QR, wallet cards, submerchants, split receivers,
-fiscal checks, subscriptions, monopay keys, receipts); 1.0.0 fixes them. See [CHANGELOG.md](CHANGELOG.md).
+fiscal checks, subscriptions, monopay keys) or receipts; 1.0.0 fixes them. See [CHANGELOG.md](CHANGELOG.md).
 
 ## Versioning
 
 [Semantic Versioning](https://semver.org/). The public API is checked on every build
 (`api/*.api`). APIs marked `@ExperimentalMonobankApi` and declarations marked `@InternalMonobankApi`
 are excluded from the compatibility promise. New exception subclasses are only added in major versions.
+Constructors of response and request models are `internal` in Kotlin but visible to Java; they are
+not part of the API and can change in a minor release. Build test data from JSON
+(`WebhookParser.parse(...)`) or use `monobank-testkit` instead of calling them.
 
 ## Contributing, security, license
 

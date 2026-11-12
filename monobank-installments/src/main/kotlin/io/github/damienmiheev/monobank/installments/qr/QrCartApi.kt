@@ -61,7 +61,7 @@ public class QrCartApi internal constructor(
     )
 
     private companion object {
-        const val CONFLICT = 409
+        private const val CONFLICT = 409
     }
 }
 

@@ -139,11 +139,11 @@ public class AccessApi internal constructor(
     }
 
     private companion object {
-        const val CALLBACK_HEADER = "X-Callback"
-        const val HTTP_UNAUTHORIZED = 401
-        const val HTTP_NOT_FOUND = 404
+        private const val CALLBACK_HEADER = "X-Callback"
+        private const val HTTP_UNAUTHORIZED = 401
+        private const val HTTP_NOT_FOUND = 404
 
         /** Documented 401 text while the client has not answered: "Request is unauthorized yet". */
-        const val PENDING_TEXT = "unauthorized yet"
+        private const val PENDING_TEXT = "unauthorized yet"
     }
 }

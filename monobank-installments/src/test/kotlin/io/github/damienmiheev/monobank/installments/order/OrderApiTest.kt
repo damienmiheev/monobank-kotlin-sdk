@@ -472,8 +472,21 @@ class OrderApiTest : InstallmentsTestSupport() {
     }
 
     @Test
-    fun `a 2xx answer that cannot be read is a serialization error with unknown outcome`() {
+    fun `a 2xx confirm answer without the optional fields still reports success of the action`() {
         enqueueJson("""{"state":"SUCCESS"}""")
+        val withState = chast.orders.confirm(ORDER_ID)
+        assertThat(withState.orderId).isEqualTo(ORDER_ID)
+        assertThat(withState.state).isEqualTo(OrderState.SUCCESS)
+
+        enqueueJson("{}")
+        val empty = chast.orders.reject(ORDER_ID)
+        assertThat(empty.orderId).isEqualTo(ORDER_ID)
+        assertThat(empty.state).isEqualTo(OrderState.UNKNOWN)
+    }
+
+    @Test
+    fun `a 2xx answer that is not JSON is a serialization error with unknown outcome`() {
+        enqueueJson("not json")
 
         assertThatThrownBy { chast.orders.confirm(ORDER_ID) }
             .isInstanceOfSatisfying(MonobankSerializationException::class.java) {

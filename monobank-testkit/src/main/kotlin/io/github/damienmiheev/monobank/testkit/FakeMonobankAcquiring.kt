@@ -99,6 +99,9 @@ import java.util.function.Predicate
  * [Builder.addMerchant]: each has its own tokens, key, invoices and wallets ([merchant]).
  *
  * ### Sharing one fake
+ * Predicates passed to `awaitWebhooks`, `injectFault`, `dropNextWebhooks` and similar run while the
+ * fake holds an internal lock: they must only look at the webhook or request they are given and
+ * must not call the fake (for example `fake.invoice(id)`), or they can deadlock with a request in flight.
  * Faults are matched per path (and optionally per request, see [injectFault] with a predicate),
  * counts and recorded webhooks are global, and [reset] clears everything. Use one fake per test
  * class, or don't use global faults, global waits or [reset] from tests that run in parallel: match

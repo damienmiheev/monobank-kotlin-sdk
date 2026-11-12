@@ -24,6 +24,7 @@ for Java 11 and also runs the tests on a Java 11 runtime, which Gradle finds or 
 - Public API changes after 1.0.0 must be backwards compatible (`apiCheck`); breaking changes wait
   for a major version. `apiCheck` also lists compiler-generated `synthetic <init>(..., DefaultConstructorMarker)`
   accessors of private constructors; changes to those are not breaking (Java and Kotlin code can't call them).
+- Add new model fields as the last constructor parameter: data classes expose `componentN()`.
 - Tests: MockWebServer for every endpoint (request and response), plus edge cases. Crypto code is
   tested with real key pairs and with the documentation's examples.
 

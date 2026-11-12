@@ -10,7 +10,8 @@ see the README's migration section.
 
 ### Added
 - Modules: `monobank-core`, `monobank-acquiring`, `monobank-personal`, `monobank-corporate`
-  (experimental), `monobank-installments`, and `monobank-bom`.
+  (experimental), `monobank-installments`, `monobank-testkit` (webhook signer and a fake monobank
+  acquiring server with fault injection, for integration tests), and `monobank-bom`.
 - Acquiring: every endpoint of monobank's current acquiring documentation (v2412), including
   sync payments, split receivers, POS refunds and Tap-to-Phone status; webhook verification with
   key rotation; statement lookup by order reference for reconciling timed-out payments.
@@ -24,8 +25,10 @@ see the README's migration section.
 - `MonobankClientOptions.maxResponseBytes` (default 20 MB).
 
 ### Changed (from app.spilki 0.0.x)
-- Packages renamed from `app.spilki.monobank.acquiring` to `io.github.damienmiheev.monobank.acquiring`.
-- Requests are built with builders; responses are immutable and tolerate unknown fields and enum values.
+- Packages renamed from `app.spilki.monobank.acquiring` to `io.github.damienmiheev.monobank.acquiring`
+  and restructured; see the README's migration table for every changed call.
+- `invoices.receipt(id)` returns the decoded PDF bytes (0.0.x returned the raw JSON).
+- Requests are built with builders; responses are read-only and tolerate unknown fields and enum values.
 - Exceptions: `errCode`/`errText` → `errorCode`/`errorText`; new subclasses for 404, 5xx, JSON and signature errors.
 - Subscriptions use `subscriptionId`.
 

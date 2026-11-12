@@ -91,10 +91,6 @@ public final class io/github/damienmiheev/monobank/corporate/SignatureEncoding :
 }
 
 public final class io/github/damienmiheev/monobank/corporate/access/AccessApi {
-	public static final field CALLBACK_HEADER Ljava/lang/String;
-	public static final field HTTP_NOT_FOUND I
-	public static final field HTTP_UNAUTHORIZED I
-	public static final field PENDING_TEXT Ljava/lang/String;
 	public final fun request ()Lio/github/damienmiheev/monobank/corporate/access/AccessRequest;
 	public final fun request (Ljava/lang/String;)Lio/github/damienmiheev/monobank/corporate/access/AccessRequest;
 	public static synthetic fun request$default (Lio/github/damienmiheev/monobank/corporate/access/AccessApi;Ljava/lang/String;ILjava/lang/Object;)Lio/github/damienmiheev/monobank/corporate/access/AccessRequest;

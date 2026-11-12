@@ -148,7 +148,7 @@ public class InvoiceApi internal constructor(
     }
 
     private companion object {
-        const val INVOICE = "/api/merchant/invoice/"
+        private const val INVOICE = "/api/merchant/invoice/"
 
         fun requireId(
             value: String,

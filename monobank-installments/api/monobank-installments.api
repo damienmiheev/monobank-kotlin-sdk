@@ -259,8 +259,6 @@ public final class io/github/damienmiheev/monobank/installments/guarantee/Guaran
 }
 
 public final class io/github/damienmiheev/monobank/installments/guarantee/GuaranteeLetterApi {
-	public static final field ACCEPT_PDF_OR_ERROR Ljava/lang/String;
-	public static final field PDF_HEADER_WINDOW I
 	public final fun data (Lio/github/damienmiheev/monobank/installments/guarantee/GuaranteeLetterRequest;)Lio/github/damienmiheev/monobank/installments/guarantee/GuaranteeLetterData;
 	public final fun dataV1 (Lio/github/damienmiheev/monobank/installments/guarantee/GuaranteeLetterRequest;)Lio/github/damienmiheev/monobank/installments/guarantee/GuaranteeLetterData;
 	public final fun pdf (Lio/github/damienmiheev/monobank/installments/guarantee/GuaranteeLetterRequest;)[B
@@ -541,7 +539,6 @@ public final class io/github/damienmiheev/monobank/installments/order/FinancialC
 }
 
 public final class io/github/damienmiheev/monobank/installments/order/OrderApi {
-	public static final field NOT_FOUND I
 	public final fun checkPaid (Ljava/lang/String;)Lio/github/damienmiheev/monobank/installments/order/CheckPaidResponse;
 	public final fun confirm (Ljava/lang/String;)Lio/github/damienmiheev/monobank/installments/order/OrderStateInfo;
 	public final fun create (Lio/github/damienmiheev/monobank/installments/order/CreateOrderRequest;)Lio/github/damienmiheev/monobank/installments/order/CreateOrderResponse;
@@ -691,7 +688,6 @@ public final class io/github/damienmiheev/monobank/installments/qr/CreateQrCartR
 }
 
 public final class io/github/damienmiheev/monobank/installments/qr/QrCartApi {
-	public static final field CONFLICT I
 	public final fun cancel (Ljava/lang/String;)V
 	public final fun create (Lio/github/damienmiheev/monobank/installments/qr/CreateQrCartRequest;)Lio/github/damienmiheev/monobank/installments/qr/QrCartResult;
 }

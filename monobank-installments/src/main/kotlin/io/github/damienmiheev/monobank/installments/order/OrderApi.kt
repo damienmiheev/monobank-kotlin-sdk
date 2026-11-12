@@ -57,13 +57,7 @@ public class OrderApi internal constructor(
      *
      * `POST /api/order/confirm`. Not retried after an unknown outcome: check [state] before calling it again.
      */
-    public fun confirm(orderId: String): OrderStateInfo =
-        http.post(
-            "/api/order/confirm",
-            OrderIdBody(requireOrderId(orderId)),
-            OrderStateInfo::class.java,
-            idempotent = false,
-        )
+    public fun confirm(orderId: String): OrderStateInfo = stateAfterAction("/api/order/confirm", orderId)
 
     /**
      * Rejects the order on the store's side (goods will not be handed over); it becomes `FAIL` /
@@ -71,13 +65,7 @@ public class OrderApi internal constructor(
      *
      * `POST /api/order/reject`. Not retried after an unknown outcome: check [state] before calling it again.
      */
-    public fun reject(orderId: String): OrderStateInfo =
-        http.post(
-            "/api/order/reject",
-            OrderIdBody(requireOrderId(orderId)),
-            OrderStateInfo::class.java,
-            idempotent = false,
-        )
+    public fun reject(orderId: String): OrderStateInfo = stateAfterAction("/api/order/reject", orderId)
 
     /**
      * Returns goods, fully or partly, on an order in state `SUCCESS`. A full return moves it to `SUCCESS` /
@@ -89,6 +77,7 @@ public class OrderApi internal constructor(
      * Returning normally means monobank accepted the return (every error is thrown); do not repeat it based on
      * [ReturnOrderResponse.status], which is informational and may be missing.
      */
+
     public fun returnOrder(request: ReturnOrderRequest): ReturnOrderResponse {
         val response = http.execute("/api/order/return", request, idempotent = false)
         if (response.body.isEmpty()) return ReturnOrderResponse(null)
@@ -126,6 +115,25 @@ public class OrderApi internal constructor(
         )
 
     private companion object {
-        const val NOT_FOUND = 404
+        private const val NOT_FOUND = 404
+    }
+
+    /*
+     * Sends confirm/reject. A 2xx answer means monobank performed the action, so an answer without
+     * `order_id` or `state` (both optional in the spec) is completed with the id sent and
+     * `OrderState.UNKNOWN` instead of failing as an unknown outcome.
+     */
+    private fun stateAfterAction(
+        path: String,
+        orderId: String,
+    ): OrderStateInfo {
+        val id = requireOrderId(orderId)
+        val body = http.execute(path, OrderIdBody(id), idempotent = false).body
+        val node = if (body.isEmpty()) MonobankJson.mapper.createObjectNode() else MonobankJson.readTree(body)
+        if (node is com.fasterxml.jackson.databind.node.ObjectNode) {
+            if (!node.hasNonNull("order_id")) node.put("order_id", id)
+            if (!node.hasNonNull("state")) node.put("state", "unknown")
+        }
+        return MonobankJson.read(MonobankJson.mapper.writeValueAsBytes(node), OrderStateInfo::class.java)
     }
 }

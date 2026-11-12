@@ -250,8 +250,8 @@ internal class Ids(
     fun digits(length: Int): String = pick("0123456789", length)
 
     private companion object {
-        const val ALNUM = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
-        const val HEX = "0123456789abcdef"
+        private const val ALNUM = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+        private const val HEX = "0123456789abcdef"
         val DAY: DateTimeFormatter = DateTimeFormatter.ofPattern("yyMMdd").withZone(ZoneOffset.UTC)
     }
 }

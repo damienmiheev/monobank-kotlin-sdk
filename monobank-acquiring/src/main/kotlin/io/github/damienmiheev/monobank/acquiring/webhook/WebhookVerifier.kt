@@ -233,7 +233,11 @@ public class WebhookVerifier private constructor(
         if (running != null) return awaitOther(running, keys)
         try {
             // Re-check: another thread may have finished a fetch between the gate and the claim.
-            gate(initial, seen)?.let { return it }
+            gate(initial, seen)?.let { early ->
+                // Waiters get the same keys, not "unavailable".
+                mine.complete(early.keys)
+                return early
+            }
             val cached = keys
             val fetched = fetch(cached)
             mine.complete(fetched)

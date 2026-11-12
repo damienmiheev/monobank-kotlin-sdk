@@ -109,7 +109,7 @@ public final class io/github/damienmiheev/monobank/acquiring/common/BasketItem$B
 	public final fun icon (Ljava/lang/String;)Lio/github/damienmiheev/monobank/acquiring/common/BasketItem$Builder;
 	public final fun splitReceiverId (Ljava/lang/String;)Lio/github/damienmiheev/monobank/acquiring/common/BasketItem$Builder;
 	public final fun tax (Ljava/util/List;)Lio/github/damienmiheev/monobank/acquiring/common/BasketItem$Builder;
-	public final fun total (Ljava/lang/Long;)Lio/github/damienmiheev/monobank/acquiring/common/BasketItem$Builder;
+	public final fun total (J)Lio/github/damienmiheev/monobank/acquiring/common/BasketItem$Builder;
 	public final fun uktzed (Ljava/lang/String;)Lio/github/damienmiheev/monobank/acquiring/common/BasketItem$Builder;
 	public final fun unit (Ljava/lang/String;)Lio/github/damienmiheev/monobank/acquiring/common/BasketItem$Builder;
 }
@@ -147,15 +147,20 @@ public final class io/github/damienmiheev/monobank/acquiring/common/Discount {
 	public final fun getType ()Lio/github/damienmiheev/monobank/acquiring/common/DiscountType;
 	public final fun getValue ()Ljava/math/BigDecimal;
 	public fun hashCode ()I
-	public static final fun of (Lio/github/damienmiheev/monobank/acquiring/common/DiscountType;Lio/github/damienmiheev/monobank/acquiring/common/DiscountMode;Ljava/math/BigDecimal;)Lio/github/damienmiheev/monobank/acquiring/common/Discount;
-	public static final fun of (Lio/github/damienmiheev/monobank/acquiring/common/DiscountType;Lio/github/damienmiheev/monobank/acquiring/common/DiscountMode;Ljava/math/BigDecimal;Ljava/util/List;)Lio/github/damienmiheev/monobank/acquiring/common/Discount;
+	public static final fun percent (Lio/github/damienmiheev/monobank/acquiring/common/DiscountType;Ljava/math/BigDecimal;)Lio/github/damienmiheev/monobank/acquiring/common/Discount;
+	public static final fun percent (Lio/github/damienmiheev/monobank/acquiring/common/DiscountType;Ljava/math/BigDecimal;Ljava/util/List;)Lio/github/damienmiheev/monobank/acquiring/common/Discount;
 	public fun toString ()Ljava/lang/String;
+	public static final fun value (Lio/github/damienmiheev/monobank/acquiring/common/DiscountType;J)Lio/github/damienmiheev/monobank/acquiring/common/Discount;
+	public static final fun value (Lio/github/damienmiheev/monobank/acquiring/common/DiscountType;JLjava/util/List;)Lio/github/damienmiheev/monobank/acquiring/common/Discount;
 }
 
 public final class io/github/damienmiheev/monobank/acquiring/common/Discount$Companion {
-	public final fun of (Lio/github/damienmiheev/monobank/acquiring/common/DiscountType;Lio/github/damienmiheev/monobank/acquiring/common/DiscountMode;Ljava/math/BigDecimal;)Lio/github/damienmiheev/monobank/acquiring/common/Discount;
-	public final fun of (Lio/github/damienmiheev/monobank/acquiring/common/DiscountType;Lio/github/damienmiheev/monobank/acquiring/common/DiscountMode;Ljava/math/BigDecimal;Ljava/util/List;)Lio/github/damienmiheev/monobank/acquiring/common/Discount;
-	public static synthetic fun of$default (Lio/github/damienmiheev/monobank/acquiring/common/Discount$Companion;Lio/github/damienmiheev/monobank/acquiring/common/DiscountType;Lio/github/damienmiheev/monobank/acquiring/common/DiscountMode;Ljava/math/BigDecimal;Ljava/util/List;ILjava/lang/Object;)Lio/github/damienmiheev/monobank/acquiring/common/Discount;
+	public final fun percent (Lio/github/damienmiheev/monobank/acquiring/common/DiscountType;Ljava/math/BigDecimal;)Lio/github/damienmiheev/monobank/acquiring/common/Discount;
+	public final fun percent (Lio/github/damienmiheev/monobank/acquiring/common/DiscountType;Ljava/math/BigDecimal;Ljava/util/List;)Lio/github/damienmiheev/monobank/acquiring/common/Discount;
+	public static synthetic fun percent$default (Lio/github/damienmiheev/monobank/acquiring/common/Discount$Companion;Lio/github/damienmiheev/monobank/acquiring/common/DiscountType;Ljava/math/BigDecimal;Ljava/util/List;ILjava/lang/Object;)Lio/github/damienmiheev/monobank/acquiring/common/Discount;
+	public final fun value (Lio/github/damienmiheev/monobank/acquiring/common/DiscountType;J)Lio/github/damienmiheev/monobank/acquiring/common/Discount;
+	public final fun value (Lio/github/damienmiheev/monobank/acquiring/common/DiscountType;JLjava/util/List;)Lio/github/damienmiheev/monobank/acquiring/common/Discount;
+	public static synthetic fun value$default (Lio/github/damienmiheev/monobank/acquiring/common/Discount$Companion;Lio/github/damienmiheev/monobank/acquiring/common/DiscountType;JLjava/util/List;ILjava/lang/Object;)Lio/github/damienmiheev/monobank/acquiring/common/Discount;
 }
 
 public final class io/github/damienmiheev/monobank/acquiring/common/DiscountMode : java/lang/Enum {
@@ -461,7 +466,7 @@ public final class io/github/damienmiheev/monobank/acquiring/invoice/CancelInvoi
 }
 
 public final class io/github/damienmiheev/monobank/acquiring/invoice/CancelInvoiceRequest$Builder {
-	public final fun amount (Ljava/lang/Long;)Lio/github/damienmiheev/monobank/acquiring/invoice/CancelInvoiceRequest$Builder;
+	public final fun amount (J)Lio/github/damienmiheev/monobank/acquiring/invoice/CancelInvoiceRequest$Builder;
 	public final fun build ()Lio/github/damienmiheev/monobank/acquiring/invoice/CancelInvoiceRequest;
 	public final fun extRef (Ljava/lang/String;)Lio/github/damienmiheev/monobank/acquiring/invoice/CancelInvoiceRequest$Builder;
 	public final fun items (Ljava/util/List;)Lio/github/damienmiheev/monobank/acquiring/invoice/CancelInvoiceRequest$Builder;
@@ -578,7 +583,7 @@ public final class io/github/damienmiheev/monobank/acquiring/invoice/CreateInvoi
 	public final fun saveCardData (Lio/github/damienmiheev/monobank/acquiring/common/SaveCardData;)Lio/github/damienmiheev/monobank/acquiring/invoice/CreateInvoiceRequest$Builder;
 	public final fun successUrl (Ljava/lang/String;)Lio/github/damienmiheev/monobank/acquiring/invoice/CreateInvoiceRequest$Builder;
 	public final fun tipsEmployeeId (Ljava/lang/String;)Lio/github/damienmiheev/monobank/acquiring/invoice/CreateInvoiceRequest$Builder;
-	public final fun validity (Ljava/lang/Long;)Lio/github/damienmiheev/monobank/acquiring/invoice/CreateInvoiceRequest$Builder;
+	public final fun validity (J)Lio/github/damienmiheev/monobank/acquiring/invoice/CreateInvoiceRequest$Builder;
 	public final fun webHookUrl (Ljava/lang/String;)Lio/github/damienmiheev/monobank/acquiring/invoice/CreateInvoiceRequest$Builder;
 	public final fun withAppUrl (Ljava/lang/Boolean;)Lio/github/damienmiheev/monobank/acquiring/invoice/CreateInvoiceRequest$Builder;
 }
@@ -733,7 +738,6 @@ public final class io/github/damienmiheev/monobank/acquiring/invoice/Fiscalizati
 }
 
 public final class io/github/damienmiheev/monobank/acquiring/invoice/InvoiceApi {
-	public static final field INVOICE Ljava/lang/String;
 	public final fun cancel (Lio/github/damienmiheev/monobank/acquiring/invoice/CancelInvoiceRequest;)Lio/github/damienmiheev/monobank/acquiring/invoice/CancelInvoiceResponse;
 	public final fun create (Lio/github/damienmiheev/monobank/acquiring/invoice/CreateInvoiceRequest;)Lio/github/damienmiheev/monobank/acquiring/invoice/CreateInvoiceResponse;
 	public final fun finalize (Lio/github/damienmiheev/monobank/acquiring/invoice/FinalizeInvoiceRequest;)Lio/github/damienmiheev/monobank/acquiring/invoice/FinalizeInvoiceResponse;
@@ -1450,7 +1454,7 @@ public final class io/github/damienmiheev/monobank/acquiring/subscription/Create
 	public final fun build ()Lio/github/damienmiheev/monobank/acquiring/subscription/CreateSubscriptionRequest;
 	public final fun ccy (Ljava/lang/Integer;)Lio/github/damienmiheev/monobank/acquiring/subscription/CreateSubscriptionRequest$Builder;
 	public final fun redirectUrl (Ljava/lang/String;)Lio/github/damienmiheev/monobank/acquiring/subscription/CreateSubscriptionRequest$Builder;
-	public final fun validity (Ljava/lang/Long;)Lio/github/damienmiheev/monobank/acquiring/subscription/CreateSubscriptionRequest$Builder;
+	public final fun validity (J)Lio/github/damienmiheev/monobank/acquiring/subscription/CreateSubscriptionRequest$Builder;
 	public final fun webHookUrls (Lio/github/damienmiheev/monobank/acquiring/subscription/SubscriptionWebHookUrls;)Lio/github/damienmiheev/monobank/acquiring/subscription/CreateSubscriptionRequest$Builder;
 }
 
@@ -1471,7 +1475,7 @@ public final class io/github/damienmiheev/monobank/acquiring/subscription/Create
 public final class io/github/damienmiheev/monobank/acquiring/subscription/EditSubscriptionRequest {
 	public static final field Companion Lio/github/damienmiheev/monobank/acquiring/subscription/EditSubscriptionRequest$Companion;
 	public static final fun cancel (Ljava/lang/String;)Lio/github/damienmiheev/monobank/acquiring/subscription/EditSubscriptionRequest;
-	public static final fun cancel (Ljava/lang/String;Ljava/lang/Long;)Lio/github/damienmiheev/monobank/acquiring/subscription/EditSubscriptionRequest;
+	public static final fun cancel (Ljava/lang/String;J)Lio/github/damienmiheev/monobank/acquiring/subscription/EditSubscriptionRequest;
 	public final fun component1 ()Ljava/lang/String;
 	public final fun component2 ()Lio/github/damienmiheev/monobank/acquiring/subscription/SubscriptionAction;
 	public final fun component3 ()Ljava/lang/Long;
@@ -1485,8 +1489,7 @@ public final class io/github/damienmiheev/monobank/acquiring/subscription/EditSu
 
 public final class io/github/damienmiheev/monobank/acquiring/subscription/EditSubscriptionRequest$Companion {
 	public final fun cancel (Ljava/lang/String;)Lio/github/damienmiheev/monobank/acquiring/subscription/EditSubscriptionRequest;
-	public final fun cancel (Ljava/lang/String;Ljava/lang/Long;)Lio/github/damienmiheev/monobank/acquiring/subscription/EditSubscriptionRequest;
-	public static synthetic fun cancel$default (Lio/github/damienmiheev/monobank/acquiring/subscription/EditSubscriptionRequest$Companion;Ljava/lang/String;Ljava/lang/Long;ILjava/lang/Object;)Lio/github/damienmiheev/monobank/acquiring/subscription/EditSubscriptionRequest;
+	public final fun cancel (Ljava/lang/String;J)Lio/github/damienmiheev/monobank/acquiring/subscription/EditSubscriptionRequest;
 }
 
 public final class io/github/damienmiheev/monobank/acquiring/subscription/SubscriptionAction : java/lang/Enum {
@@ -1498,7 +1501,6 @@ public final class io/github/damienmiheev/monobank/acquiring/subscription/Subscr
 }
 
 public final class io/github/damienmiheev/monobank/acquiring/subscription/SubscriptionApi {
-	public static final field PATH Ljava/lang/String;
 	public final fun create (Lio/github/damienmiheev/monobank/acquiring/subscription/CreateSubscriptionRequest;)Lio/github/damienmiheev/monobank/acquiring/subscription/CreateSubscriptionResponse;
 	public final fun edit (Lio/github/damienmiheev/monobank/acquiring/subscription/EditSubscriptionRequest;)V
 	public final fun list (Lio/github/damienmiheev/monobank/acquiring/subscription/SubscriptionListQuery;)Lio/github/damienmiheev/monobank/acquiring/common/Page;

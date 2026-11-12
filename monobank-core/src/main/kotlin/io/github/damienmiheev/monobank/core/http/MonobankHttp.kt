@@ -272,8 +272,8 @@ public class MonobankHttp(
 
     private companion object {
         val SUCCESS = 200..299
-        const val MAX_SHIFT = 20
-        const val MAX_CAUSES = 10
+        private const val MAX_SHIFT = 20
+        private const val MAX_CAUSES = 10
     }
 }
 

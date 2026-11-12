@@ -228,7 +228,8 @@ internal class CorporateHttp(
         path: String,
         query: List<Pair<String, String?>>,
     ) {
-        execute(ApiRequest(HttpMethod.DELETE, path, query, idempotent = true))
+        // A cancel that succeeded but whose answer was lost must not be sent again.
+        execute(ApiRequest(HttpMethod.DELETE, path, query, idempotent = false))
     }
 
     companion object {

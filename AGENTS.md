@@ -32,6 +32,8 @@ release — see RELEASING.md (every check is done twice before publishing; only 
 2. **Models:** explicit `@JsonProperty` names. Responses: `@ConsistentCopyVisibility data class` with an
    `internal` `@JsonCreator` constructor; only ids/status/amount/currency non-null; enums from
    responses have `UNKNOWN` (and keep the raw value where it matters). Requests: builders.
+   New model fields go LAST in the constructor (`componentN()` is public API). Model constructors
+   are Java-visible but not API: never document them for use.
 3. **Money:** minor units as `Long` (acquiring/personal/corporate), `BigDecimal` hryvnias (installments).
    Never `Double`. KDoc states the unit on every amount.
 4. **Retries:** mark each operation `idempotent` honestly. Payments, refunds, creates, deletes and
@@ -43,7 +45,7 @@ release — see RELEASING.md (every check is done twice before publishing; only 
 6. **Public API:** `explicitApi()`; after changing it run `./gradlew apiDump` and commit `api/*.api`.
    After 1.0.0 only additive changes.
 7. **Tests:** MockWebServer per endpoint (request and response), fixtures from the docs, edge cases,
-   a Java interop test per module, real key pairs for crypto. Live tests are tagged `live` and only
+   a Java interop test per API module, real key pairs for crypto. Live tests are tagged `live` and only
    run by hand (`./gradlew liveTest` with env vars, see CONTRIBUTING.md) or via the manual
    `live.yml` workflow. Never commit credentials.
 

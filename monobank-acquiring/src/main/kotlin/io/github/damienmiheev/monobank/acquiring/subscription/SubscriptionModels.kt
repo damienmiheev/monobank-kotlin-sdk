@@ -70,7 +70,7 @@ public data class CreateSubscriptionRequest internal constructor(
         public fun webHookUrls(urls: SubscriptionWebHookUrls?): Builder = apply { webHookUrls = urls }
 
         /** Payment page lifetime in seconds. */
-        public fun validity(seconds: Long?): Builder = apply { validity = seconds }
+        public fun validity(seconds: Long): Builder = apply { validity = seconds }
 
         /** Builds the request. */
         public fun build(): CreateSubscriptionRequest {
@@ -296,15 +296,21 @@ public data class EditSubscriptionRequest internal constructor(
 ) {
     public companion object {
         /**
-         * Cancels a subscription.
-         *
-         * @param refundAmount Amount to refund in minor units (kopiyky), or `null` for no refund.
+         * Cancels a subscription without a refund.
          */
         @JvmStatic
-        @JvmOverloads
+        public fun cancel(subscriptionId: String): EditSubscriptionRequest = cancelWith(subscriptionId, null)
+
+        /** Cancels the subscription and refunds [refundAmount] (minor units, kopiyky) of the last payment. */
+        @JvmStatic
         public fun cancel(
             subscriptionId: String,
-            refundAmount: Long? = null,
+            refundAmount: Long,
+        ): EditSubscriptionRequest = cancelWith(subscriptionId, refundAmount)
+
+        private fun cancelWith(
+            subscriptionId: String,
+            refundAmount: Long?,
         ): EditSubscriptionRequest {
             require(subscriptionId.isNotBlank()) { "subscriptionId must not be blank" }
             refundAmount?.let { require(it > 0) { "refundAmount must be positive (minor units)" } }
