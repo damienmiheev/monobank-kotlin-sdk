@@ -15,7 +15,7 @@ review), on the exact commit that gets tagged. Nothing is published until both p
    can re-apply everything below; review the result under Settings → Rules.
    - Ruleset `main` (no bypass for anyone, admin included): changes only through squash-merged
      pull requests with resolved conversations; CI checks `build`, `newest-jdk`, `killbill-consumer`,
-     `workflow-lint` and `codeql` must pass on the up-to-date branch; no high CodeQL alerts; signed
+     `workflow-lint`, `codeql` and `codeql-actions` must pass on the up-to-date branch; no high CodeQL alerts; signed
      commits; linear history; no force pushes; no deletion. A failing PR can never be merged.
    - Ruleset `main-review`: 1 approving review from a code owner, re-approval after new pushes.
      The admin may bypass only this one, and only when merging a pull request, so the owner can
