@@ -10,7 +10,12 @@ public object AcquiringErrorCodes {
     /** 400: the request is invalid; fix the parameters. */
     public const val BAD_REQUEST: String = "BAD_REQUEST"
 
-    /** 400: the request is invalid; on `subscription/remove` it means the subscription already has a payment. */
+    /**
+     * 400: the request is invalid. On `subscription/remove` it means the subscription already has a
+     * payment. On `invoice/finalize` (seen live, errText "wrong amount for finalization without
+     * basket") it means a partial capture without `items` on a merchant with fiscal receipts or
+     * split payments.
+     */
     public const val INVALID_REQUEST: String = "1001"
 
     /** 400: an invalid value in `merchantPaymInfo`. */

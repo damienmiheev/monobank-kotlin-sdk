@@ -40,6 +40,9 @@ public class InvoiceApi internal constructor(
     /**
      * Refunds a successful payment (fully, or partly with `amount`), or releases a hold.
      *
+     * Merchants with fiscal receipts or split payments should send `items` (the refunded products,
+     * with `splitReceiverId` for split payments) with a partial refund; see [finalize].
+     *
      * `POST /api/merchant/invoice/cancel`. Not retried after an unknown outcome. The refund is
      * usually [io.github.damienmiheev.monobank.acquiring.common.OperationStatus.PROCESSING]: follow
      * it with `status(invoiceId).cancelFor(extRef)` or webhooks. A refund that is impossible fails
@@ -66,6 +69,11 @@ public class InvoiceApi internal constructor(
 
     /**
      * Captures (finalizes) a hold, fully or partly.
+     *
+     * Merchants with fiscal receipts or split payments must send `items` for a partial capture
+     * (amount below the held amount); without them monobank answers 400 `1001` "wrong amount for
+     * finalization without basket" (verified on monobank's test merchant). The same is likely for
+     * a partial refund ([cancel]) without `items`.
      *
      * `POST /api/merchant/invoice/finalize`. Not retried after an unknown outcome (including a
      * 5xx `EXTERNAL_ERROR`: the capture may have happened); check
