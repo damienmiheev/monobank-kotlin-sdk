@@ -1,0 +1,34 @@
+{
+  "name": "main: checks and history (no bypass)",
+  "target": "branch",
+  "enforcement": "active",
+  "conditions": { "ref_name": { "include": ["~DEFAULT_BRANCH"], "exclude": [] } },
+  "bypass_actors": [],
+  "rules": [
+    { "type": "deletion" },
+    { "type": "non_fast_forward" },
+    { "type": "required_linear_history" },
+    {
+      "type": "required_status_checks",
+      "parameters": {
+        "strict_required_status_checks_policy": true,
+        "do_not_enforce_on_create": false,
+        "required_status_checks": [
+          { "context": "build", "integration_id": 15368 },
+          { "context": "newest-jdk", "integration_id": 15368 },
+          { "context": "killbill-consumer", "integration_id": 15368 },
+          { "context": "workflow-lint", "integration_id": 15368 },
+          { "context": "codeql", "integration_id": 15368 }
+        ]
+      }
+    },
+    {
+      "type": "code_scanning",
+      "parameters": {
+        "code_scanning_tools": [
+          { "tool": "CodeQL", "security_alerts_threshold": "high_or_higher", "alerts_threshold": "errors" }
+        ]
+      }
+    }
+  ]
+}

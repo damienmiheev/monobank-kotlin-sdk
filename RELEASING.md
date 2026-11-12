@@ -11,12 +11,29 @@ review), on the exact commit that gets tagged. Nothing is published until both p
    (Namespaces → Add namespace → create the temporary public repo GitHub asks for, then verify).
    The old namespace `app.spilki` stays verified on the same account (needed once, for the relocation POM).
 2. Central Portal → Account → Generate User Token.
-3. GitHub repository → Settings → Environments → create `maven-central` (optionally with required
-   reviewers), and add these environment secrets:
+3. Repository settings: run `tools/github/apply.sh` (needs `gh` logged in as admin). It applies and
+   can re-apply everything below; review the result under Settings → Rules.
+   - `main`: changes only through pull requests with squash merge; 1 approving review from a code
+     owner, re-approval after new pushes, resolved conversations. The admin may merge a PR without
+     approval (bypass in pull-request mode only: no direct pushes).
+   - `main`, with no bypass for anyone: CI checks `build`, `newest-jdk`, `killbill-consumer`,
+     `workflow-lint` and `codeql` must pass on the up-to-date branch; no high CodeQL alerts; linear
+     history; no force pushes; no deletion.
+   - Release tags `v*`: only the admin can create, move or delete them.
+   - Secret scanning with push protection, Dependabot alerts and security updates, private
+     vulnerability reporting.
+   - Actions: GitHub-owned actions and `gradle/actions` only, pinned to full commit SHAs; read-only
+     `GITHUB_TOKEN` by default; workflows from outside contributors need approval.
+   - Environments `maven-central` (only `v*` tags may deploy) and `monobank-test`, both requiring
+     the admin's approval for every run.
+4. Add these secrets to the `maven-central` environment (Settings → Environments):
    - `OSSRH_USERNAME`, `OSSRH_PASSWORD` — the Central Portal user token (username / password parts).
    - `GPG_SIGNING_KEY` — ASCII-armored private key (`gpg --armor --export-secret-keys <KEY_ID>`).
    - `GPG_SIGNING_PASSWORD` — its passphrase.
    The public key must be on a keyserver (`gpg --keyserver keys.openpgp.org --send-keys <KEY_ID>`).
+5. Add the live-test credentials to the `monobank-test` environment: `MONOBANK_ACQUIRING_TEST_TOKEN`
+   (required), and optionally `MONOBANK_PERSONAL_TOKEN`, `MONOBANK_CORP_PRIVATE_KEY_PEM`,
+   `MONOBANK_CORP_REQUEST_ID`, `MONOBANK_CHAST_STORE_ID`, `MONOBANK_CHAST_STORE_SECRET`.
 
 ## Verification pass (run it twice)
 
@@ -25,7 +42,7 @@ On a clean checkout of the release commit:
 1. `./gradlew clean check publishToMavenLocal -x :relocation:publishToMavenLocal --console=plain` passes. `check` includes the unit
    tests on JDK 21 and JDK 11 (`testJdk11`), the tests against Jackson 2.13 (`testJackson213`),
    detekt, ktlint and the public API dump (`apiCheck`).
-2. CI is green on the commit: `check`, tests on the newest JDK, the Kill Bill Maven consumer, CodeQL.
+2. CI is green on the commit: `build`, `newest-jdk`, `killbill-consumer`, `workflow-lint`, `codeql`.
 3. Live tests against monobank: Actions → "Live tests (monobank test mode)" (secrets live in the
    `monobank-test` environment), or by hand with test credentials (never committed):
    ```bash

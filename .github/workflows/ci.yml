@@ -6,20 +6,25 @@ on:
   pull_request:
   workflow_dispatch:
 
-permissions:
-  contents: read
+# Least privilege: nothing by default, each job asks for what it needs.
+permissions: {}
 
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  # Job names are the required status checks in the branch ruleset (tools/github/): keep them stable.
   check:
-    name: Check (tests on JDK 21 + JDK 11, Jackson 2.13, detekt, ktlint, API dump)
+    name: build
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
         with:
           distribution: temurin
@@ -41,11 +46,15 @@ jobs:
           retention-days: 7
 
   newest-jdk:
-    name: Tests on the newest JDK (25)
+    name: newest-jdk
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
         with:
           distribution: temurin
@@ -57,11 +66,15 @@ jobs:
         run: ./gradlew test -PtestJavaVersion=25 --console=plain
 
   kill-bill-consumer:
-    name: Maven consumer with Kill Bill's parent POM on JDK 11
+    name: killbill-consumer
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
         with:
           distribution: temurin
@@ -76,3 +89,18 @@ jobs:
         run: |
           export JAVA_HOME="$JAVA_HOME_11_X64"
           mvn -B -ntp verify -Dmonobank.sdk.version="$(grep '^VERSION_NAME=' ../../gradle.properties | cut -d= -f2)"
+
+  workflow-lint:
+    name: workflow-lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: actionlint
+        uses: docker://rhysd/actionlint@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667 # 1.7.12
+        with:
+          args: -color
