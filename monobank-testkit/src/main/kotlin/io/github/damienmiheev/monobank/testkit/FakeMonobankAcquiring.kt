@@ -273,27 +273,30 @@ public class FakeMonobankAcquiring private constructor(
     /**
      * Stops listening, keeping every invoice, card and setting: clients now get "connection refused"
      * (the SDK reports `RequestOutcome.NOT_SENT`). Requests in progress are cut off. [resume] listens
-     * again on the same port.
+     * again on the same port. Does nothing when already paused.
      *
-     * @throws IllegalStateException when not started, already paused, or closed.
+     * @throws IllegalStateException when not started, or closed.
      */
     public fun pause() {
         synchronized(lifecycle) {
-            check(!closed && boundPort >= 0 && !paused) { "the fake is not running" }
+            check(!closed && boundPort >= 0) { "the fake is not running" }
+            if (paused) return
             server.pause()
             paused = true
         }
     }
 
     /**
-     * Listens again on the same port after [pause].
+     * Listens again on the same port after [pause]. Does nothing when the fake is not paused, so it
+     * is safe in `@AfterEach` cleanup.
      *
-     * @throws IllegalStateException when not paused.
+     * @throws IllegalStateException when the fake is closed.
      * @throws UncheckedIOException when the port was taken meanwhile.
      */
     public fun resume() {
         synchronized(lifecycle) {
-            check(!closed && paused) { "the fake is not paused" }
+            check(!closed) { "the fake is closed" }
+            if (!paused) return
             server.start(boundPort)
             paused = false
         }

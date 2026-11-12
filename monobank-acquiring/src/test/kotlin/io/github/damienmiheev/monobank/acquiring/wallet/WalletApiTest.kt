@@ -281,3 +281,21 @@ class DiscountTest {
             }.isInstanceOf(IllegalArgumentException::class.java)
     }
 }
+
+class PaymentResponseErrCodeTest {
+    @org.junit.jupiter.api.Test
+    fun `errCode is read when monobank sends it and null otherwise`() {
+        fun read(json: String) =
+            io.github.damienmiheev.monobank.core.json.MonobankJson
+                .read(json.toByteArray(), io.github.damienmiheev.monobank.acquiring.invoice.PaymentResponse::class.java)
+        val declined =
+            read("""{"invoiceId":"i","status":"failure","failureReason":"x","errCode":"59","amount":1,"ccy":980}""")
+        org.assertj.core.api.Assertions
+            .assertThat(declined.errCode)
+            .isEqualTo("59")
+        val ok = read("""{"invoiceId":"i","status":"success","amount":1,"ccy":980}""")
+        org.assertj.core.api.Assertions
+            .assertThat(ok.errCode)
+            .isNull()
+    }
+}

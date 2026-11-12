@@ -192,6 +192,8 @@ internal fun requireDebitOrHold(paymentType: PaymentType?) {
  * @property ccy ISO 4217 numeric currency.
  * @property createdDate When the payment was created.
  * @property modifiedDate Last change of the payment.
+ * @property errCode Payment error code (see `PaymentErrorCodes.describe`). Not in monobank's schema
+ *   for this answer, so usually `null`; `invoices.status(invoiceId).errCode` always carries it.
  */
 @ConsistentCopyVisibility
 public data class PaymentResponse
@@ -205,6 +207,7 @@ public data class PaymentResponse
         @param:JsonProperty("ccy") public val ccy: Int,
         @param:JsonProperty("createdDate") public val createdDate: OffsetDateTime?,
         @param:JsonProperty("modifiedDate") public val modifiedDate: OffsetDateTime?,
+        @param:JsonProperty("errCode") public val errCode: String?,
     ) {
         /** Typed payment status; [OperationStatus.UNKNOWN] for a value this SDK version does not know. */
         public val status: OperationStatus

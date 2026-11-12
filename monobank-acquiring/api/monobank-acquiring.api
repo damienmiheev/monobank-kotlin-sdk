@@ -870,10 +870,12 @@ public final class io/github/damienmiheev/monobank/acquiring/invoice/PaymentResp
 	public final fun component6 ()I
 	public final fun component7 ()Ljava/time/OffsetDateTime;
 	public final fun component8 ()Ljava/time/OffsetDateTime;
+	public final fun component9 ()Ljava/lang/String;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getAmount ()J
 	public final fun getCcy ()I
 	public final fun getCreatedDate ()Ljava/time/OffsetDateTime;
+	public final fun getErrCode ()Ljava/lang/String;
 	public final fun getFailureReason ()Ljava/lang/String;
 	public final fun getInvoiceId ()Ljava/lang/String;
 	public final fun getModifiedDate ()Ljava/time/OffsetDateTime;

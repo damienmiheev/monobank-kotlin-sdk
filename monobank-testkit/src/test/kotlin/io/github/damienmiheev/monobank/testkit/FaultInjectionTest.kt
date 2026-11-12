@@ -360,14 +360,15 @@ class FaultInjectionTest {
         fake.pause()
         val error = failure<MonobankNetworkException> { noRetry.invoices.create(createRequest("while-paused")) }
         assertThat(error.outcome).isEqualTo(RequestOutcome.NOT_SENT)
-        assertThatThrownBy { fake.pause() }.isInstanceOf(IllegalStateException::class.java)
+        fake.pause() // already paused: no-op
 
         fake.resume()
         assertThat(fake.port).isEqualTo(port)
         assertThat(noRetry.invoices.status(invoiceId).status).isEqualTo(InvoiceStatus.CREATED)
         assertThat(noRetry.invoices.create(createRequest("retry")).invoiceId).isNotBlank()
         assertThat(fake.invoices().map { it.reference }).containsExactly("order-1", "retry")
-        assertThatThrownBy { fake.resume() }.isInstanceOf(IllegalStateException::class.java)
+        fake.resume() // not paused: no-op
+        assertThat(noRetry.invoices.status(invoiceId).status).isEqualTo(InvoiceStatus.CREATED)
     }
 
     @Test

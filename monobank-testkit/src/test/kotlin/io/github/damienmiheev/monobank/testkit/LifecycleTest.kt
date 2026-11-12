@@ -285,3 +285,21 @@ class LifecycleTest {
             .isInstanceOf(IllegalArgumentException::class.java)
     }
 }
+
+class ResumeIdempotenceTest {
+    @org.junit.jupiter.api.Test
+    fun `resume is a no-op when not paused and refused after close`() {
+        val fake = FakeMonobankAcquiring().start()
+        fake.resume() // not paused: nothing happens
+        fake.pause()
+        fake.resume()
+        fake.resume()
+        org.assertj.core.api.Assertions
+            .assertThat(fake.port)
+            .isPositive()
+        fake.close()
+        org.assertj.core.api.Assertions
+            .assertThatThrownBy { fake.resume() }
+            .isInstanceOf(IllegalStateException::class.java)
+    }
+}
