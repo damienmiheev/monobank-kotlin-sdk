@@ -132,16 +132,25 @@ class FinalizeItemsMatchingTest {
         finalize(hold, 200, item())
     }
 
+    private fun paymInfoError(call: () -> Unit): String {
+        val error = runCatching { call() }.exceptionOrNull()
+        assertThat(error).isInstanceOf(MonobankBadRequestException::class.java)
+        return (error as MonobankBadRequestException)
+            .also { assertThat(it.errorCode).isEqualTo("INVALID_MERCHANT_PAYM_INFO") }
+            .errorText
+            .orEmpty()
+    }
+
     @Test
-    fun `refund items are matched against the paid basket (inferred)`() {
+    fun `refund items are matched against the paid basket by name, code and unit sum (verified live)`() {
         val paid = create(PaymentType.DEBIT)
 
-        assertThat(error { refund(paid, 50, item(qty = "1", sum = 50)) }.errorText)
-            .isEqualTo("refund basket contains item not found in invoice: ${name}_payment_50_$receiver")
-        assertThat(error { refund(paid, 50, item(qty = "0.5")) }.errorText).isEqualTo("wrong amount for refund")
-        assertThat(
-            error { refund(paid, 50, item(qty = "3")) }.errorText,
-        ).startsWith("refund basket item exceeds the invoice")
+        assertThat(paymInfoError { refund(paid, 50, item(qty = "1", sum = 50)) })
+            .isEqualTo("invalid item '$name' with code 'payment'")
+        assertThat(paymInfoError { refund(paid, 50, item(qty = "0.5", code = "other")) })
+            .isEqualTo("invalid item '$name' with code 'other'")
+        assertThat(paymInfoError { refund(paid, 50, item(qty = "0.5")) }).isEqualTo(DISCOUNT)
+        assertThat(paymInfoError { refund(paid, 50, item(qty = "3")) }).isEqualTo(DISCOUNT)
 
         refund(paid, 50, item(qty = "0.25"))
         assertThat(mono.invoices.status(paid).finalAmount).isEqualTo(150)
@@ -153,11 +162,17 @@ class FinalizeItemsMatchingTest {
         finalize(hold, 150, item(qty = "0.75"))
         fake.settleFinalize(hold)
 
-        assertThat(error { refund(hold, 100, item(qty = "1", sum = 100)) }.errorText)
-            .startsWith("refund basket contains item not found in invoice")
-        assertThat(error { refund(hold, 100, item(qty = "1")) }.errorText).startsWith("refund basket item exceeds")
+        assertThat(paymInfoError { refund(hold, 100, item(qty = "1", sum = 100)) })
+            .isEqualTo("invalid item '$name' with code 'payment'")
+        // inferred: more than the finalized line's qty 0.75
+        assertThat(paymInfoError { refund(hold, 100, item(qty = "1")) }).isEqualTo(DISCOUNT)
 
         refund(hold, 100, item(qty = "0.5"))
         assertThat(mono.invoices.status(hold).finalAmount).isEqualTo(50)
+    }
+
+    private companion object {
+        const val DISCOUNT =
+            "total amount of ('sum' * 'qty')-calculated 'discount' does not equal 'amount' field from request"
     }
 }

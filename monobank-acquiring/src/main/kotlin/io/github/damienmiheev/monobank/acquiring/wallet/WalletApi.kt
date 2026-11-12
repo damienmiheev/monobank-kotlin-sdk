@@ -30,6 +30,10 @@ public class WalletApi internal constructor(
      * this throws with `RequestOutcome.UNKNOWN`, look the payment up with
      * `MerchantApi.findByReference` before charging again. When [PaymentResponse.isThreeDsRequired],
      * send the customer to [PaymentResponse.tdsUrl]; the final status comes in a webhook.
+     *
+     * Charge in UAH: USD/EUR charges are converted to UAH and then cannot be fully refunded
+     * (monobank bug, verified). On merchants with fiscal receipts or split payments every refund of
+     * such a charge needs `items`; see `InvoiceApi.cancel` for a basket that allows any refund amount.
      */
     public fun payment(request: WalletPaymentRequest): PaymentResponse =
         http.post("/api/merchant/wallet/payment", request, PaymentResponse::class.java, idempotent = false)

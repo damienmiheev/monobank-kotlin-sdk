@@ -104,26 +104,55 @@ Create one client per merchant token and reuse it; it is thread-safe.
 If your merchant has fiscal receipts (Checkbox) or split payments enabled, monobank rejects invoices
 without `merchantPaymInfo.basketOrder` (`INVALID_MERCHANT_PAYM_INFO`), and with split payments every
 `BasketItem` needs a `splitReceiverId` (from `mono.split.receivers()`). Such merchants must also send `items` with a
-partial `finalize` (and, likely, a partial refund); otherwise monobank answers 400 `1001`. The items
-must repeat the original basket lines (same name, code, unit price and split receiver) with a smaller
-`qty`, e.g. 1.50 of a 1 × 2.00 line is `qty` 0.75 at `sum` 200.
+partial `finalize`, and with **every** refund of a saved-card payment (`wallet/payment`); otherwise
+monobank answers 400 `1001` ("wrong amount for finalization without basket", "'items' cannot be
+empty"). The items must repeat the original basket lines (same name, code, unit price `sum` and split
+receiver) with a smaller `qty`, and `qty × sum` must equal the amount exactly (no rounding).
+
+So if you will refund **arbitrary amounts** (pro-rated subscriptions, goodwill refunds) of saved-card
+payments, put the price into the basket in kopiyky: one line with `qty` = the amount and `sum` = 1.
+Any refund `r` is then the item `qty r × sum 1` — a whole number, which monobank expects. Verified on
+monobank's test merchant: a ₴450.00 charge with the line `45000 × 1` was refunded as `13742 × 1`,
+`1000 × 1`, then `30258 × 1`. With the line `1 × 45000`, a ₴137.42 refund cannot be expressed.
+
+```kotlin
+val amount = 45_000L // ₴450.00
+val line = BasketItem.builder("Pro plan, November", BigDecimal.valueOf(amount), 1, "pro-monthly")
+    .splitReceiverId(receiverId).build()
+// refund ₴137.42 later:
+CancelInvoiceRequest.builder(invoiceId).amount(13_742).extRef(refundId)
+    .items(listOf(FiscalizationItem.builder("Pro plan, November", BigDecimal.valueOf(13_742), 1, "pro-monthly")
+        .splitReceiverId(receiverId).build()))
+    .build()
+```
+
+Payments made on monobank's payment page or with `payment-direct` can also be refunded without `items`.
 
 ## Money
 
-Merchant acquiring accepts three currencies: UAH (980), USD (840) and EUR (978); holds work only in
-UAH. Other codes (e.g. PLN 985) are refused with 400 `1001` "invalid 'ccy'".
+**Use UAH with merchant acquiring.** It accepts three currencies: UAH (980), USD (840) and EUR
+(978); holds work only in UAH. Other codes (e.g. PLN 985) are refused with 400 `1001` "invalid 'ccy'".
+USD and EUR work for one-off payments, but saved-card charges in them cannot be fully refunded (see
+below). If you also sell in EUR, keep EUR customers on a provider that settles in EUR.
 
 All acquiring payments settle in UAH: Ukrainian law requires payments in the national currency
 (monobank's developers confirmed it), so there is no EUR or USD settlement. USD and EUR are
 **converted to UAH when the customer pays** (verified on monobank's test merchant:
 1.00 EUR became 50.48 UAH, already shown in UAH on the 3-D Secure page). The invoice is created in
 the original currency, the payment answer echoes it, but `invoice/status` and the statement report
-the UAH amount with `ccy` 980, and refunds are made in UAH: send the UAH amount, without `items`.
+the UAH amount with `ccy` 980, and refunds are made in UAH: for a payment-page or `payment-direct`
+payment, send the UAH amount without `items` (verified, partial and full).
 The actual rate is the payment's own UAH amount divided by the invoiced amount (it differs from
 monobank's public rate); a partial refund of an invoiced amount `x` out of `total` is
 `x / total × paid UAH`. A card in another currency is converted again by the card's own bank.
-After a refund of such a payment, monobank's `invoice/status` answers 500 for that invoice; use the
-statement (`merchant.statementEntries`, `findByReference`) for it.
+After a refund of such a payment, monobank's `invoice/status` answers 500 for that invoice; use
+`invoices.status(invoiceId, statementFrom)`, which falls back to the statement.
+
+**Saved-card charges in USD/EUR cannot be fully refunded** (monobank bug, verified 12.11.2026 on the
+test merchant, reported to monobank). The basket must be in the original currency's minor units, and
+monobank checks refund items against that basket while it refunds UAH kopiyky: on a €1.00 charge
+(₴50.48) with the line `100 × 1`, at most ₴1.00 could be refunded; every other form was refused. Charge
+saved cards in UAH only.
 
 The acquiring, personal and corporate APIs use **minor units** (kopiyky, cents) for every amount:
 `4200` is 42.00 UAH. Every amount field's documentation says so. The installments API uses decimal
@@ -202,12 +231,16 @@ are **never** retried after an unknown outcome.
    `currentPublicKey()` returns the key in use.
 3. **Charge a saved card**: `mono.wallet.payment(WalletPaymentRequest.builder(cardToken, amount, CurrencyCodes.UAH, InitiationKind.MERCHANT).build())`.
    If `isThreeDsRequired`, send the customer to `tdsUrl`; the result comes by webhook or status.
+   Charge in UAH, and on fiscal or split merchants use the kopiyka basket line (see above) if you
+   will refund arbitrary amounts.
 4. **Holds**: `paymentType(PaymentType.HOLD)`, then `invoices.finalize(FinalizeInvoiceRequest.of(invoiceId, amount))`
    within 9 days, or `invoices.cancel(...)` to release.
 5. **Refunds**: `invoices.cancel(CancelInvoiceRequest.builder(invoiceId).amount(partial).extRef(refundId).build())`.
    Match the result in `cancelList` by `extRef` (`status.cancelFor(refundId)`). After any refund, even a
    partial one, the invoice status is `reversed`: use `finalAmount` for what is still paid. A refund right
    after a capture is refused with 404 `1004` "order not finished" until the capture settles (`success`).
+   After a partial refund, refund the rest with an explicit `amount` (and `items` where required): a
+   refund without `amount` is then refused on split merchants ("already been partially cancelled").
 6. **Missed webhooks**: poll `invoices.status(invoiceId)`.
 7. **Unknown outcome on create or payment**: you may not have an `invoiceId`. Look the payment up by
    its reference before doing anything else: `mono.merchant.findByReference(reference, from)`.

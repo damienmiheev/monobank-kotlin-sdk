@@ -286,7 +286,7 @@ internal class MerchantState(
         // Verified live on a merchant with fiscal receipts and split payments.
         if (info.needsBasket && amount < invoice.amount && items.isEmpty()) throw noBasketForPartialAmount()
         if (info.needsBasket && items.isNotEmpty()) {
-            matchItems(invoice.basket, items, amount, ItemTexts.FINALIZE)
+            matchFinalizeItems(invoice.basket, items, amount)
             invoice.basket = items
         }
         invoice.finalAmount = amount
@@ -328,11 +328,11 @@ internal class MerchantState(
         amount: Long?,
         items: List<BasketLine>,
     ): CancelRecord {
-        val refundAmount =
+        val plan =
             when (invoice.status) {
-                Status.HOLD -> holdReleaseAmount(invoice, amount)
+                Status.HOLD -> RefundPlan(holdReleaseAmount(invoice, amount))
 
-                Status.SUCCESS, Status.REVERSED -> paymentRefundAmount(invoice, amount, items, info.needsBasket)
+                Status.SUCCESS, Status.REVERSED -> paymentRefund(invoice, amount, items, info)
 
                 // Verified live: a partial capture that is still settling cannot be refunded yet.
                 Status.PROCESSING -> throw if (invoice.finalizing) orderNotFinished() else cancelNotAvailable()
@@ -341,7 +341,17 @@ internal class MerchantState(
             }
         val now = now()
         val cancel =
-            CancelRecord(extRef, refundAmount, invoice.ccy, now, now, Status.PROCESSING, ids.digits(6), ids.digits(12))
+            CancelRecord(
+                extRef,
+                plan.amount,
+                invoice.ccy,
+                now,
+                now,
+                Status.PROCESSING,
+                ids.digits(6),
+                ids.digits(12),
+                plan.lineQty,
+            )
         invoice.cancels.add(cancel)
         return cancel
     }
@@ -438,78 +448,153 @@ private fun holdReleaseAmount(
 /** monobank's answer (verified live for finalize) to a partial amount without `items` on a fiscal or split merchant. */
 private fun noBasketForPartialAmount() = ApiError(400, "1001", "wrong amount for finalization without basket")
 
-/** Error texts of the item checks: the finalize "not found" text is verified live, the rest inferred. */
-internal enum class ItemTexts(
-    val notFound: String,
-    val tooMany: String,
-    val wrongTotal: String,
-) {
-    FINALIZE(
-        "finalization basket contains item not found in hold: ",
-        "finalization basket item exceeds the hold: ",
-        "wrong amount for finalization",
-    ),
-    REFUND(
-        "refund basket contains item not found in invoice: ",
-        "refund basket item exceeds the invoice: ",
-        "wrong amount for refund",
-    ),
-}
-
 /**
- * Matches each item to a line of [basket] by (name, code, sum = unit price, splitReceiverId): only
- * qty may differ, and not beyond the line's qty. The items must add up to [amount].
+ * Matches each finalize item to a line of [basket] by (name, code, sum = unit price, splitReceiverId):
+ * only qty may differ, and not beyond the line's qty. The items must add up to [amount]. The "not found"
+ * text is verified live, the others are inferred.
  */
-private fun matchItems(
+private fun matchFinalizeItems(
     basket: List<BasketLine>,
     items: List<BasketLine>,
     amount: Long,
-    texts: ItemTexts,
 ) {
     for (item in items) {
-        val line = basket.firstOrNull { it.sameItem(item) } ?: throw ApiError(400, "1001", texts.notFound + item.key)
-        if (item.qty > line.qty) throw ApiError(400, "1001", texts.tooMany + item.key)
+        val line =
+            basket.firstOrNull { it.sameItem(item) }
+                ?: throw ApiError(400, "1001", "finalization basket contains item not found in hold: " + item.key)
+        if (item.qty > line.qty) throw ApiError(400, "1001", "finalization basket item exceeds the hold: " + item.key)
     }
-    if (items.sumOf { it.total() } != amount) throw ApiError(400, "1001", texts.wrongTotal)
+    if (items.sumOf { it.total() } != amount) throw ApiError(400, "1001", "wrong amount for finalization")
 }
 
 private fun orderNotFinished() = ApiError(404, "1004", "order not finished")
 
 private fun cancelNotAvailable() = ApiError(500, "CANCEL_NOT_AVAILABLE", "cancel is not available")
 
+/** What a refund takes: its amount in minor units and the basket qty it cancels, by line index. */
+private class RefundPlan(
+    val amount: Long,
+    val lineQty: Map<Int, BigDecimal> = emptyMap(),
+)
+
+/** Verified live: qty × sum of the refund items is not exactly the refund amount (also: a wallet basket). */
+private fun discountMismatch() = ApiError(400, "INVALID_MERCHANT_PAYM_INFO", RequestParsing.DISCOUNT_MISMATCH)
+
 /**
- * The amount of a refund of a paid invoice. A partially refunded payment is `reversed` but can be
- * refunded further; a released or lapsed hold cannot.
+ * The refund of a paid invoice. A partially refunded payment is `reversed` but can be refunded further;
+ * a released or lapsed hold cannot. On a fiscal or split merchant the refund `items` are checked as
+ * monobank's test merchant answered live (see the class KDoc of `FakeMonobankAcquiring`); elsewhere
+ * `items` are not looked at.
  */
-private fun paymentRefundAmount(
+private fun paymentRefund(
     invoice: InvoiceRecord,
     amount: Long?,
     items: List<BasketLine>,
-    needsBasket: Boolean,
-): Long {
+    info: MerchantInfo,
+): RefundPlan {
     if (invoice.status == Status.REVERSED && invoice.reversedFrom != Status.SUCCESS) throw wrongCancelAmount()
     val refundable = invoice.refundable()
+    // Verified live: a refund without `amount` is a refund of everything that is left.
     val requested = amount ?: refundable
     if (requested <= 0 || requested > refundable) throw wrongCancelAmount()
-    // Verified live: a converted (USD/EUR → UAH) payment is refunded in UAH without items; items, whose
-    // sums are in the original currency, are refused (inferred for any items on a converted payment).
-    if (invoice.converted && items.isNotEmpty()) {
-        throw ApiError(400, "1001", "whole discount is expected to be cancelled with the last item")
-    }
-    if (invoice.converted) return requested
-    if (needsBasket) checkRefundItems(invoice, requested, items)
-    return requested
+    return if (info.needsBasket) basketRefund(invoice, amount, requested, items, info) else RefundPlan(requested)
 }
 
-/** Inferred from the finalize rule: a partial refund needs the refunded items, matching the basket. */
-private fun checkRefundItems(
+/** [paymentRefund] on a fiscal or split merchant. */
+private fun basketRefund(
     invoice: InvoiceRecord,
+    amount: Long?,
     requested: Long,
     items: List<BasketLine>,
+    info: MerchantInfo,
+): RefundPlan {
+    // Verified live (UAH and converted): a saved-card payment is never refunded without items.
+    if (invoice.viaWallet && items.isEmpty()) throw ApiError(400, "1001", "'items' cannot be empty")
+    if (items.isEmpty()) {
+        checkNotPartiallyRefunded(invoice, amount, info, null)
+        // Verified live: a converted payment page payment is refunded in UAH without items. Inferred from
+        // the finalize rule: a partial refund of a UAH payment page payment needs items.
+        if (!invoice.converted && requested < (invoice.finalAmount ?: 0)) throw noBasketForPartialAmount()
+        return RefundPlan(requested)
+    }
+    val lineQty = matchRefundItems(invoice, items)
+    // Verified live: no rounding, qty × sum must be the amount exactly. For a converted payment the items
+    // are in the original currency's minor units, and that number is refunded as kopiyky.
+    val total = items.fold(BigDecimal.ZERO) { sum, item -> sum.add(item.exactTotal()) }
+    if (total.compareTo(BigDecimal.valueOf(requested)) != 0) throw discountMismatch()
+    checkNotPartiallyRefunded(invoice, amount, info, lineQty.keys.first())
+    if (invoice.converted && invoice.viaWallet) checkConvertedWalletItems(invoice, lineQty)
+    return RefundPlan(requested, lineQty)
+}
+
+/**
+ * Verified live (saved-card payments, split on): after a partial refund, a refund without `amount` is
+ * refused; inferred for payment page payments.
+ */
+private fun checkNotPartiallyRefunded(
+    invoice: InvoiceRecord,
+    amount: Long?,
+    info: MerchantInfo,
+    lineIndex: Int?,
 ) {
-    if (requested >= (invoice.finalAmount ?: 0)) return
-    if (items.isEmpty()) throw noBasketForPartialAmount()
-    matchItems(invoice.basket, items, requested, ItemTexts.REFUND)
+    if (amount != null || !info.splitPayments) return
+    if (invoice.cancels.none { it.status != Status.FAILURE }) return
+    val receiver =
+        lineIndex?.let { invoice.basket[it].splitReceiverId }
+            ?: invoice.basket.firstNotNullOfOrNull { it.splitReceiverId }
+            ?: ""
+    throw ApiError(400, "1001", "split receiver's part of invoice has already been partially cancelled: $receiver")
+}
+
+/**
+ * Matches each refund item to a line of the paid (or finalized) basket by name, code and unit `sum`
+ * (verified live: only qty may differ); the `splitReceiverId` is not compared, since monobank's test
+ * merchant accepted refund items with any of its receiver ids. Inferred: the qty of a line cannot be
+ * refunded beyond what is left of it. Returns the qty taken from each line.
+ */
+private fun matchRefundItems(
+    invoice: InvoiceRecord,
+    items: List<BasketLine>,
+): Map<Int, BigDecimal> {
+    val basket = invoice.basket
+    val wanted = LinkedHashMap<Int, BigDecimal>()
+    for (item in items) {
+        val candidates = basket.indices.filter { basket[it].sameGoods(item) }
+        val index =
+            candidates.firstOrNull { basket[it].splitReceiverId == item.splitReceiverId }
+                ?: candidates.firstOrNull()
+                ?: throw ApiError(
+                    400,
+                    "INVALID_MERCHANT_PAYM_INFO",
+                    "invalid item '${item.name}' with code '${item.code}'",
+                )
+        wanted[index] = (wanted[index] ?: BigDecimal.ZERO).add(item.qty)
+    }
+    val taken = HashMap<Int, BigDecimal>()
+    invoice.cancels.filter { it.status != Status.FAILURE }.forEach { cancel ->
+        cancel.lineQty.forEach { (index, qty) -> taken[index] = (taken[index] ?: BigDecimal.ZERO).add(qty) }
+    }
+    for ((index, qty) in wanted) {
+        if (qty.add(taken[index] ?: BigDecimal.ZERO) > basket[index].qty) throw discountMismatch()
+    }
+    return wanted
+}
+
+/**
+ * A converted (USD/EUR → UAH) saved-card payment. Verified live: with a 100 × 1 line, refunds of 50 × 1,
+ * 49 × 1 and 1 × 1 worked; with a 1 × 100 line, 1 × 100 and 0.5 × 100 were refused. Inferred from that:
+ * an item of a line whose qty is 1 or less, or a fractional qty, is refused.
+ */
+private fun checkConvertedWalletItems(
+    invoice: InvoiceRecord,
+    lineQty: Map<Int, BigDecimal>,
+) {
+    for ((index, qty) in lineQty) {
+        val whole = qty.stripTrailingZeros().scale() <= 0
+        if (invoice.basket[index].qty <= BigDecimal.ONE || !whole) {
+            throw ApiError(400, "1001", "whole discount is expected to be cancelled with the last item")
+        }
+    }
 }
 
 /** The invoice becomes `reversed`, remembering what it was. */

@@ -175,29 +175,23 @@ class CurrencyConversionTest {
     }
 
     @Test
-    fun `refund items of a converted payment are refused with 1001`() {
-        val invoiceId = paid(978)
+    fun `items of the original-currency basket refund qty x sum kopiyky, then the rest goes without items`() {
+        val invoiceId = paid(978) // EUR 1.00 → 5048 kopiyky, basket 1 × 100 (euro cents)
         val items =
-            listOf(
-                FiscalizationItem.builder("Plan", BigDecimal("0.5"), 100, "plan").splitReceiverId(receiverId).build(),
-            )
+            listOf(FiscalizationItem.builder("Plan", BigDecimal.ONE, 100, "plan").splitReceiverId(receiverId).build())
 
-        val error =
-            runCatching {
-                mono.invoices.cancel(
-                    CancelInvoiceRequest
-                        .builder(invoiceId)
-                        .amount(50)
-                        .items(items)
-                        .build(),
-                )
-            }.exceptionOrNull()
+        mono.invoices.cancel(
+            CancelInvoiceRequest
+                .builder(invoiceId)
+                .amount(100)
+                .items(items)
+                .build(),
+        )
 
-        assertThat(error).isInstanceOfSatisfying(MonobankBadRequestException::class.java) {
-            assertThat(it.errorCode).isEqualTo("1001")
-            assertThat(it.errorText).isEqualTo("whole discount is expected to be cancelled with the last item")
-        }
-        assertThat(mono.invoices.status(invoiceId).finalAmount).isEqualTo(5048) // nothing refunded, status intact
+        assertThat(fake.invoice(invoiceId)!!.finalAmount).isEqualTo(4948) // ₴1.00 refunded
+        mono.invoices.cancel(CancelInvoiceRequest.builder(invoiceId).amount(4948).build())
+        assertThat(fake.invoice(invoiceId)!!.finalAmount).isEqualTo(0)
+        assertThat(fake.invoice(invoiceId)!!.refunds.map { it.amount }).containsExactly(100L, 4948L)
     }
 
     @Test

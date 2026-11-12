@@ -211,8 +211,13 @@ class FiscalSplitMerchantTest {
                 ).build(),
         )
         assertThat(split.invoices.status(invoiceId).finalAmount).isEqualTo(150)
-        // the rest, without an amount: a full refund of what is left needs no items
-        split.invoices.cancel(CancelInvoiceRequest.builder(invoiceId).build())
+        // after a partial refund, a refund without `amount` is refused (verified live for saved cards)
+        val noAmount = badRequest { split.invoices.cancel(CancelInvoiceRequest.builder(invoiceId).build()) }
+        assertThat(noAmount.errorCode).isEqualTo("1001")
+        assertThat(noAmount.errorText)
+            .isEqualTo("split receiver's part of invoice has already been partially cancelled: sr_aB3dC5eF7g")
+        // the rest, with its amount: a full refund of what is left needs no items
+        split.invoices.cancel(CancelInvoiceRequest.builder(invoiceId).amount(150).build())
         assertThat(split.invoices.status(invoiceId).status).isEqualTo(InvoiceStatus.REVERSED)
     }
 

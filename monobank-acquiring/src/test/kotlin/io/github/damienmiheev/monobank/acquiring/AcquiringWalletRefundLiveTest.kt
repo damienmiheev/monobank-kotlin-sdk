@@ -312,6 +312,91 @@ class AcquiringWalletRefundLiveTest {
         runCatching { mono.wallet.deleteCard(savedToken) }
     }
 
+    /**
+     * The verified pattern for refunding arbitrary amounts of saved-card charges on a fiscal/split
+     * merchant: a basket line in kopiyky (`qty` = amount, `sum` 1). Saves a card (one 3-D Secure
+     * confirmation), charges 450.00 UAH and refunds 137.42, 10.00 and the remaining 302.58 as whole
+     * `qty`. Then logs (does not assert) the EUR bug: a 1.00 EUR charge refunds at most 100 kopiyky.
+     *
+     * Runs only with `MONOBANK_ACQUIRING_TEST_TOKEN` AND `MONOBANK_LIVE_SAVED_CARD_RUN=true`.
+     */
+    @Test
+    fun `saved-card charge with a kopiyka basket - refunds of any amount`() {
+        val token = System.getenv("MONOBANK_ACQUIRING_TEST_TOKEN")
+        assumeTrue(!token.isNullOrBlank(), "MONOBANK_ACQUIRING_TEST_TOKEN is not set")
+        assumeTrue(
+            System.getenv("MONOBANK_LIVE_SAVED_CARD_RUN") == "true",
+            "MONOBANK_LIVE_SAVED_CARD_RUN=true is not set",
+        )
+        val mono = MonobankAcquiring.create(token!!)
+        // The test merchant returns random receiver ids on every call: take one and reuse it.
+        val receiver =
+            mono.split
+                .receivers()
+                .firstOrNull()
+                ?.id
+        val savedToken = saveCard(mono, receiver) ?: return
+
+        fun kopiykaLine(minor: Long) =
+            BasketItem.builder(name, BigDecimal.valueOf(minor), 1, code).splitReceiverId(receiver).build()
+
+        fun charge(
+            minor: Long,
+            ccy: Int,
+        ) = mono.wallet.payment(
+            WalletPaymentRequest
+                .builder(savedToken, minor, ccy, InitiationKind.MERCHANT)
+                .merchantPaymInfo(
+                    MerchantPaymInfo
+                        .builder()
+                        .reference(ref())
+                        .destination("SDK kopiyka basket")
+                        .basketOrder(listOf(kopiykaLine(minor)))
+                        .build(),
+                ).build(),
+        )
+
+        fun refundItems(minor: Long) =
+            listOf(
+                FiscalizationItem
+                    .builder(name, BigDecimal.valueOf(minor), 1, code)
+                    .splitReceiverId(receiver)
+                    .build(),
+            )
+
+        val uah = charge(45_000, 980)
+        log("UAH ${uah.invoiceId}: ${settled(mono, uah.invoiceId)}")
+        for (part in listOf(13_742L, 1_000L, 30_258L)) {
+            mono.invoices.cancel(
+                CancelInvoiceRequest
+                    .builder(uah.invoiceId)
+                    .amount(part)
+                    .extRef(ref())
+                    .items(refundItems(part))
+                    .build(),
+            )
+            Thread.sleep(3_000)
+        }
+        var after = mono.invoices.status(uah.invoiceId)
+        repeat(20) {
+            if (after.finalAmount == 0L) return@repeat
+            Thread.sleep(1_500)
+            after = mono.invoices.status(uah.invoiceId)
+        }
+        log("UAH after refunds: status=${after.statusRaw} finalAmount=${after.finalAmount}")
+        org.junit.jupiter.api.Assertions
+            .assertEquals(InvoiceStatus.REVERSED, after.status)
+        org.junit.jupiter.api.Assertions
+            .assertEquals(0L, after.finalAmount)
+
+        log("--- EUR 1.00 with basket 100 x 1 (monobank bug: at most 100 kopiyky refundable)")
+        val eur = charge(100, 978)
+        log("EUR ${eur.invoiceId}: ${settled(mono, eur.invoiceId)}")
+        refund(mono, eur.invoiceId, "EUR 100 x 1") { it.amount(100).items(refundItems(100)) }
+        refund(mono, eur.invoiceId, "EUR rest 4948 no items") { it.amount(4948) }
+        runCatching { mono.wallet.deleteCard(savedToken) }
+    }
+
     private fun ref() = "sdk-wallet-" + UUID.randomUUID().toString().take(8)
 
     private fun settled(

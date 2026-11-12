@@ -164,7 +164,8 @@ class CaptureSettlementTest {
                     .status,
             ).isEqualTo(InvoiceStatus.SUCCESS)
 
-            mono.invoices.cancel(CancelInvoiceRequest.builder(invoiceId).build())
+            // the rest with its amount: after a partial refund, one without `amount` is refused on a split merchant
+            mono.invoices.cancel(CancelInvoiceRequest.builder(invoiceId).amount(100).build())
             val emptied = mono.invoices.status(invoiceId)
             assertThat(emptied.status).isEqualTo(InvoiceStatus.REVERSED)
             assertThat(emptied.finalAmount).isEqualTo(0)

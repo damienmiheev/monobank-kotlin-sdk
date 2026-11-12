@@ -76,14 +76,22 @@ public class InvoiceApi internal constructor(
     /**
      * Refunds a successful payment (fully, or partly with `amount`), or releases a hold.
      *
-     * Merchants with fiscal receipts or split payments should send `items` with a partial refund,
-     * built like [finalize]'s: the paid basket lines with a smaller `qty` (verified: 0.50 of a
-     * 2.00 line as `qty` 0.25, `sum` 200).
+     * Merchants with fiscal receipts or split payments (verified on monobank's test merchant):
+     * - a refund of a saved-card payment (`wallet/payment`) needs `items`, partial or full; without
+     *   them: 400 `1001` "'items' cannot be empty". Payment-page and `payment-direct` payments can be
+     *   refunded without `items`.
+     * - `items` repeat the paid basket lines (same name, code, unit `sum`, split receiver) with a
+     *   smaller `qty`, and `qty × sum` must equal `amount` exactly; otherwise 400
+     *   `INVALID_MERCHANT_PAYM_INFO`. To refund arbitrary amounts, charge with a basket line in
+     *   kopiyky (`qty` = amount, `sum` 1) and refund `qty r × sum 1` (see the README).
+     * - after a partial refund, a refund without `amount` is refused (400 `1001` "split receiver's
+     *   part of invoice has already been partially cancelled"); send the remaining amount.
      *
-     * USD and EUR payments are converted to UAH when paid (verified): refund them in UAH, without
-     * `items` (a partial UAH refund without items and a full refund without amount and items were
-     * accepted; items with the original-currency `sum` are refused with 400 `1001` "whole discount
-     * is expected to be cancelled with the last item").
+     * USD and EUR payments are converted to UAH when paid (verified): refund payment-page and
+     * `payment-direct` ones in UAH without `items`. Saved-card charges in USD/EUR cannot be fully
+     * refunded (monobank bug): their refund items are checked against the basket in the original
+     * currency's minor units while UAH kopiyky are refunded, so at most that many kopiyky come back.
+     * Charge saved cards in UAH.
      *
      * Verified live: a refund while the invoice is still `processing` after a finalize is refused
      * with 404 `1004` "order not finished" (nothing was refunded; retry once the status is
@@ -119,14 +127,14 @@ public class InvoiceApi internal constructor(
      *
      * Merchants with fiscal receipts or split payments must send `items` for a partial capture
      * (amount below the held amount); without them monobank answers 400 `1001` "wrong amount for
-     * finalization without basket" (verified on monobank's test merchant). The same is likely for
-     * a partial refund ([cancel]) without `items`.
+     * finalization without basket" (verified on monobank's test merchant). For refunds see [cancel].
      *
      * Each item must repeat a line of the hold's basket exactly — same `name`, `code`, unit price
      * `sum` and `splitReceiverId` — with only `qty` changed so that the items add up to the captured
      * amount (e.g. capture 1.50 of a 1 × 2.00 line as `qty` 0.75, `sum` 200; fractional `qty` is
-     * accepted). An item that does not match gets 400 `1001` "finalization basket contains item not
-     * found in hold: ..." (verified).
+     * accepted, though monobank's developers say quantities should be whole — a basket line in
+     * kopiyky, `qty` = amount and `sum` 1, keeps them whole). An item that does not match gets 400
+     * `1001` "finalization basket contains item not found in hold: ..." (verified).
      *
      * The answer `success` means monobank accepted the capture; the invoice then stays `processing`
      * (with `finalAmount` already set) for a while — over 30 s on the test merchant — before it turns

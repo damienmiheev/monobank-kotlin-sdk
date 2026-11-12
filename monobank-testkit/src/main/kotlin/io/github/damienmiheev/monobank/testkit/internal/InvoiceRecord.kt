@@ -44,6 +44,8 @@ internal class CancelRecord(
     var status: String,
     val approvalCode: String,
     val rrn: String,
+    /** Basket qty this refund cancels, by index of the invoice's [InvoiceRecord.basket] line. */
+    val lineQty: Map<Int, BigDecimal> = emptyMap(),
 )
 
 /** A saved card in a wallet. */
@@ -74,11 +76,16 @@ internal class BasketLine(
     /** monobank's item key in error texts (verified live): `<name>_<code>_<sum>_<splitReceiverId>`. */
     val key: String get() = listOfNotNull(name, code, sum.toString(), splitReceiverId).joinToString("_")
 
-    fun sameItem(other: BasketLine): Boolean =
-        name == other.name && code == other.code && sum == other.sum && splitReceiverId == other.splitReceiverId
+    fun sameItem(other: BasketLine): Boolean = sameGoods(other) && splitReceiverId == other.splitReceiverId
+
+    /** Same name, code and unit price; the receiver may differ. */
+    fun sameGoods(other: BasketLine): Boolean = name == other.name && code == other.code && sum == other.sum
 
     /** qty × sum in minor units, rounded half up. */
-    fun total(): Long = qty.multiply(BigDecimal.valueOf(sum)).setScale(0, RoundingMode.HALF_UP).toLong()
+    fun total(): Long = exactTotal().setScale(0, RoundingMode.HALF_UP).toLong()
+
+    /** qty × sum in minor units, not rounded. */
+    fun exactTotal(): BigDecimal = qty.multiply(BigDecimal.valueOf(sum))
 }
 
 /** Everything the fake knows about one invoice. Guarded by the state's lock. */

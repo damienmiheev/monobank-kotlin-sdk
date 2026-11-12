@@ -74,15 +74,38 @@ import java.util.function.Predicate
  *   unpaid; when paid it is converted at [Builder.conversionRate] (live: 100 EUR → 5048, 100 USD → 4551).
  *   From then on `invoice/status` and the statement show `amount` = `finalAmount` = the UAH amount and
  *   `ccy` 980, and the fee is on the UAH amount; the payment answer still echoes the requested amount and
- *   currency. Refunds are in UAH: a partial `amount` and a full refund work without `items`; `items`
- *   (whose sums are in the original currency) answer 400 `1001` "whole discount is expected to be
- *   cancelled with the last item" (seen with such items; inferred for any items). After any successful
+ *   currency. Refunds of a converted payment page payment are in UAH: a partial `amount` and a full
+ *   refund work without `items`; `items` of the original-currency basket are accepted too and refund
+ *   qty × sum *kopiyky* (1 × 100 euro cents with `amount` 100 refunded ₴1.00, then the rest worked
+ *   without items). Converted saved-card payments: see the refund rules below. After any successful
  *   refund of a converted payment, `invoice/status` answers 500 `INTERNAL_ERROR` "unexpected end of JSON
  *   input" for good, a monobank bug the fake reproduces by default
  *   ([Builder.brokenStatusAfterConvertedRefund]); the statement keeps working. Inferred: webhooks of a
  *   converted payment carry the UAH amount and 980 (they are still sent after such a refund), and the
  *   conversion happens when the customer starts paying (`processing`).
  * - Fractional item `qty` is accepted in finalize and refund `items` (0.75 × 200 = 150, 0.25 × 200 = 50).
+ * - Refunds on a merchant with fiscal receipts or split payments (seen with saved-card payments):
+ *   - a saved-card (`wallet/payment`) payment is never refunded without `items`, whatever the amount, in
+ *     UAH or converted: 400 `1001` "'items' cannot be empty". Payment page payments refund without items
+ *     as before.
+ *   - each refund item must match a paid basket line by name, code and unit `sum`; only `qty` may differ.
+ *     Otherwise 400 `INVALID_MERCHANT_PAYM_INFO` "invalid item '<name>' with code '<code>'". The
+ *     `splitReceiverId` is not compared (the test merchant accepted any of its receiver ids).
+ *   - qty × sum over the items must equal the refund amount exactly, without rounding (0.30538 × 45000 for
+ *     13742 is refused); a refund without `amount` is for everything that is left. Otherwise 400
+ *     `INVALID_MERCHANT_PAYM_INFO` "total amount of ('sum' * 'qty')-calculated 'discount' does not equal
+ *     'amount' field from request".
+ *   - after a partial refund, a refund without `amount` → 400 `1001` "split receiver's part of invoice has
+ *     already been partially cancelled: <splitReceiverId>" (split payments only); send the rest as an
+ *     amount with items.
+ *   - the pattern that works for UAH saved cards: a basket line in kopiyky (`qty` = amount, `sum` 1);
+ *     then a refund of any amount R is the item R × 1.
+ *   - a converted (USD/EUR) saved-card payment needs its basket in the original currency's minor units
+ *     (a UAH basket 5048 × 1 for EUR 1.00 is refused at `wallet/payment` with the 'discount' text above).
+ *     Refund items are checked against that basket, and qty × sum is refunded as kopiyky: with a 100 × 1
+ *     line, 50 × 1, 49 × 1 and 1 × 1 worked (₴1.00 of ₴50.48), and nothing more could be refunded; with a
+ *     1 × 100 line, 1 × 100 and 0.5 × 100 answered 400 `1001` "whole discount is expected to be cancelled
+ *     with the last item".
  * - A saved-card hold (`wallet/payment` with `paymentType` hold, no 3-D Secure) answers `processing`
  *   without `tdsUrl`, while `invoice/status` already says `hold` (the fake moves it at once, with
  *   `processing` and `hold` webhooks). Its status has `paymentInfo.paymentMethod` `wallet` and a
@@ -122,21 +145,28 @@ import java.util.function.Predicate
  *   refunds in `cancelList`; `profitAmount` = amount − fee for `success` only. The fee is 1.3 %
  *   ([Builder.feePercent]).
  * - `merchantPaymInfo.basketOrder` must add up to `amount` (400 `INVALID_MERCHANT_PAYM_INFO`;
- *   [Builder.validateBasketTotal] turns it off).
+ *   [Builder.validateBasketTotal] turns it off). On fiscal or split merchants without rounding and with
+ *   the 'discount' text (verified for `wallet/payment`, inferred for `invoice/create`); elsewhere per-line
+ *   totals are rounded half up and the text is the fake's own.
  * - Webhooks are tried 3 times, 200 ms apart, until the receiver answers 200 ([Builder.webhookRetries]).
  *   They go out one at a time, in order, on one thread: a slow receiver delays later webhooks.
  * - Merchants with fiscal receipts or split payments ([Builder.fiscalization], [Builder.splitPayments]):
  *   the basket rules of `invoice/create` and the partial-finalize rule are verified against monobank's
- *   test merchant; the same rules on `wallet/payment`, the partial-`invoice/cancel` rule (400 `1001` without
- *   `items`) and the exemption of verification invoices are inferred.
+ *   test merchant; the same rules on `wallet/payment` (apart from the basket total, verified), the
+ *   partial-refund rule for payment page payments (400 `1001` "wrong amount for finalization without
+ *   basket" for a partial amount without `items`) and the exemption of verification invoices are inferred.
  * - On those merchants, `items` sent with `invoice/finalize` must each match a line of the hold's basket
  *   by name, code, `sum` (unit price) and `splitReceiverId`; only `qty` may differ. A mismatch answers 400
  *   `1001` "finalization basket contains item not found in hold: <name>_<code>_<sum>_<splitReceiverId>"
  *   for the first unmatched item (verified live). Inferred: an item's `qty` may not exceed the hold line's
  *   ("... item exceeds the hold: ..."), and qty × sum over the items must equal the amount ("wrong amount
- *   for finalization"). A partial `invoice/cancel` with `items` is checked the same way against the paid
- *   (or finalized) basket ("refund basket contains item not found in invoice: ...", "wrong amount for
- *   refund"; all inferred). Fractional `qty` is accepted (verified, see above).
+ *   for finalization"). Fractional `qty` is accepted (verified, see above).
+ * - Refund items (the verified rules are above), inferred parts: refund items are checked against the
+ *   paid basket, or the finalized one after a partial capture; a line cannot be refunded beyond its `qty`
+ *   minus what earlier refunds took (the 'discount' text); the "already partially cancelled" rule also
+ *   applies to payment page payments; on a converted saved-card payment any item of a line whose `qty` is
+ *   1 or less, and any fractional `qty`, answers "whole discount is expected to be cancelled with the last
+ *   item", while whole-qty items of a longer line work. On other merchants refund `items` are not checked.
  * - The settling window after a partial finalize is applied to every merchant, not only fiscal or split ones.
  *
  * ### Faults and webhook control

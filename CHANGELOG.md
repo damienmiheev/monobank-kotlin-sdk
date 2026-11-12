@@ -30,6 +30,13 @@ see the README's migration section.
 - `MonobankClientOptions.allowPlainHttp` (tests only): plain http to a non-loopback host such as a
   fake monobank reached from a container; `FakeMonobankAcquiring.containerClientOptionsBuilder()`.
 
+### Notes (verified on monobank's test merchant, 12.11.2026)
+- Use UAH with merchant acquiring. USD/EUR payments are converted to UAH; saved-card charges in
+  USD/EUR cannot be fully refunded (monobank bug, reported).
+- On fiscal or split merchants every refund of a saved-card payment needs `items` matching the paid
+  basket exactly; a basket line in kopiyky (`qty` = amount, `sum` 1) allows refunds of any amount.
+  README and `InvoiceApi.cancel` describe the rules.
+
 ### Changed (from app.spilki 0.0.x)
 - Packages renamed from `app.spilki.monobank.acquiring` to `io.github.damienmiheev.monobank.acquiring`
   and restructured; see the README's migration table for every changed call.

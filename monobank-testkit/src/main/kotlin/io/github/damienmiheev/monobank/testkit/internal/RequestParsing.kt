@@ -196,13 +196,21 @@ internal object RequestParsing {
         rules: BasketRules,
     ): List<BasketLine> {
         paymInfoUnless(basket.isArray) { "invalid 'basketOrder'" }
-        val total = basket.sumOf { basketItemTotal(it) }
+        val totals = basket.map { basketItemTotal(it) }
         paymInfoUnless(!rules.splitRequired || basket.all { isText(it.get("splitReceiverId")) }) {
             "'splitReceiverId' is required"
         }
         val hasDiscounts = info.hasNonNull("discounts") || basket.any { it.hasNonNull("discounts") }
-        paymInfoUnless(!rules.validateTotal || hasDiscounts || total == amount) {
-            "basketOrder total $total does not match amount $amount"
+        if (rules.validateTotal && !hasDiscounts) {
+            if (rules.basketRequired) {
+                // Verified live for wallet/payment on a fiscal and split merchant (a EUR payment with a UAH
+                // basket): no rounding, the basket must add up to the amount exactly.
+                val exact = totals.fold(BigDecimal.ZERO, BigDecimal::add)
+                paymInfoUnless(exact.compareTo(BigDecimal.valueOf(amount)) == 0) { DISCOUNT_MISMATCH }
+            } else {
+                val total = totals.sumOf { it.setScale(0, RoundingMode.HALF_UP).toLong() }
+                paymInfoUnless(total == amount) { "basketOrder total $total does not match amount $amount" }
+            }
         }
         return basket.map { line(it) }
     }
@@ -223,6 +231,13 @@ internal object RequestParsing {
         }
     }
 
+    /**
+     * monobank's answer (verified live on a fiscal and split merchant) when qty × sum of a `wallet/payment`
+     * basket or of refund `items` is not exactly the amount.
+     */
+    const val DISCOUNT_MISMATCH =
+        "total amount of ('sum' * 'qty')-calculated 'discount' does not equal 'amount' field from request"
+
     /** monobank's answer (verified live) when a fiscalization or split merchant sends no basket. */
     const val BASKET_REQUIRED =
         "'basketOrder' cannot be empty, it is mandatory for fiscalization and split payments"
@@ -239,7 +254,8 @@ internal object RequestParsing {
             throw invalidPaymInfo("invalid '$name'")
         }
 
-    private fun basketItemTotal(item: JsonNode): Long {
+    /** qty × sum of a basket line, not rounded (or its `total` when given). */
+    private fun basketItemTotal(item: JsonNode): BigDecimal {
         paymInfoUnless(item.isObject) { "invalid 'basketOrder' item" }
         paymInfoUnless(isText(item.get("name"))) { "empty basketOrder 'name'" }
         paymInfoUnless(isText(item.get("code"))) { "empty basketOrder 'code'" }
@@ -255,11 +271,7 @@ internal object RequestParsing {
             }
         paymInfoUnless(sum >= 0) { "invalid basketOrder 'sum'" }
         val total = item.get("total")?.takeIf { it.isNumber }?.asLong()
-        return total ?: BigDecimal
-            .valueOf(sum)
-            .multiply(qty.decimalValue())
-            .setScale(0, RoundingMode.HALF_UP)
-            .toLong()
+        return total?.let { BigDecimal.valueOf(it) } ?: BigDecimal.valueOf(sum).multiply(qty.decimalValue())
     }
 }
 

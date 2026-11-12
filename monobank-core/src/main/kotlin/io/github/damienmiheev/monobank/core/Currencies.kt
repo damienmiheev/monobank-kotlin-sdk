@@ -9,7 +9,8 @@ import java.util.Currency
  * Merchant acquiring accepts only [UAH], [USD] and [EUR]: other codes get 400 `1001`
  * "invalid 'ccy'" (verified on monobank's test merchant). USD and EUR invoices are converted to
  * UAH when they are paid: `invoice/status` and the statement then report the amount in UAH
- * (`ccy` 980), and refunds are in UAH. The personal and corporate APIs report accounts and rates
+ * (`ccy` 980), and refunds are in UAH. Use UAH for acquiring: saved-card charges in USD/EUR cannot
+ * be fully refunded (monobank bug, verified). The personal and corporate APIs report accounts and rates
  * in many more currencies.
  */
 public object CurrencyCodes {
