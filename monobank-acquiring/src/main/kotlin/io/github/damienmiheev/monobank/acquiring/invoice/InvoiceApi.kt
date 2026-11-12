@@ -28,7 +28,14 @@ public class InvoiceApi internal constructor(
         http.post(INVOICE + "create", request, CreateInvoiceResponse::class.java, idempotent = false)
 
     /**
-     * Current state of an invoice. Use it to recover from missed webhooks.
+     * Current state of an invoice.
+     *
+     * USD and EUR invoices report the converted UAH amount (`ccy` 980) once paid. Verified on the
+     * test merchant: after a refund of such a converted payment, this endpoint answers 500
+     * `INTERNAL_ERROR` "unexpected end of JSON input" for that invoice every time; reconcile it
+     * through `merchant.statementEntries` / `findByReference`, which keep working.
+     *
+     * Use it to recover from missed webhooks.
      *
      * `GET /api/merchant/invoice/status`. Safe to retry.
      */
@@ -43,6 +50,11 @@ public class InvoiceApi internal constructor(
      * Merchants with fiscal receipts or split payments should send `items` with a partial refund,
      * built like [finalize]'s: the paid basket lines with a smaller `qty` (verified: 0.50 of a
      * 2.00 line as `qty` 0.25, `sum` 200).
+     *
+     * USD and EUR payments are converted to UAH when paid (verified): refund them in UAH, without
+     * `items` (a partial UAH refund without items and a full refund without amount and items were
+     * accepted; items with the original-currency `sum` are refused with 400 `1001` "whole discount
+     * is expected to be cancelled with the last item").
      *
      * Verified live: a refund while the invoice is still `processing` after a finalize is refused
      * with 404 `1004` "order not finished" (nothing was refunded; retry once the status is
