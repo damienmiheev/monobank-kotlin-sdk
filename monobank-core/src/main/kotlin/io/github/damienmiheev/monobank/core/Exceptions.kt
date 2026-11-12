@@ -7,13 +7,16 @@ import java.time.Duration
  * over it can be exhaustive.
  *
  * @property outcome What is known about the request's effect, or `null` when the error is not
- *   about an outgoing request (for example an invalid webhook signature).
+ *   about an outgoing request (for example an invalid webhook signature). Never `null` on
+ *   [MonobankApiException] and [MonobankNetworkException].
  */
 public sealed class MonobankException(
     message: String,
     cause: Throwable?,
-    public val outcome: RequestOutcome?,
-) : RuntimeException(message, cause)
+    outcome: RequestOutcome?,
+) : RuntimeException(message, cause) {
+    public open val outcome: RequestOutcome? = outcome
+}
 
 /**
  * monobank answered with an HTTP error status.
@@ -31,7 +34,8 @@ public sealed class MonobankApiException(
     public val errorCode: String?,
     public val errorText: String?,
     public val responseBody: String?,
-    outcome: RequestOutcome,
+    /** What is known about the request's effect; never `null` for an HTTP answer. */
+    public override val outcome: RequestOutcome,
 ) : MonobankException(
         message = buildMessage(statusCode, errorCode, errorText),
         cause = null,
@@ -120,7 +124,8 @@ public class MonobankNetworkException
     constructor(
         message: String,
         cause: Throwable?,
-        outcome: RequestOutcome,
+        /** [RequestOutcome.NOT_SENT] or [RequestOutcome.UNKNOWN]; never `null`. */
+        public override val outcome: RequestOutcome,
     ) : MonobankException(message, cause, outcome)
 
 /**

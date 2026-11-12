@@ -9,6 +9,7 @@ import io.github.damienmiheev.monobank.core.MonobankException
 import io.github.damienmiheev.monobank.core.MonobankNetworkException
 import io.github.damienmiheev.monobank.core.MonobankNotFoundException
 import io.github.damienmiheev.monobank.core.MonobankRateLimitException
+import io.github.damienmiheev.monobank.core.MonobankSerializationException
 import io.github.damienmiheev.monobank.core.MonobankServerException
 import io.github.damienmiheev.monobank.core.RequestOutcome
 import io.github.damienmiheev.monobank.core.SdkInfo
@@ -161,11 +162,22 @@ public class MonobankHttp(
         val started = System.nanoTime()
         val response =
             try {
-                client.send(httpRequest, HttpResponse.BodyHandlers.ofByteArray())
+                client.send(httpRequest) { LimitedBodySubscriber(options.maxResponseBytes) }
             } catch (e: InterruptedException) {
                 Thread.currentThread().interrupt()
                 throw MonobankNetworkException("monobank request interrupted", e, RequestOutcome.UNKNOWN)
             } catch (e: IOException) {
+                // The JDK wraps the subscriber's exception, so look through the causes.
+                if (generateSequence(
+                        e as Throwable,
+                    ) { it.cause }.take(MAX_CAUSES).any { it is ResponseTooLargeException }
+                ) {
+                    throw MonobankSerializationException(
+                        "monobank response is larger than maxResponseBytes (${options.maxResponseBytes})",
+                        null,
+                        RequestOutcome.UNKNOWN,
+                    )
+                }
                 throw networkException(e)
             }
         val status = response.statusCode()
@@ -262,5 +274,54 @@ public class MonobankHttp(
         val SUCCESS = 200..299
         const val MAX_SHIFT = 20
         const val MAX_CAUSES = 10
+    }
+}
+
+/** Thrown inside the body subscriber when the answer exceeds the limit. */
+private class ResponseTooLargeException : java.io.IOException("response body too large")
+
+/** Like `BodySubscribers.ofByteArray()`, but stops reading after [limit] bytes. */
+private class LimitedBodySubscriber(
+    private val limit: Long,
+) : HttpResponse.BodySubscriber<ByteArray> {
+    private val result = java.util.concurrent.CompletableFuture<ByteArray>()
+    private val buffer = java.io.ByteArrayOutputStream()
+    private var subscription: java.util.concurrent.Flow.Subscription? = null
+    private var done = false
+
+    override fun getBody(): java.util.concurrent.CompletionStage<ByteArray> = result
+
+    override fun onSubscribe(subscription: java.util.concurrent.Flow.Subscription) {
+        this.subscription = subscription
+        subscription.request(Long.MAX_VALUE)
+    }
+
+    override fun onNext(item: List<java.nio.ByteBuffer>) {
+        if (done) return
+        for (chunk in item) {
+            if (buffer.size().toLong() + chunk.remaining() > limit) {
+                done = true
+                subscription?.cancel()
+                result.completeExceptionally(ResponseTooLargeException())
+                return
+            }
+            val bytes = ByteArray(chunk.remaining())
+            chunk.get(bytes)
+            buffer.write(bytes)
+        }
+    }
+
+    override fun onError(throwable: Throwable) {
+        if (!done) {
+            done = true
+            result.completeExceptionally(throwable)
+        }
+    }
+
+    override fun onComplete() {
+        if (!done) {
+            done = true
+            result.complete(buffer.toByteArray())
+        }
     }
 }

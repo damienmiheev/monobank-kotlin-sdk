@@ -24,6 +24,7 @@ public abstract class io/github/damienmiheev/monobank/core/MonobankApiException 
 	public synthetic fun <init> (ILjava/lang/String;Ljava/lang/String;Ljava/lang/String;Lio/github/damienmiheev/monobank/core/RequestOutcome;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getErrorCode ()Ljava/lang/String;
 	public final fun getErrorText ()Ljava/lang/String;
+	public fun getOutcome ()Lio/github/damienmiheev/monobank/core/RequestOutcome;
 	public final fun getResponseBody ()Ljava/lang/String;
 	public final fun getStatusCode ()I
 	public final fun getTraceId ()Ljava/lang/String;
@@ -43,6 +44,7 @@ public final class io/github/damienmiheev/monobank/core/MonobankClientOptions {
 	public final fun getBaseUrl ()Ljava/net/URI;
 	public final fun getConnectTimeout ()Ljava/time/Duration;
 	public final fun getHttpClient ()Ljava/net/http/HttpClient;
+	public final fun getMaxResponseBytes ()J
 	public final fun getRequestTimeout ()Ljava/time/Duration;
 	public final fun getRetryPolicy ()Lio/github/damienmiheev/monobank/core/RetryPolicy;
 	public final fun getUserAgentSuffix ()Ljava/lang/String;
@@ -55,6 +57,7 @@ public final class io/github/damienmiheev/monobank/core/MonobankClientOptions$Bu
 	public final fun build ()Lio/github/damienmiheev/monobank/core/MonobankClientOptions;
 	public final fun connectTimeout (Ljava/time/Duration;)Lio/github/damienmiheev/monobank/core/MonobankClientOptions$Builder;
 	public final fun httpClient (Ljava/net/http/HttpClient;)Lio/github/damienmiheev/monobank/core/MonobankClientOptions$Builder;
+	public final fun maxResponseBytes (J)Lio/github/damienmiheev/monobank/core/MonobankClientOptions$Builder;
 	public final fun requestTimeout (Ljava/time/Duration;)Lio/github/damienmiheev/monobank/core/MonobankClientOptions$Builder;
 	public final fun retryPolicy (Lio/github/damienmiheev/monobank/core/RetryPolicy;)Lio/github/damienmiheev/monobank/core/MonobankClientOptions$Builder;
 	public final fun userAgentSuffix (Ljava/lang/String;)Lio/github/damienmiheev/monobank/core/MonobankClientOptions$Builder;
@@ -66,10 +69,11 @@ public final class io/github/damienmiheev/monobank/core/MonobankClientOptions$Co
 
 public abstract class io/github/damienmiheev/monobank/core/MonobankException : java/lang/RuntimeException {
 	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/Throwable;Lio/github/damienmiheev/monobank/core/RequestOutcome;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun getOutcome ()Lio/github/damienmiheev/monobank/core/RequestOutcome;
+	public fun getOutcome ()Lio/github/damienmiheev/monobank/core/RequestOutcome;
 }
 
 public final class io/github/damienmiheev/monobank/core/MonobankNetworkException : io/github/damienmiheev/monobank/core/MonobankException {
+	public fun getOutcome ()Lio/github/damienmiheev/monobank/core/RequestOutcome;
 }
 
 public final class io/github/damienmiheev/monobank/core/MonobankNotFoundException : io/github/damienmiheev/monobank/core/MonobankApiException {

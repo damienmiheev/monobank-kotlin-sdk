@@ -237,3 +237,63 @@ class HeaderSafetyTest {
         }.isInstanceOf(IllegalArgumentException::class.java)
     }
 }
+
+class ResponseSizeLimitTest {
+    private fun http(
+        server: MockWebServer,
+        limit: Long,
+    ) = MonobankHttp(
+        options =
+            MonobankClientOptions
+                .builder()
+                .baseUrl(server.url("/").toString())
+                .maxResponseBytes(limit)
+                .build(),
+        defaultBaseUrl = "https://example.invalid",
+        module = "test",
+        authenticator = { emptyMap() },
+        errorDecoder =
+            object : ErrorDecoder {
+                override fun decode(body: ByteArray) = ApiError(null, null)
+            },
+        sleeper = {},
+    )
+
+    @Test
+    fun `oversized answers fail as UNKNOWN serialization errors and are not retried`() {
+        val server = MockWebServer()
+        server.start()
+        try {
+            server.enqueue(MockResponse().setBody("x".repeat(2_000)))
+            assertThatThrownBy { http(server, 1_000).execute(ApiRequest(HttpMethod.GET, "/x", idempotent = true)) }
+                .isInstanceOfSatisfying(
+                    io.github.damienmiheev.monobank.core.MonobankSerializationException::class.java,
+                ) {
+                    assertThat(it.outcome).isEqualTo(RequestOutcome.UNKNOWN)
+                    assertThat(it.message).contains("maxResponseBytes")
+                }
+            assertThat(server.requestCount).isEqualTo(1)
+
+            server.enqueue(MockResponse().setBody("y".repeat(1_000)))
+            assertThat(
+                http(server, 1_000).execute(ApiRequest(HttpMethod.GET, "/x", idempotent = true)).body,
+            ).hasSize(1_000)
+        } finally {
+            server.shutdown()
+        }
+    }
+
+    @Test
+    fun `api and network exceptions expose a non-null outcome`() {
+        val e: io.github.damienmiheev.monobank.core.MonobankNetworkException =
+            io.github.damienmiheev.monobank.core
+                .MonobankNetworkException("x", null, RequestOutcome.NOT_SENT)
+        val outcome: RequestOutcome = e.outcome // compiles only because the type is non-null
+        assertThat(outcome).isEqualTo(RequestOutcome.NOT_SENT)
+        val asBase: io.github.damienmiheev.monobank.core.MonobankException = e
+        assertThat(asBase.outcome).isEqualTo(RequestOutcome.NOT_SENT)
+        assertThatThrownBy {
+            MonobankClientOptions.builder().maxResponseBytes(0)
+        }.isInstanceOf(IllegalArgumentException::class.java)
+    }
+}

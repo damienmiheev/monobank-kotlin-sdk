@@ -17,6 +17,9 @@ import java.time.Duration
  * @property httpClient Your own [HttpClient] (for a proxy, custom TLS or executor). It must not
  *   follow redirects. When set, [connectTimeout] is ignored because it belongs to the client.
  * @property userAgentSuffix Appended to the SDK's `User-Agent`, for example `my-shop/2.1`.
+ * @property maxResponseBytes Largest response body the SDK reads (default 20 MB). A bigger answer
+ *   (for example from a misbehaving proxy) fails with `MonobankSerializationException` instead of
+ *   exhausting memory.
  */
 public class MonobankClientOptions private constructor(
     builder: Builder,
@@ -27,6 +30,7 @@ public class MonobankClientOptions private constructor(
     public val retryPolicy: RetryPolicy = builder.retryPolicy
     public val httpClient: HttpClient? = builder.httpClient
     public val userAgentSuffix: String? = builder.userAgentSuffix
+    public val maxResponseBytes: Long = builder.maxResponseBytes
 
     /** Returns a builder pre-filled with these options. */
     public fun toBuilder(): Builder =
@@ -37,10 +41,11 @@ public class MonobankClientOptions private constructor(
             .retryPolicy(retryPolicy)
             .httpClient(httpClient)
             .userAgentSuffix(userAgentSuffix)
+            .maxResponseBytes(maxResponseBytes)
 
     override fun toString(): String =
         "MonobankClientOptions(baseUrl=$baseUrl, connectTimeout=$connectTimeout, requestTimeout=$requestTimeout, " +
-            "retryPolicy=$retryPolicy, customHttpClient=${httpClient != null}, userAgentSuffix=$userAgentSuffix)"
+            "retryPolicy=$retryPolicy, customHttpClient=${httpClient != null}, userAgentSuffix=$userAgentSuffix, maxResponseBytes=$maxResponseBytes)"
 
     /** Builder for [MonobankClientOptions]. */
     public class Builder internal constructor() {
@@ -50,6 +55,7 @@ public class MonobankClientOptions private constructor(
         internal var retryPolicy: RetryPolicy = RetryPolicy.DEFAULT
         internal var httpClient: HttpClient? = null
         internal var userAgentSuffix: String? = null
+        internal var maxResponseBytes: Long = DEFAULT_MAX_RESPONSE_BYTES
 
         /**
          * Overrides the API host, e.g. a proxy or `http://localhost:8080` in tests. Plain `http` is
@@ -109,12 +115,20 @@ public class MonobankClientOptions private constructor(
                 userAgentSuffix = suffix
             }
 
+        /** Largest response body to read, in bytes (default 20 MB). */
+        public fun maxResponseBytes(bytes: Long): Builder =
+            apply {
+                require(bytes > 0) { "maxResponseBytes must be positive" }
+                maxResponseBytes = bytes
+            }
+
         /** Builds the options. */
         public fun build(): MonobankClientOptions = MonobankClientOptions(this)
     }
 
     public companion object {
         private val LOOPBACK_HOSTS = setOf("localhost", "127.0.0.1", "[::1]", "::1")
+        private const val DEFAULT_MAX_RESPONSE_BYTES: Long = 20L * 1024 * 1024
 
         /** Default options: production host, 10 s connect, 30 s request timeout, [RetryPolicy.DEFAULT]. */
         @JvmField
