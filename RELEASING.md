@@ -13,15 +13,15 @@ review), on the exact commit that gets tagged. Nothing is published until both p
 2. Central Portal → Account → Generate User Token.
 3. Repository settings: run `tools/github/apply.sh` (needs `gh` logged in as admin). It applies and
    can re-apply everything below; review the result under Settings → Rules.
-   - `main`: changes only through pull requests with squash merge; 1 approving review from a code
-     owner, re-approval after new pushes, resolved conversations. The admin may merge a PR without
-     approval (bypass in pull-request mode only: no direct pushes).
-   - `main` (admin may bypass, again only when merging a pull request): CI checks `build`, `newest-jdk`, `killbill-consumer`,
-     `workflow-lint` and `codeql` must pass on the up-to-date branch; no high CodeQL alerts; linear
-     history; no force pushes; no deletion.
+   - Ruleset `main` (no bypass for anyone, admin included): changes only through squash-merged
+     pull requests with resolved conversations; CI checks `build`, `newest-jdk`, `killbill-consumer`,
+     `workflow-lint` and `codeql` must pass on the up-to-date branch; no high CodeQL alerts; signed
+     commits; linear history; no force pushes; no deletion. A failing PR can never be merged.
+   - Ruleset `main-review`: 1 approving review from a code owner, re-approval after new pushes.
+     The admin may bypass only this one, and only when merging a pull request, so the owner can
+     merge their own green PR without a second developer.
    - Release tags `v*`: only the admin can create them; nobody (admin included) can move or delete
      them. GitHub releases are immutable once published.
-   - `main` accepts only signed commits (GitHub signs squash merges itself).
    - Secret scanning with push protection, Dependabot alerts and security updates, private
      vulnerability reporting.
    - Actions: GitHub-owned actions, `gradle/actions` and `ossf/scorecard-action` only, pinned to full commit SHAs; read-only

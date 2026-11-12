@@ -76,9 +76,11 @@ api -X PUT "repos/$repo/environments/monobank-test" --silent --input - <<JSON
 JSON
 
 echo "== Rulesets"
-# Rulesets renamed since the first version of this script.
-old="$(api "repos/$repo/rulesets" --jq '.[] | select(.name == "release tags") | .id')"
-if [ -n "$old" ]; then api -X DELETE "repos/$repo/rulesets/$old" --silent; echo "removed old: release tags"; fi
+# Rulesets renamed or replaced since earlier versions of this script.
+for old_name in "release tags" "main: checks and history" "main: pull requests and review"; do
+  old="$(api "repos/$repo/rulesets" --jq ".[] | select(.name == \"$old_name\") | .id")"
+  if [ -n "$old" ]; then api -X DELETE "repos/$repo/rulesets/$old" --silent; echo "removed old: $old_name"; fi
+done
 for file in "$dir"/ruleset-*.json; do
   name="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["name"])' "$file")"
   id="$(api "repos/$repo/rulesets" --jq ".[] | select(.name == \"$name\") | .id")"

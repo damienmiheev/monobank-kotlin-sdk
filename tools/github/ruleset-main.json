@@ -1,5 +1,4 @@
 {
-  "name": "main: checks and history",
   "target": "branch",
   "enforcement": "active",
   "conditions": {
@@ -10,13 +9,8 @@
       "exclude": []
     }
   },
-  "bypass_actors": [
-    {
-      "actor_id": 5,
-      "actor_type": "RepositoryRole",
-      "bypass_mode": "pull_request"
-    }
-  ],
+  "name": "main",
+  "bypass_actors": [],
   "rules": [
     {
       "type": "deletion"
@@ -29,6 +23,20 @@
     },
     {
       "type": "required_signatures"
+    },
+    {
+      "type": "pull_request",
+      "parameters": {
+        "required_approving_review_count": 0,
+        "dismiss_stale_reviews_on_push": true,
+        "require_code_owner_review": false,
+        "require_last_push_approval": false,
+        "required_review_thread_resolution": true,
+        "allowed_merge_methods": [
+          "squash"
+        ],
+        "require_extra_approval_for_unattributed_changes": false
+      }
     },
     {
       "type": "required_status_checks",
