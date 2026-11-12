@@ -1,0 +1,43 @@
+{
+  "invoiceId": "p2_9ZgpZVsl3",
+  "status": "created",
+  "failureReason": "Неправильний CVV код",
+  "errCode": "59",
+  "amount": 4200,
+  "ccy": 980,
+  "finalAmount": 4200,
+  "createdDate": "2024-05-01T12:30:00+03:00",
+  "modifiedDate": "2024-05-01T12:30:00+03:00",
+  "reference": "84d0070ee4e44667b31371d8f8813947",
+  "destination": "Покупка щастя",
+  "cancelList": [
+    {
+      "status": "processing",
+      "amount": 4200,
+      "ccy": 980,
+      "createdDate": "2024-05-01T12:30:00+03:00",
+      "modifiedDate": "2024-05-01T12:30:00+03:00",
+      "approvalCode": "662476",
+      "rrn": "060189181768",
+      "extRef": "635ace02599849e981b2cd7a65f417fe"
+    }
+  ],
+  "paymentInfo": {
+    "maskedPan": "444403******1902",
+    "approvalCode": "662476",
+    "rrn": "060189181768",
+    "tranId": "13194036",
+    "terminal": "MI001088",
+    "bank": "Універсал Банк",
+    "paymentSystem": "visa",
+    "paymentMethod": "pan",
+    "fee": 0,
+    "country": "804",
+    "agentFee": 0
+  },
+  "walletData": {
+    "cardToken": "67XZtXdR4NpKU3",
+    "walletId": "c1376a611e17b059aeaf96b73258da9c",
+    "status": "new"
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "amount": 4200,
+  "ccy": 980,
+  "merchantPaymInfo": {
+    "reference": "84d0070ee4e44667b31371d8f8813947",
+    "destination": "Покупка щастя"
+  },
+  "cardData": {
+    "pan": "4242424242424242",
+    "type": "FPAN",
+    "exp": "0642",
+    "cvv": "123",
+    "eciIndicator": "02",
+    "cavv": "123",
+    "tavv": "tavv",
+    "dsTranId": "12",
+    "tReqID": "51",
+    "mit": "1",
+    "sst": "2",
+    "tid": "12"
+  },
+  "applePay": {
+    "token": "4242424242424242",
+    "exp": "0642",
+    "eciIndicator": "02",
+    "cryptogram": "AQAAAAoAR9qDi9kAAAAAgGpLpoA="
+  },
+  "googlePay": {
+    "token": "4242424242424242",
+    "exp": "0642",
+    "eciIndicator": "02",
+    "cryptogram": "AQAAAAoAR9qDi9kAAAAAgGpLpoA="
+  }
+}

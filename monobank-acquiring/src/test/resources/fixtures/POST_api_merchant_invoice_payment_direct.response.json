@@ -1,0 +1,10 @@
+{
+  "invoiceId": "2210012MPLYwJjVUzchj",
+  "tdsUrl": "https://example.com/tds/url",
+  "status": "success",
+  "failureReason": "Неправильний CVV код",
+  "amount": 4200,
+  "ccy": 980,
+  "createdDate": "2024-05-01T12:30:00+03:00",
+  "modifiedDate": "2024-05-01T12:30:00+03:00"
+}

@@ -1,0 +1,21 @@
+{
+  "subscriptionId": "s2_AbrCdXyZ13",
+  "status": "active",
+  "startDate": "2024-06-01T14:15:22Z",
+  "endDate": "2024-06-20T09:30:15Z",
+  "amount": 4200,
+  "ccy": 980,
+  "interval": "1m",
+  "nextChargeDate": "2024-07-01T14:15:22Z",
+  "cancellationDesc": "Скасовано за запитом користувача",
+  "summary": {
+    "totalPaid": 3,
+    "totalFailed": 1
+  },
+  "walletData": {
+    "cardToken": "67XZtXdR4NpKU3",
+    "walletId": "c1376a611e17b059aeaf96b73258da9c",
+    "status": "created",
+    "failureDescription": "Недостатньо коштів на картці"
+  }
+}

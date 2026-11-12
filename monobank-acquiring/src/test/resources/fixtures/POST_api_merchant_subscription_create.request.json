@@ -1,0 +1,11 @@
+{
+  "amount": 4200,
+  "ccy": 980,
+  "redirectUrl": "https://example.com/your/website/result/page",
+  "webHookUrls": {
+    "chargeUrl": "https://example.com/mono/subscription/charge/webhook",
+    "statusUrl": "https://example.com/mono/subscription/status/webhook"
+  },
+  "interval": "1m",
+  "validity": 3600
+}

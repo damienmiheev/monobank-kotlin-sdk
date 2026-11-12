@@ -1,0 +1,64 @@
+{
+  "amount": 4200,
+  "ccy": 980,
+  "cardData": {
+    "pan": "4242424242424242",
+    "exp": "0642",
+    "cvv": 123
+  },
+  "merchantPaymInfo": {
+    "reference": "84d0070ee4e44667b31371d8f8813947",
+    "destination": "Покупка щастя",
+    "comment": "Покупка щастя",
+    "customerEmails": [],
+    "discounts": [
+      {
+        "type": "DISCOUNT",
+        "mode": "PERCENT",
+        "value": 0.0,
+        "tax": [
+          null
+        ]
+      }
+    ],
+    "metadata": {
+      "key1": "value1",
+      "key2": "value2"
+    },
+    "basketOrder": [
+      {
+        "name": "Табуретка",
+        "qty": 2,
+        "sum": 2100,
+        "total": 4200,
+        "icon": "string",
+        "unit": "шт.",
+        "code": "d21da1c47f3c45fca10a10c32518bdeb",
+        "barcode": "string",
+        "header": "string",
+        "footer": "string",
+        "tax": [],
+        "uktzed": "string",
+        "splitReceiverId": "a1b2c3d4e5f6",
+        "discounts": [
+          {
+            "type": "DISCOUNT",
+            "mode": "PERCENT",
+            "value": 0.0,
+            "tax": [
+              null
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "webHookUrl": "https://example.com/mono/acquiring/webhook/maybesomegibberishuniquestringbutnotnecessarily",
+  "paymentType": "debit",
+  "saveCardData": {
+    "saveCard": true,
+    "walletId": "69f780d841a0434aa535b08821f4822c"
+  },
+  "redirectUrl": "https://example.com/your/website/result/page",
+  "initiationKind": "merchant"
+}

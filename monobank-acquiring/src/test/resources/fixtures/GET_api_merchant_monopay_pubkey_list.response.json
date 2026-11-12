@@ -1,0 +1,10 @@
+{
+  "result": [
+    {
+      "keyId": "28F91hHGtzoSFJ",
+      "keyValue": "LS0tLS1CRUdJTiBQVUJMSUMgS0VZLS0tLS0K...",
+      "keyName": "my_key",
+      "expiresAt": "2026-02-02T15:04:05+03:00"
+    }
+  ]
+}

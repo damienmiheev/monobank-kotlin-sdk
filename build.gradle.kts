@@ -1,116 +1,167 @@
+import com.vanniktech.maven.publish.JavadocJar
+import com.vanniktech.maven.publish.KotlinJvm
+import com.vanniktech.maven.publish.MavenPublishBaseExtension
+import com.vanniktech.maven.publish.SourcesJar
+import dev.detekt.gradle.extensions.DetektExtension
+import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension
+import org.jetbrains.kotlin.gradle.dsl.KotlinVersion
+import org.jlleitschuh.gradle.ktlint.KtlintExtension
 
 plugins {
-    alias(libs.plugins.kotlin.jvm)
-    alias(libs.plugins.detekt)
-    alias(libs.plugins.ktlint)
-    alias(libs.plugins.nexus.publish)
-    `java-library`
-    `maven-publish`
-    signing
+    alias(libs.plugins.kotlin.jvm) apply false
+    alias(libs.plugins.detekt) apply false
+    alias(libs.plugins.ktlint) apply false
+    alias(libs.plugins.dokka) apply false
+    alias(libs.plugins.maven.publish) apply false
+    alias(libs.plugins.bcv)
 }
 
-group = property("GROUP") as String
-version = property("VERSION_NAME") as String
+/** Modules that ship Kotlin code (everything except the BOM and the relocation POM). */
+val libraryModules =
+    setOf(
+        "monobank-core",
+        "monobank-acquiring",
+        "monobank-personal",
+        "monobank-corporate",
+        "monobank-installments",
+    )
 
-repositories {
-    mavenCentral()
+apiValidation {
+    ignoredProjects += listOf("monobank-bom", "relocation")
+    nonPublicMarkers += "io.github.damienmiheev.monobank.core.InternalMonobankApi"
 }
 
-dependencies {
-    api(libs.bundles.jackson)
-    implementation(libs.slf4j.api)
-
-    testImplementation(platform(libs.junit.bom))
-    testImplementation(libs.bundles.test)
+allprojects {
+    group = property("GROUP") as String
+    version = property("VERSION_NAME") as String
 }
 
-kotlin {
-    jvmToolchain(21)
-    compilerOptions {
-        jvmTarget.set(JvmTarget.JVM_11)
-        freeCompilerArgs.addAll(
-            "-Xjsr305=strict",
-            "-opt-in=kotlin.RequiresOptIn",
-        )
+val catalog = libs
+val ktlintVersion: String = libs.versions.ktlint.engine.get()
+val jacksonMinVersion: String = libs.versions.jackson.min.get()
+val jacksonDatabindMinVersion: String = libs.versions.jackson.databind.min.get()
+
+configure(subprojects.filter { it.name in libraryModules }) {
+    apply(plugin = "org.jetbrains.kotlin.jvm")
+    apply(plugin = "java-library")
+    apply(plugin = "dev.detekt")
+    apply(plugin = "org.jlleitschuh.gradle.ktlint")
+    apply(plugin = "org.jetbrains.dokka")
+    apply(plugin = "com.vanniktech.maven.publish")
+
+    configure<KotlinJvmProjectExtension> {
+        explicitApi()
+        jvmToolchain(21)
+        compilerOptions {
+            // Bytecode and JDK API surface of Java 11: Kill Bill 0.24 runs on JDK 11.
+            jvmTarget.set(JvmTarget.JVM_11)
+            freeCompilerArgs.addAll("-Xjdk-release=11", "-Xjsr305=strict")
+            // Kotlin consumers need Kotlin 2.1+ (they read 2.2 metadata); Java consumers are unaffected.
+            apiVersion.set(KotlinVersion.KOTLIN_2_2)
+            languageVersion.set(KotlinVersion.KOTLIN_2_2)
+            optIn.add("io.github.damienmiheev.monobank.core.InternalMonobankApi")
+        }
     }
-}
 
-java {
-    withJavadocJar()
-    withSourcesJar()
-    sourceCompatibility = JavaVersion.VERSION_11
-    targetCompatibility = JavaVersion.VERSION_11
-}
+    tasks.withType<JavaCompile>().configureEach {
+        options.release.set(11)
+    }
 
-detekt {
-    buildUponDefaultConfig = true
-    allRules = false
-    config.setFrom(files("detekt.yml"))
-}
+    dependencies {
+        "testImplementation"(platform(catalog.junit.bom))
+        "testImplementation"(catalog.bundles.test)
+        "testRuntimeOnly"(catalog.junit.platform.launcher)
+    }
 
-ktlint {
-    version.set("1.5.0")
-}
+    tasks.withType<Test>().configureEach {
+        useJUnitPlatform {
+            excludeTags("live")
+        }
+        testLogging {
+            events("failed")
+            exceptionFormat = TestExceptionFormat.FULL
+        }
+    }
 
-tasks.withType<Test> {
-    useJUnitPlatform()
-}
+    val javaToolchains = extensions.getByType<JavaToolchainService>()
+    val sourceSets = extensions.getByType<SourceSetContainer>()
 
-publishing {
-    publications {
-        create<MavenPublication>("maven") {
-            from(components["java"])
+    // Runs the unit tests on a real Java 11 runtime (the oldest supported JVM).
+    val testJdk11 =
+        tasks.register<Test>("testJdk11") {
+            description = "Runs the unit tests on Java 11."
+            group = "verification"
+            testClassesDirs = sourceSets["test"].output.classesDirs
+            classpath = sourceSets["test"].runtimeClasspath
+            javaLauncher.set(javaToolchains.launcherFor { languageVersion.set(JavaLanguageVersion.of(11)) })
+        }
 
-            groupId = property("GROUP") as String
-            artifactId = property("ARTIFACT_ID") as String
-            version = property("VERSION_NAME") as String
-
-            pom {
-                name.set("Monobank Kotlin SDK")
-                description.set(
-                    "Kotlin SDK for Monobank Acquiring API — invoice management, " +
-                        "subscriptions, wallet tokenization, QR payments, webhooks, and more.",
-                )
-                url.set("https://github.com/Spilki/monobank-kotlin-sdk")
-                licenses {
-                    license {
-                        name.set("MIT License")
-                        url.set("https://opensource.org/licenses/MIT")
-                    }
-                }
-                developers {
-                    developer {
-                        id.set("damienmiheev")
-                        name.set("Dmytro Mikhieiev")
-                    }
-                }
-                scm {
-                    connection.set("scm:git:git://github.com/Spilki/monobank-kotlin-sdk.git")
-                    developerConnection.set("scm:git:ssh://github.com/Spilki/monobank-kotlin-sdk.git")
-                    url.set("https://github.com/Spilki/monobank-kotlin-sdk")
+    // Runs the unit tests against the oldest supported Jackson (the version Kill Bill pins).
+    val jackson213 =
+        configurations.create("testRuntimeJackson213") {
+            extendsFrom(configurations["testRuntimeClasspath"])
+            isCanBeConsumed = false
+            resolutionStrategy.eachDependency {
+                if (requested.group == "com.fasterxml.jackson.core") {
+                    useVersion(
+                        if (requested.name == "jackson-databind") jacksonDatabindMinVersion else jacksonMinVersion,
+                    )
                 }
             }
         }
+    val testJackson213 =
+        tasks.register<Test>("testJackson213") {
+            description = "Runs the unit tests with Jackson 2.13."
+            group = "verification"
+            testClassesDirs = sourceSets["test"].output.classesDirs
+            classpath = sourceSets["test"].output + sourceSets["main"].output + jackson213
+            systemProperty("monobank.expectedJacksonDatabind", jacksonDatabindMinVersion)
+        }
+
+    // Tagged @Tag("live"): calls the real monobank API. Run by hand only, see CONTRIBUTING.md.
+    tasks.register<Test>("liveTest") {
+        description = "Runs tests against the real monobank API (needs credentials in env vars)."
+        group = "verification"
+        testClassesDirs = sourceSets["test"].output.classesDirs
+        classpath = sourceSets["test"].runtimeClasspath
+        useJUnitPlatform { includeTags("live") }
+        outputs.upToDateWhen { false }
+    }
+
+    tasks.named("check") {
+        dependsOn(testJdk11, testJackson213)
+    }
+
+    configure<DetektExtension> {
+        buildUponDefaultConfig = true
+        allRules = false
+        config.setFrom(rootProject.files("detekt.yml"))
+    }
+    // Keep detekt's and ktlint's bundled Kotlin compiler instead of the project's version.
+    configurations.matching { it.name.startsWith("detekt") || it.name.startsWith("ktlint") }.configureEach {
+        resolutionStrategy.eachDependency {
+            if (requested.group == "org.jetbrains.kotlin") {
+                useVersion(requested.version!!)
+            }
+        }
+    }
+    configure<KtlintExtension> {
+        version.set(ktlintVersion)
+    }
+
+    configure<MavenPublishBaseExtension> {
+        configure(KotlinJvm(javadocJar = JavadocJar.Dokka("dokkaGeneratePublicationHtml"), sourcesJar = SourcesJar.Sources()))
     }
 }
 
-signing {
-    val signingKey = findProperty("signingKey") as String? ?: System.getenv("GPG_SIGNING_KEY")
-    val signingPassword = findProperty("signingPassword") as String? ?: System.getenv("GPG_SIGNING_PASSWORD")
-    if (signingKey != null && signingPassword != null) {
-        useInMemoryPgpKeys(signingKey, signingPassword)
-        sign(publishing.publications["maven"])
-    }
-}
-
-nexusPublishing {
-    repositories {
-        sonatype {
-            nexusUrl.set(uri("https://ossrh-staging-api.central.sonatype.com/service/local/"))
-            snapshotRepositoryUrl.set(uri("https://central.sonatype.com/repository/maven-snapshots/"))
-            username.set(findProperty("ossrhUsername") as String? ?: System.getenv("OSSRH_USERNAME"))
-            password.set(findProperty("ossrhPassword") as String? ?: System.getenv("OSSRH_PASSWORD"))
+configure(subprojects.filter { it.name != "relocation" }) {
+    plugins.withId("com.vanniktech.maven.publish") {
+        configure<MavenPublishBaseExtension> {
+            // Uploads to the Central Portal; the release is confirmed by hand in the portal UI.
+            publishToMavenCentral(automaticRelease = false)
+            signAllPublications()
         }
     }
 }

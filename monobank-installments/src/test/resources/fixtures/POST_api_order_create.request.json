@@ -1,0 +1,39 @@
+{
+  "store_order_id": "ORD-2024-001234",
+  "client_phone": "+380501234567",
+  "total_sum": 2499.99,
+  "invoice": {
+    "number": "INV-2024-001234",
+    "date": "2024-01-15",
+    "source": "INTERNET",
+    "point_id": "STORE-001"
+  },
+  "available_programs": [
+    {
+      "type": "payment_installments",
+      "available_parts_count": [
+        3,
+        6,
+        10
+      ]
+    }
+  ],
+  "products": [
+    {
+      "name": "Телевізор Samsung 55\"",
+      "count": 2,
+      "sum": 9999.99
+    }
+  ],
+  "result_callback": "https://shop.example.com/api/order/callback",
+  "additional_params": {
+    "seller_phone": "+380501234568",
+    "nds": 416.67,
+    "ext_initial_sum": 500
+  },
+  "financial_company_merchant_info": {
+    "store_name": "Електроніка Плюс",
+    "edrpou_code": "12345678",
+    "iban_account": "UA123456789012345678901234567"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "orders": [
+    {
+      "order_id": "fa4a8249-336e-4e6d-9b85-79bc8be62377",
+      "invoice_number": "INV-001234",
+      "order_date": "2024-01-15",
+      "pay_parts": 10,
+      "commission_percent": 2.5,
+      "total_sum": 2499.99,
+      "transferred_sum": 2437.49,
+      "commission": 62.5,
+      "operation_timestamp": "2024-01-15T14:30:00",
+      "odb_contract_number": "КД-2024-001234"
+    }
+  ]
+}

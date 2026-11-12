@@ -1,0 +1,16 @@
+{
+  "payments": [
+    {
+      "amount": 4200,
+      "status": "success",
+      "chargedAt": "2024-06-01T14:15:22Z",
+      "ccy": 980
+    }
+  ],
+  "pagination": {
+    "totalItems": 10,
+    "itemsPerPage": 20,
+    "currentPage": 1,
+    "totalPages": 1
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "list": [
+    {
+      "subscriptionId": "s2_AbrCdXyZ13",
+      "amount": 4200,
+      "interval": "1m",
+      "startDate": "2024-06-01T14:15:22Z",
+      "created": "2024-05-30T12:10:05Z",
+      "nextChargeDate": "2024-07-01T14:15:22Z",
+      "endDate": "2024-09-01T14:15:22Z",
+      "status": "active"
+    }
+  ],
+  "pagination": {
+    "totalItems": 5,
+    "itemsPerPage": 20,
+    "currentPage": 1,
+    "totalPages": 1
+  }
+}
