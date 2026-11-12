@@ -113,10 +113,15 @@ must repeat the original basket lines (same name, code, unit price and split rec
 Merchant acquiring accepts three currencies: UAH (980), USD (840) and EUR (978); holds work only in
 UAH. Other codes (e.g. PLN 985) are refused with 400 `1001` "invalid 'ccy'".
 
-USD and EUR are **converted to UAH when the customer pays** (verified on monobank's test merchant:
+All acquiring payments settle in UAH: Ukrainian law requires payments in the national currency
+(monobank's developers confirmed it), so there is no EUR or USD settlement. USD and EUR are
+**converted to UAH when the customer pays** (verified on monobank's test merchant:
 1.00 EUR became 50.48 UAH, already shown in UAH on the 3-D Secure page). The invoice is created in
 the original currency, the payment answer echoes it, but `invoice/status` and the statement report
 the UAH amount with `ccy` 980, and refunds are made in UAH: send the UAH amount, without `items`.
+The actual rate is the payment's own UAH amount divided by the invoiced amount (it differs from
+monobank's public rate); a partial refund of an invoiced amount `x` out of `total` is
+`x / total × paid UAH`. A card in another currency is converted again by the card's own bank.
 After a refund of such a payment, monobank's `invoice/status` answers 500 for that invoice; use the
 statement (`merchant.statementEntries`, `findByReference`) for it.
 
