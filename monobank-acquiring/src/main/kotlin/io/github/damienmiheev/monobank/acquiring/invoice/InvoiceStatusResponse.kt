@@ -31,6 +31,9 @@ import java.time.OffsetDateTime
  *   strictly older than the state you have ([isOlderThan]). Apply one with the **same** date: monobank
  *   may send separate webhooks for the saved card (`walletData`) and refunds (`cancelList`) without
  *   changing this date.
+ *   Precision differs between endpoints (`invoice/status` and webhooks: whole seconds; payment
+ *   answers: fractions of a second), so never order events on sub-second differences;
+ *   [isNewerThan] and [isOlderThan] compare to the second.
  * @property reference Your [io.github.damienmiheev.monobank.acquiring.common.MerchantPaymInfo.reference].
  * @property destination Payment purpose.
  * @property cancelList Refunds requested on this invoice.
@@ -70,7 +73,7 @@ public data class InvoiceStatusResponse
         public fun isNewerThan(other: InvoiceStatusResponse): Boolean {
             val mine = modifiedDate ?: return false
             val theirs = other.modifiedDate ?: return true
-            return mine.isAfter(theirs)
+            return wholeSeconds(mine) > wholeSeconds(theirs)
         }
 
         /**
@@ -81,8 +84,15 @@ public data class InvoiceStatusResponse
         public fun isOlderThan(other: InvoiceStatusResponse): Boolean {
             val mine = modifiedDate ?: return false
             val theirs = other.modifiedDate ?: return false
-            return mine.isBefore(theirs)
+            return wholeSeconds(mine) < wholeSeconds(theirs)
         }
+
+        /**
+         * Dates are compared to the second: `invoice/status` and webhooks send whole seconds while
+         * payment answers (`wallet/payment`) carry fractions, so a newer status can look older by a
+         * fraction of a second (seen live).
+         */
+        private fun wholeSeconds(date: java.time.OffsetDateTime): Long = date.toEpochSecond()
 
         /**
          * The refund requested with [extRef] (your `CancelInvoiceRequest.extRef`), or `null`.

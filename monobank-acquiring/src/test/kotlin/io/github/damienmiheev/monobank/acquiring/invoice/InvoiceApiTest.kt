@@ -190,3 +190,31 @@ class InvoiceApiTest : AcquiringTestSupport() {
         assertThat(mono.toString()).doesNotContain(TOKEN)
     }
 }
+
+class ModifiedDatePrecisionTest {
+    private fun state(date: String) =
+        io.github.damienmiheev.monobank.core.json.MonobankJson.read(
+            """{"invoiceId":"i","status":"hold","amount":1,"ccy":980,"modifiedDate":"$date"}""".toByteArray(),
+            InvoiceStatusResponse::class.java,
+        )
+
+    @org.junit.jupiter.api.Test
+    fun `ordering ignores sub-second differences between endpoints`() {
+        // Seen live: the wallet/payment answer had fractions, the later invoice/status whole seconds.
+        val paymentAnswer = state("2026-11-12T19:04:33.525289Z")
+        val statusAfter = state("2026-11-12T19:04:33Z")
+        org.assertj.core.api.Assertions
+            .assertThat(statusAfter.isOlderThan(paymentAnswer))
+            .isFalse()
+        org.assertj.core.api.Assertions
+            .assertThat(paymentAnswer.isNewerThan(statusAfter))
+            .isFalse()
+        val nextSecond = state("2026-11-12T19:04:34Z")
+        org.assertj.core.api.Assertions
+            .assertThat(nextSecond.isNewerThan(paymentAnswer))
+            .isTrue()
+        org.assertj.core.api.Assertions
+            .assertThat(paymentAnswer.isOlderThan(nextSecond))
+            .isTrue()
+    }
+}
