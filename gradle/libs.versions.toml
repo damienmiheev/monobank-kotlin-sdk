@@ -21,7 +21,7 @@ dokka = "2.3.0"
 maven-publish = "0.37.0"
 bcv = "0.18.2"
 junit5 = "5.14.4"
-mockwebserver = "4.12.0"
+mockwebserver = "5.5.1"
 assertj = "3.27.7"
 
 [libraries]
