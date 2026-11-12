@@ -8,8 +8,14 @@ updates:
       build-tools:
         patterns: ["*"]
     ignore:
-      # The SDK deliberately stays on Jackson 2.x (Kill Bill uses 2.x) and JUnit 5 (JUnit 6 needs Java 17).
+      # Runtime dependency versions are published as consumers' minimum versions (see
+      # gradle/libs.versions.toml): only patch updates. Jackson stays 2.x, slf4j-api stays 1.7.
+      - dependency-name: "com.fasterxml.jackson*"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
       - dependency-name: "tools.jackson*"
+      - dependency-name: "org.slf4j:slf4j-api"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      # JUnit 6 needs Java 17; the tests also run on Java 11.
       - dependency-name: "org.junit:junit-bom"
         versions: [">=6"]
   - package-ecosystem: github-actions
@@ -20,3 +26,8 @@ updates:
     directory: /consumer-tests/killbill-maven
     schedule:
       interval: monthly
+    ignore:
+      # Pinned to the Kill Bill version the plugin runs on (0.24.x).
+      - dependency-name: "org.kill-bill.billing:killbill-oss-parent"
+      - dependency-name: "org.junit.jupiter:junit-jupiter"
+        versions: [">=6"]

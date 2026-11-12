@@ -30,8 +30,9 @@ for Java 11 and also runs the tests on a Java 11 runtime, which Gradle finds or 
 
 ## Live tests
 
-Tests tagged `live` call the real API and are skipped unless credentials are set. Run them by hand
-only; never in CI, never with production credentials you cannot afford to have rate-limited.
+Tests tagged `live` call the real API and are skipped unless credentials are set. They never run on
+pull requests: run them by hand, or with the manual `live.yml` workflow (credentials in the
+`monobank-test` environment, every run approved by the maintainer). Never use production credentials.
 
 | Module | Variables | Notes |
 |---|---|---|

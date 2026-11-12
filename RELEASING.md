@@ -3,7 +3,8 @@
 Releases go to Maven Central under `io.github.damienmiheev`. Only the maintainer releases.
 A release must not need a follow-up fix release, so **every step below is done twice**:
 the first pass by the maintainer, the second pass independently (a second person or a fresh
-review), on the exact commit that gets tagged. Nothing is published until both passes are clean.
+review), on the head of the release pull request, whose content is exactly what gets tagged.
+Nothing is published until both passes are clean.
 
 ## One-time setup
 
@@ -39,7 +40,7 @@ review), on the exact commit that gets tagged. Nothing is published until both p
 
 ## Verification pass (run it twice)
 
-On a clean checkout of the release commit:
+On a clean checkout of the release pull request's head (version `X.Y.Z`, not a snapshot):
 
 1. `./gradlew clean check publishToMavenLocal -x :relocation:publishToMavenLocal --console=plain` passes. `check` includes the unit
    tests on JDK 21 and JDK 11 (`testJdk11`), the tests against Jackson 2.13 (`testJackson213`),
@@ -71,14 +72,25 @@ On a clean checkout of the release commit:
 
 ## Release
 
-1. Set `VERSION_NAME=X.Y.Z` in `gradle.properties`, move the CHANGELOG `Unreleased` section under
-   `X.Y.Z`, commit "Release X.Y.Z", tag `vX.Y.Z`, push the tag.
-2. Actions → "Publish to Maven Central" → run on tag `vX.Y.Z`, target `sdk`. It re-runs `check`,
-   uploads, and stops: the deployment waits in the Central Portal.
-3. Central Portal → Deployments: check the file list once more, then **Publish**.
-4. After it appears on https://repo1.maven.org/maven2/io/github/damienmiheev/ (can take ~30 min),
-   create the GitHub release from the tag with the CHANGELOG entry.
-5. Set `VERSION_NAME` to the next `-SNAPSHOT` and commit.
+`main` only accepts squash-merged pull requests and `v*` tags can't be moved, so:
+
+1. Open a release pull request: `VERSION_NAME=X.Y.Z` in `gradle.properties`, the CHANGELOG
+   `Unreleased` section moved under `X.Y.Z`, and nothing else.
+2. Run both verification passes on its head; fix anything in a new pull request first.
+3. Squash-merge it (all required checks green). The merge commit on `main` has the same tree as
+   the verified head.
+4. Tag the merge commit and push the tag (only the maintainer can create `v*` tags):
+   ```bash
+   git fetch origin && git tag -s vX.Y.Z origin/main && git push origin vX.Y.Z
+   ```
+5. Actions → "Publish to Maven Central" → run on tag `vX.Y.Z`, target `sdk`, and approve the
+   `maven-central` environment. It re-runs `check`, uploads, and stops: the deployment waits in
+   the Central Portal.
+6. Central Portal → Deployments: check the file list once more, then **Publish**.
+7. After it appears on https://repo1.maven.org/maven2/io/github/damienmiheev/ (can take ~30 min),
+   create the GitHub release from the tag with the CHANGELOG entry (releases are immutable once
+   published, so check it before publishing).
+8. Open a pull request setting `VERSION_NAME` to the next `-SNAPSHOT`.
 
 ### Once: relocation of the old coordinates
 

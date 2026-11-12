@@ -65,5 +65,5 @@ publishing {
 
 configure<MavenPublishBaseExtension> {
     publishToMavenCentral(automaticRelease = false)
-    signAllPublications()
+    if (gradle.startParameter.taskNames.any { "MavenCentral" in it }) signAllPublications()
 }

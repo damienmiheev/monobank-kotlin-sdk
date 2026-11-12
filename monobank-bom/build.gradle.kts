@@ -7,6 +7,6 @@ dependencies {
     constraints {
         rootProject.subprojects
             .filter { it.name.startsWith("monobank-") && it.name != project.name }
-            .forEach { api(it) }
+            .forEach { api(project(it.path)) }
     }
 }

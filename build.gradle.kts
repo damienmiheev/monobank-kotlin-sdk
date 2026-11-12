@@ -73,6 +73,13 @@ configure(subprojects.filter { it.name in libraryModules }) {
         options.release.set(11)
     }
 
+    // Stable JPMS name for module-path users, e.g. io.github.damienmiheev.monobank.acquiring.
+    tasks.named<Jar>("jar") {
+        manifest {
+            attributes("Automatic-Module-Name" to "io.github.damienmiheev.monobank." + project.name.removePrefix("monobank-"))
+        }
+    }
+
     dependencies {
         // Aligns all SDK modules to one version, so mixing module versions can't break at runtime.
         "api"(platform(project(":monobank-bom")))
@@ -173,13 +180,17 @@ configure(subprojects.filter { it.name in libraryModules }) {
     }
 }
 
+val publishingToCentral: Boolean = gradle.startParameter.taskNames.any { "MavenCentral" in it }
+
 configure(subprojects.filter { it.name != "relocation" }) {
     plugins.withId("com.vanniktech.maven.publish") {
         configure<MavenPublishBaseExtension> {
             // Uploads to the Central Portal; the release is confirmed by hand in the portal UI.
             publishToMavenCentral(automaticRelease = false)
-            // Required for every non-SNAPSHOT version: a release without a key fails instead of going out unsigned.
-            signAllPublications()
+            // Signing is required when publishing to Maven Central (a release without a key fails, and
+            // publish.yml refuses to start without one). Local publishing (publishToMavenLocal in CI
+            // and in RELEASING.md's verification) works unsigned, also for release versions.
+            if (publishingToCentral) signAllPublications()
         }
     }
 }

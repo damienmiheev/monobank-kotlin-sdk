@@ -68,7 +68,7 @@ api -X PUT "repos/$repo/environments/maven-central" --silent --input - <<JSON
   "deployment_branch_policy": { "protected_branches": false, "custom_branch_policies": true }
 }
 JSON
-if ! api "repos/$repo/environments/maven-central/deployment-branch-policies" --jq '.branch_policies[].name' | grep -qx 'v*'; then
+if ! api "repos/$repo/environments/maven-central/deployment-branch-policies" --jq '.branch_policies[].name' | grep -qxF 'v*'; then
   api -X POST "repos/$repo/environments/maven-central/deployment-branch-policies" --silent -f name='v*' -f type=tag
 fi
 api -X PUT "repos/$repo/environments/monobank-test" --silent --input - <<JSON
