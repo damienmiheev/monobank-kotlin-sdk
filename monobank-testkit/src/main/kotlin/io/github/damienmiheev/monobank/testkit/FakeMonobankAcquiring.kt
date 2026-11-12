@@ -70,6 +70,18 @@ import java.util.function.Predicate
  *   [Builder.finalizeSettlementDelay], 2 s by default, or [settleFinalize]); webhooks: `processing`,
  *   then `success`. Meanwhile `invoice/cancel` answers 404 `1004` "order not finished". A full finalize
  *   becomes `success` at once (not observed live).
+ * - Currency: monobank settles in UAH. A USD (840) or EUR (978) invoice keeps its amount and `ccy` while
+ *   unpaid; when paid it is converted at [Builder.conversionRate] (live: 100 EUR → 5048, 100 USD → 4551).
+ *   From then on `invoice/status` and the statement show `amount` = `finalAmount` = the UAH amount and
+ *   `ccy` 980, and the fee is on the UAH amount; the payment answer still echoes the requested amount and
+ *   currency. Refunds are in UAH: a partial `amount` and a full refund work without `items`; `items`
+ *   (whose sums are in the original currency) answer 400 `1001` "whole discount is expected to be
+ *   cancelled with the last item" (seen with such items; inferred for any items). After any successful
+ *   refund of a converted payment, `invoice/status` answers 500 `INTERNAL_ERROR` "unexpected end of JSON
+ *   input" for good, a monobank bug the fake reproduces by default
+ *   ([Builder.brokenStatusAfterConvertedRefund]); the statement keeps working. Inferred: webhooks of a
+ *   converted payment carry the UAH amount and 980 (they are still sent after such a refund), and the
+ *   conversion happens when the customer starts paying (`processing`).
  * - Fractional item `qty` is accepted in finalize and refund `items` (0.75 × 200 = 150, 0.25 × 200 = 50).
  * - A saved-card hold (`wallet/payment` with `paymentType` hold, no 3-D Secure) answers `processing`
  *   without `tdsUrl`, while `invoice/status` already says `hold` (the fake moves it at once, with
@@ -225,6 +237,8 @@ public class FakeMonobankAcquiring private constructor(
                 validateBasketTotal = builder.validateBasketTotal,
                 refundSettlement = builder.refundSettlement,
                 finalizeSettlementDelay = builder.finalizeSettlementDelay,
+                conversionRates = builder.conversionRates.toMap(),
+                brokenStatusAfterConvertedRefund = builder.brokenStatusAfterConvertedRefund,
             ),
             Ids(builder.seed?.let { Random(it) } ?: SecureRandom()),
             webhooks::enqueue,
@@ -816,6 +830,32 @@ public class FakeMonobankAcquiring private constructor(
         internal var feePercent: BigDecimal = BigDecimal("1.3")
         internal var hangLimit: Duration = Duration.ofMinutes(2)
         internal var finalizeSettlementDelay: Duration? = Duration.ofSeconds(2)
+        internal val conversionRates: MutableMap<Int, BigDecimal> =
+            mutableMapOf(EUR to BigDecimal("50.48"), USD to BigDecimal("45.51"))
+        internal var brokenStatusAfterConvertedRefund: Boolean = true
+
+        /**
+         * The rate (UAH per 1 unit) at which payments in [ccy] (ISO 4217 numeric) are converted to UAH,
+         * as monobank settles in UAH. Defaults: EUR (978) 50.48 and USD (840) 45.51, the rates seen live.
+         * The UAH amount is round(amount × rate), half up, in kopiyky (the fake's choice).
+         */
+        public fun conversionRate(
+            ccy: Int,
+            uahPerUnit: BigDecimal,
+        ): Builder =
+            apply {
+                require(ccy != UAH) { "UAH needs no rate" }
+                require(uahPerUnit.signum() > 0) { "rate must be positive" }
+                conversionRates[ccy] = uahPerUnit
+            }
+
+        /**
+         * Reproduce monobank's bug (default `true`, seen live): after any successful refund of a converted
+         * (USD/EUR) payment, `invoice/status` for that invoice answers 500 `INTERNAL_ERROR` "unexpected end
+         * of JSON input" every time. The statement keeps working. `false` turns it off.
+         */
+        public fun brokenStatusAfterConvertedRefund(broken: Boolean): Builder =
+            apply { brokenStatusAfterConvertedRefund = broken }
 
         /**
          * How long a partially finalized invoice stays `processing` before it becomes `success` (default
@@ -970,6 +1010,9 @@ public class FakeMonobankAcquiring private constructor(
         public const val DEFAULT_TOKEN: String = "fake-monobank-token"
 
         private const val WAKE_UP_MARGIN_MS = 20L
+        private const val UAH = 980
+        private const val EUR = 978
+        private const val USD = 840
         private val INSTANCES = AtomicInteger()
         private const val SHUTDOWN_SECONDS = 5L
 

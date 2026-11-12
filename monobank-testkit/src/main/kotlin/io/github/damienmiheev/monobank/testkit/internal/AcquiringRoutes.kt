@@ -120,7 +120,12 @@ internal class AcquiringRoutes(
         call: ApiCall,
     ): HttpResult {
         val invoiceId = requiredQuery(call, "invoiceId")
-        return bank.locked { HttpResult.json(merchant.find(invoiceId).statusJson()) }
+        return bank.locked {
+            val invoice = merchant.find(invoiceId)
+            // monobank's bug, seen live: permanent after a refund of a converted payment.
+            if (invoice.statusBroken) throw ApiError(500, "INTERNAL_ERROR", "unexpected end of JSON input")
+            HttpResult.json(invoice.statusJson())
+        }
     }
 
     /**
@@ -260,8 +265,9 @@ internal class AcquiringRoutes(
         answer.put("status", status)
         invoice.failureReason?.let { answer.put("failureReason", it) }
         return answer
-            .put("amount", invoice.amount)
-            .put("ccy", invoice.ccy)
+            // Verified live: the payment answer echoes the requested amount and currency, even when converted.
+            .put("amount", invoice.originalAmount)
+            .put("ccy", invoice.originalCcy)
             .put("createdDate", FakeJson.preciseDate(invoice.createdAt))
             .put("modifiedDate", FakeJson.preciseDate(invoice.modifiedAt))
     }

@@ -84,8 +84,8 @@ internal class BasketLine(
 /** Everything the fake knows about one invoice. Guarded by the state's lock. */
 internal class InvoiceRecord(
     val invoiceId: String,
-    val amount: Long,
-    val ccy: Int,
+    var amount: Long,
+    var ccy: Int,
     val paymentType: String,
     val viaWallet: Boolean,
     val order: OrderInfo,
@@ -110,6 +110,16 @@ internal class InvoiceRecord(
 
     /** The status before the invoice became `reversed` (`hold` for a released or lapsed hold). */
     var reversedFrom: String? = null
+
+    /** The amount and currency of the request; [amount] and [ccy] become UAH when a USD/EUR payment is made. */
+    val originalAmount: Long = amount
+    val originalCcy: Int = ccy
+
+    /** `true` once a USD/EUR payment was converted to UAH. */
+    val converted: Boolean get() = ccy != originalCcy
+
+    /** monobank's bug (seen live): `invoice/status` of this invoice answers 500 from now on. */
+    var statusBroken: Boolean = false
 
     /** A partial capture is settling (`processing` after `invoice/finalize`). */
     var finalizing: Boolean = false

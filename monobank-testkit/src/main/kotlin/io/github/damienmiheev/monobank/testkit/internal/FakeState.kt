@@ -25,6 +25,10 @@ internal class FakeSettings(
     @Volatile var refundSettlement: RefundSettlement,
     /** How long a partially finalized invoice stays `processing`; `null`: until settled by hand. */
     val finalizeSettlementDelay: Duration?,
+    /** UAH per 1 unit of a foreign currency (by ISO 4217 numeric code). */
+    val conversionRates: Map<Int, BigDecimal>,
+    /** Reproduce monobank's broken `invoice/status` after a refund of a converted payment. */
+    val brokenStatusAfterConvertedRefund: Boolean,
 )
 
 /** The merchant behind a set of tokens. */
@@ -185,6 +189,7 @@ internal class MerchantState(
     ) {
         check(invoice.status == Status.CREATED) { "invoice ${invoice.invoiceId} is ${invoice.status}, not created" }
         val now = now()
+        convertToUah(invoice)
         invoice.status = Status.PROCESSING
         invoice.paidAt = now
         invoice.card =
@@ -381,6 +386,7 @@ internal class MerchantState(
         invoice: InvoiceRecord,
         amount: Long,
     ) {
+        if (invoice.converted && settings.brokenStatusAfterConvertedRefund) invoice.statusBroken = true
         if (invoice.status == Status.HOLD) {
             reverse(invoice)
         } else {
@@ -485,11 +491,25 @@ private fun paymentRefundAmount(
     val refundable = invoice.refundable()
     val requested = amount ?: refundable
     if (requested <= 0 || requested > refundable) throw wrongCancelAmount()
-    // Inferred from the finalize rule: a partial refund needs the refunded items.
-    val partial = requested < (invoice.finalAmount ?: 0)
-    if (needsBasket && partial && items.isEmpty()) throw noBasketForPartialAmount()
-    if (needsBasket && partial) matchItems(invoice.basket, items, requested, ItemTexts.REFUND)
+    // Verified live: a converted (USD/EUR → UAH) payment is refunded in UAH without items; items, whose
+    // sums are in the original currency, are refused (inferred for any items on a converted payment).
+    if (invoice.converted && items.isNotEmpty()) {
+        throw ApiError(400, "1001", "whole discount is expected to be cancelled with the last item")
+    }
+    if (invoice.converted) return requested
+    if (needsBasket) checkRefundItems(invoice, requested, items)
     return requested
+}
+
+/** Inferred from the finalize rule: a partial refund needs the refunded items, matching the basket. */
+private fun checkRefundItems(
+    invoice: InvoiceRecord,
+    requested: Long,
+    items: List<BasketLine>,
+) {
+    if (requested >= (invoice.finalAmount ?: 0)) return
+    if (items.isEmpty()) throw noBasketForPartialAmount()
+    matchItems(invoice.basket, items, requested, ItemTexts.REFUND)
 }
 
 /** The invoice becomes `reversed`, remembering what it was. */
@@ -499,3 +519,22 @@ private fun reverse(invoice: InvoiceRecord) {
     invoice.finalAmount = 0
     invoice.holdUntil = null
 }
+
+/**
+ * monobank settles in UAH: a USD/EUR invoice is converted when paid (verified live). The UAH amount is
+ * round(amount × rate), half up, in kopiyky: the rounding is the fake's choice. A currency without a
+ * configured rate stays as it is.
+ */
+private fun MerchantState.convertToUah(invoice: InvoiceRecord) {
+    val rate = settings.conversionRates[invoice.ccy] ?: return
+    if (invoice.ccy == UAH) return
+    invoice.amount =
+        BigDecimal
+            .valueOf(invoice.amount)
+            .multiply(rate)
+            .setScale(0, RoundingMode.HALF_UP)
+            .toLong()
+    invoice.ccy = UAH
+}
+
+private const val UAH = 980

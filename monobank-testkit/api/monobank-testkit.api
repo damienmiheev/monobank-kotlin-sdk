@@ -170,8 +170,10 @@ public final class io/github/damienmiheev/monobank/testkit/FakeMonobankAcquiring
 	public final fun addMerchant (Lio/github/damienmiheev/monobank/testkit/MerchantSetup;)Lio/github/damienmiheev/monobank/testkit/FakeMonobankAcquiring$Builder;
 	public final fun advertisedHost (Ljava/lang/String;)Lio/github/damienmiheev/monobank/testkit/FakeMonobankAcquiring$Builder;
 	public final fun bindAddress (Ljava/net/InetAddress;)Lio/github/damienmiheev/monobank/testkit/FakeMonobankAcquiring$Builder;
+	public final fun brokenStatusAfterConvertedRefund (Z)Lio/github/damienmiheev/monobank/testkit/FakeMonobankAcquiring$Builder;
 	public final fun build ()Lio/github/damienmiheev/monobank/testkit/FakeMonobankAcquiring;
 	public final fun clock (Lio/github/damienmiheev/monobank/testkit/TestClock;)Lio/github/damienmiheev/monobank/testkit/FakeMonobankAcquiring$Builder;
+	public final fun conversionRate (ILjava/math/BigDecimal;)Lio/github/damienmiheev/monobank/testkit/FakeMonobankAcquiring$Builder;
 	public final fun feePercent (Ljava/math/BigDecimal;)Lio/github/damienmiheev/monobank/testkit/FakeMonobankAcquiring$Builder;
 	public final fun finalizeSettlementDelay (Ljava/time/Duration;)Lio/github/damienmiheev/monobank/testkit/FakeMonobankAcquiring$Builder;
 	public final fun fiscalization (Z)Lio/github/damienmiheev/monobank/testkit/FakeMonobankAcquiring$Builder;
