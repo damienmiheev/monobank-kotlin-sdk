@@ -274,6 +274,12 @@ class LifecycleTest {
                 val mono = clientFor(fake)
                 val created = mono.invoices.create(CreateInvoiceRequest.builder(100).build())
                 assertThat(created.pageUrl).startsWith("http://host.testcontainers.internal:${fake.port}/pay/")
+                // What an application in a container gets: the advertised host, plain http allowed.
+                val containerOptions = fake.containerClientOptionsBuilder().build()
+                assertThat(
+                    containerOptions.baseUrl.toString(),
+                ).isEqualTo("http://host.testcontainers.internal:${fake.port}")
+                assertThat(containerOptions.allowPlainHttp).isTrue()
             }
         assertThatThrownBy { FakeMonobankAcquiring.builder().advertisedHost("http://x/") }
             .isInstanceOf(IllegalArgumentException::class.java)

@@ -109,6 +109,7 @@ public final class io/github/damienmiheev/monobank/testkit/FakeMonobankAcquiring
 	public final fun clientOptions ()Lio/github/damienmiheev/monobank/core/MonobankClientOptions;
 	public final fun clientOptionsBuilder ()Lio/github/damienmiheev/monobank/core/MonobankClientOptions$Builder;
 	public fun close ()V
+	public final fun containerClientOptionsBuilder ()Lio/github/damienmiheev/monobank/core/MonobankClientOptions$Builder;
 	public final fun corruptNextWebhookSignatures (I)V
 	public final fun corruptNextWebhookSignatures (ILjava/util/function/Predicate;)V
 	public final fun deliverPendingWebhooks (Ljava/util/function/Predicate;)Ljava/util/List;

@@ -134,7 +134,7 @@ class MonobankHttpEdgeCasesTest {
     @Test
     fun `plain http is only allowed for localhost`() {
         MonobankClientOptions.builder().baseUrl("http://localhost:8080").baseUrl("http://127.0.0.1:1")
-        assertThatThrownBy { MonobankClientOptions.builder().baseUrl("http://api.monobank.ua") }
+        assertThatThrownBy { MonobankClientOptions.builder().baseUrl("http://api.monobank.ua").build() }
             .isInstanceOf(IllegalArgumentException::class.java)
         assertThatThrownBy { MonobankClientOptions.builder().baseUrl("https://api.monobank.ua?x=1") }
             .isInstanceOf(IllegalArgumentException::class.java)

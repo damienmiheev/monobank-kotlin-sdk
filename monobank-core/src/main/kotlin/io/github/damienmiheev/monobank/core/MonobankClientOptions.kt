@@ -17,6 +17,7 @@ import java.time.Duration
  * @property httpClient Your own [HttpClient] (for a proxy, custom TLS or executor). It must not
  *   follow redirects. When set, [connectTimeout] is ignored because it belongs to the client.
  * @property userAgentSuffix Appended to the SDK's `User-Agent`, for example `my-shop/2.1`.
+ * @property allowPlainHttp Whether a plain-http [baseUrl] on a non-loopback host is allowed (tests only).
  * @property maxResponseBytes Largest response body the SDK reads (default 20 MB). A bigger answer
  *   (for example from a misbehaving proxy) fails with `MonobankSerializationException` instead of
  *   exhausting memory.
@@ -31,6 +32,7 @@ public class MonobankClientOptions private constructor(
     public val httpClient: HttpClient? = builder.httpClient
     public val userAgentSuffix: String? = builder.userAgentSuffix
     public val maxResponseBytes: Long = builder.maxResponseBytes
+    public val allowPlainHttp: Boolean = builder.allowPlainHttp
 
     /** Returns a builder pre-filled with these options. */
     public fun toBuilder(): Builder =
@@ -42,6 +44,7 @@ public class MonobankClientOptions private constructor(
             .httpClient(httpClient)
             .userAgentSuffix(userAgentSuffix)
             .maxResponseBytes(maxResponseBytes)
+            .allowPlainHttp(allowPlainHttp)
 
     override fun toString(): String =
         "MonobankClientOptions(baseUrl=$baseUrl, connectTimeout=$connectTimeout, requestTimeout=$requestTimeout, " +
@@ -56,10 +59,12 @@ public class MonobankClientOptions private constructor(
         internal var httpClient: HttpClient? = null
         internal var userAgentSuffix: String? = null
         internal var maxResponseBytes: Long = DEFAULT_MAX_RESPONSE_BYTES
+        internal var allowPlainHttp: Boolean = false
 
         /**
          * Overrides the API host, e.g. a proxy or `http://localhost:8080` in tests. Plain `http` is
-         * allowed only for loopback hosts, so credentials never travel unencrypted. `null` restores the default.
+         * allowed only for loopback hosts (or with [allowPlainHttp]), so credentials never travel
+         * unencrypted. `null` restores the default.
          */
         public fun baseUrl(baseUrl: String?): Builder =
             apply {
@@ -71,9 +76,6 @@ public class MonobankClientOptions private constructor(
                     require(uri.host != null) { "baseUrl must have a host" }
                     require(uri.rawQuery == null && uri.rawFragment == null) {
                         "baseUrl must not have a query or fragment"
-                    }
-                    require(uri.scheme == "https" || uri.host in LOOPBACK_HOSTS) {
-                        "Plain http is allowed only for localhost; use https for ${uri.host}"
                     }
                     this.baseUrl = uri
                 }
@@ -122,8 +124,23 @@ public class MonobankClientOptions private constructor(
                 maxResponseBytes = bytes
             }
 
+        /**
+         * Allows a plain `http` [baseUrl] on a non-loopback host, e.g. a fake monobank reached from
+         * a container as `http://host.testcontainers.internal:1234`. For tests only: the token and
+         * payment data then travel unencrypted. Default `false`.
+         */
+        public fun allowPlainHttp(allow: Boolean): Builder = apply { allowPlainHttp = allow }
+
         /** Builds the options. */
-        public fun build(): MonobankClientOptions = MonobankClientOptions(this)
+        public fun build(): MonobankClientOptions {
+            baseUrl?.let { uri ->
+                require(uri.scheme == "https" || allowPlainHttp || uri.host in LOOPBACK_HOSTS) {
+                    "Plain http is allowed only for localhost; use https for ${uri.host}, " +
+                        "or allowPlainHttp(true) in tests"
+                }
+            }
+            return MonobankClientOptions(this)
+        }
     }
 
     public companion object {

@@ -41,6 +41,7 @@ public final class io/github/damienmiheev/monobank/core/MonobankClientOptions {
 	public static final field DEFAULT Lio/github/damienmiheev/monobank/core/MonobankClientOptions;
 	public synthetic fun <init> (Lio/github/damienmiheev/monobank/core/MonobankClientOptions$Builder;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public static final fun builder ()Lio/github/damienmiheev/monobank/core/MonobankClientOptions$Builder;
+	public final fun getAllowPlainHttp ()Z
 	public final fun getBaseUrl ()Ljava/net/URI;
 	public final fun getConnectTimeout ()Ljava/time/Duration;
 	public final fun getHttpClient ()Ljava/net/http/HttpClient;
@@ -53,6 +54,7 @@ public final class io/github/damienmiheev/monobank/core/MonobankClientOptions {
 }
 
 public final class io/github/damienmiheev/monobank/core/MonobankClientOptions$Builder {
+	public final fun allowPlainHttp (Z)Lio/github/damienmiheev/monobank/core/MonobankClientOptions$Builder;
 	public final fun baseUrl (Ljava/lang/String;)Lio/github/damienmiheev/monobank/core/MonobankClientOptions$Builder;
 	public final fun build ()Lio/github/damienmiheev/monobank/core/MonobankClientOptions;
 	public final fun connectTimeout (Ljava/time/Duration;)Lio/github/damienmiheev/monobank/core/MonobankClientOptions$Builder;

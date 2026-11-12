@@ -63,3 +63,42 @@ class RetryPolicyBuilderTest {
             .isInstanceOf(IllegalArgumentException::class.java)
     }
 }
+
+class PlainHttpOptInTest {
+    @Test
+    fun `plain http to a non-loopback host needs an explicit opt-in, in any call order`() {
+        assertThatThrownBy {
+            MonobankClientOptions
+                .builder()
+                .baseUrl(
+                    "http://host.testcontainers.internal:1234",
+                ).build()
+        }.isInstanceOf(IllegalArgumentException::class.java)
+            .hasMessageContaining("allowPlainHttp")
+        val after =
+            MonobankClientOptions
+                .builder()
+                .baseUrl(
+                    "http://host.testcontainers.internal:1234",
+                ).allowPlainHttp(true)
+                .build()
+        val before =
+            MonobankClientOptions
+                .builder()
+                .allowPlainHttp(
+                    true,
+                ).baseUrl("http://host.docker.internal:1")
+                .build()
+        assertThat(after.baseUrl.toString()).isEqualTo("http://host.testcontainers.internal:1234")
+        assertThat(before.allowPlainHttp).isTrue()
+        assertThat(after.toBuilder().build().allowPlainHttp).isTrue()
+        assertThat(
+            MonobankClientOptions
+                .builder()
+                .baseUrl("http://localhost:1")
+                .build()
+                .allowPlainHttp,
+        ).isFalse()
+        assertThat(MonobankClientOptions.DEFAULT.allowPlainHttp).isFalse()
+    }
+}

@@ -23,6 +23,8 @@ see the README's migration section.
 - `merchant.statementEntries(...)`: reads the statement entry by entry and returns unreadable
   entries raw; `findByReference` uses it and never reports an unreadable matching payment as missing.
 - `MonobankClientOptions.maxResponseBytes` (default 20 MB).
+- `MonobankClientOptions.allowPlainHttp` (tests only): plain http to a non-loopback host such as a
+  fake monobank reached from a container; `FakeMonobankAcquiring.containerClientOptionsBuilder()`.
 
 ### Changed (from app.spilki 0.0.x)
 - Packages renamed from `app.spilki.monobank.acquiring` to `io.github.damienmiheev.monobank.acquiring`

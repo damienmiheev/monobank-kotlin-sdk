@@ -112,7 +112,9 @@ import java.util.function.Predicate
  * The fake listens on 127.0.0.1 by default, so it is not reachable from other machines. For an
  * application in a container, call `Testcontainers.exposeHostPorts(fake.port)` before starting it and
  * give it `http://host.testcontainers.internal:<port>`; set [Builder.advertisedHost] to
- * `host.testcontainers.internal` so `pageUrl`/`tdsUrl` match. Docker networks that reach the host
+ * `host.testcontainers.internal` so `pageUrl`/`tdsUrl` match. The SDK client inside the container
+ * must opt in to plain http on that host: `MonobankClientOptions.builder().baseUrl(fake.baseUrl)
+ * .allowPlainHttp(true)` (or [containerClientOptionsBuilder]). Docker networks that reach the host
  * through its bridge IP (`host.docker.internal` with `host-gateway`, docker-compose) need
  * [Builder.bindAddress], which exposes a fake that accepts payments: test machines only.
  *
@@ -323,6 +325,14 @@ public class FakeMonobankAcquiring private constructor(
     /** A client options builder pointing at this fake ([localBaseUrl]), to adjust timeouts or retries. */
     public fun clientOptionsBuilder(): MonobankClientOptions.Builder =
         MonobankClientOptions.builder().baseUrl(localBaseUrl)
+
+    /**
+     * A client options builder for an application in a container: [baseUrl] (the advertised host,
+     * e.g. `host.testcontainers.internal`) with plain http allowed. Pass its values to the
+     * application's configuration.
+     */
+    public fun containerClientOptionsBuilder(): MonobankClientOptions.Builder =
+        MonobankClientOptions.builder().baseUrl(baseUrl).allowPlainHttp(true)
 
     /**
      * Stops the server and the webhook sender, ends hanging requests, and waits (up to a few seconds)
