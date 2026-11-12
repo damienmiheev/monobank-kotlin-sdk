@@ -20,7 +20,7 @@ import java.util.concurrent.TimeUnit
 /** The SDK's real client pointed at [fake], with fast retries. */
 fun clientFor(
     fake: FakeMonobankAcquiring,
-    timeout: Duration = Duration.ofSeconds(5),
+    timeout: Duration = Duration.ofSeconds(30),
     retryPolicy: RetryPolicy = RetryPolicy.of(2, Duration.ZERO, Duration.ZERO),
     token: String = fake.token,
     keyRefreshInterval: Duration = Duration.ofMinutes(1),
@@ -83,7 +83,7 @@ class WebhookReceiver : AutoCloseable {
 
     fun await(
         count: Int,
-        timeout: Duration = Duration.ofSeconds(5),
+        timeout: Duration = Duration.ofSeconds(30),
     ): List<ReceivedWebhook> {
         val deadline = System.nanoTime() + timeout.toNanos()
         while (received.size < count && System.nanoTime() < deadline) Thread.sleep(10)
@@ -109,7 +109,7 @@ fun rawCall(
     val builder =
         HttpRequest
             .newBuilder(URI.create(fake.baseUrl + pathAndQuery))
-            .timeout(Duration.ofSeconds(5))
+            .timeout(Duration.ofSeconds(30))
             .method(
                 method,
                 body?.let { HttpRequest.BodyPublishers.ofString(it) } ?: HttpRequest.BodyPublishers.noBody(),

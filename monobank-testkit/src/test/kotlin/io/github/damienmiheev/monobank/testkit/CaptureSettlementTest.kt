@@ -25,7 +25,7 @@ import java.time.Duration
 class CaptureSettlementTest {
     private val receiverId = "sr_aB3dC5eF7g"
     private val webhooks = WebhookReceiver()
-    private val timeout = Duration.ofSeconds(5)
+    private val timeout = Duration.ofSeconds(30)
 
     private fun fake(delay: Duration?) =
         FakeMonobankAcquiring

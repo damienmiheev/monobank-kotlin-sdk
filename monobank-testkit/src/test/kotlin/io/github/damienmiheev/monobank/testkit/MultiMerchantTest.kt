@@ -63,7 +63,7 @@ class MultiMerchantTest {
 
         b.payInvoice(invoiceB)
 
-        val webhook = fake.awaitWebhooks(invoiceB, 2, Duration.ofSeconds(5)).last()
+        val webhook = fake.awaitWebhooks(invoiceB, 2, Duration.ofSeconds(30)).last()
         assertThat(webhook.merchantId).isEqualTo("merchant-b")
         assertThat(WebhookVerifier.ofPublicKey(newKeyB).verify(webhook.xSign, webhook.bodyBytes())).isTrue()
         assertThat(WebhookVerifier.ofPublicKey(keyA).verify(webhook.xSign, webhook.bodyBytes())).isFalse()

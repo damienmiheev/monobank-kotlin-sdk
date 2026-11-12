@@ -68,7 +68,7 @@ class DatePrecisionTest {
         assertThat(answer.isNewerThan(status)).isFalse()
 
         // the hold webhook is sent with whole seconds too
-        val hold = fake.awaitWebhooks(invoiceId, 2, Duration.ofSeconds(5)).last()
+        val hold = fake.awaitWebhooks(invoiceId, 2, Duration.ofSeconds(30)).last()
         assertThat(hold.status).isEqualTo("hold")
         assertThat(WebhookParser.parse(hold.body).modifiedDate!!.nano).isZero()
     }

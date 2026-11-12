@@ -9,11 +9,13 @@ import java.io.IOException
 import java.io.UncheckedIOException
 import java.net.InetAddress
 import java.net.InetSocketAddress
+import java.net.Socket
 import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
 import java.time.Clock
 import java.time.Duration
 import java.util.Collections
+import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.ExecutorService
@@ -74,13 +76,15 @@ internal class FakeServer(
     private val clock: Clock,
     private val hangLimit: Duration,
     private val bindAddress: InetAddress,
+    threadPrefix: String,
 ) {
     private val logger = LoggerFactory.getLogger(FakeServer::class.java)
-    private val executor: ExecutorService = Executors.newCachedThreadPool(NamedThreadFactory("fake-monobank-http"))
+    private val executor: ExecutorService = Executors.newCachedThreadPool(NamedThreadFactory("$threadPrefix-http"))
     private val requestLog: MutableList<FakeRequest> = Collections.synchronizedList(ArrayList())
     private val counts = ConcurrentHashMap<String, AtomicInteger>()
     val faults = FaultRegistry()
     private var server: HttpServer? = null
+    private val identity: String = UUID.randomUUID().toString()
 
     /** Released when the listener stops (pause or close): ends hanging and delayed requests. */
     @Volatile
@@ -93,6 +97,21 @@ internal class FakeServer(
      */
     @Synchronized
     fun start(port: Int): Int {
+        repeat(BIND_ATTEMPTS) {
+            val http = bind(port)
+            // On a wildcard bind, another program may hold 127.0.0.1 on the same port (macOS allows it),
+            // and local clients would reach that program instead. Check that loopback reaches this fake.
+            if (!bindAddress.isAnyLocalAddress || loopbackReachesSelf(http.address.port)) {
+                server = http
+                return http.address.port
+            }
+            http.stop(0)
+            if (port != 0) throw UncheckedIOException(IOException("127.0.0.1:$port is served by another program"))
+        }
+        throw UncheckedIOException(IOException("no port whose 127.0.0.1 address is free, after $BIND_ATTEMPTS tries"))
+    }
+
+    private fun bind(port: Int): HttpServer {
         val http =
             try {
                 HttpServer.create(InetSocketAddress(bindAddress, port), 0)
@@ -103,9 +122,26 @@ internal class FakeServer(
         http.executor = executor
         stopping = CountDownLatch(1)
         http.start()
-        server = http
-        return http.address.port
+        return http
     }
+
+    /** Asks `127.0.0.1:[port]` for this fake's identity: `true` only when this fake answers. */
+    private fun loopbackReachesSelf(port: Int): Boolean =
+        try {
+            Socket().use { socket ->
+                socket.connect(InetSocketAddress(InetAddress.getByName("127.0.0.1"), port), PROBE_TIMEOUT_MS)
+                socket.soTimeout = PROBE_TIMEOUT_MS
+                socket.getOutputStream().write(
+                    "GET $IDENTITY_PATH HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n"
+                        .toByteArray(StandardCharsets.US_ASCII),
+                )
+                String(socket.getInputStream().readBytes(), StandardCharsets.UTF_8).endsWith(identity)
+            }
+        } catch (
+            @Suppress("SwallowedException") e: IOException,
+        ) {
+            false
+        }
 
     /** Stops listening (new connections are refused) and ends requests in progress; keeps all state. */
     @Synchronized
@@ -172,6 +208,10 @@ internal class FakeServer(
     }
 
     private fun serve(exchange: HttpExchange) {
+        if (exchange.requestURI.path == IDENTITY_PATH) {
+            send(exchange, HttpResult(200, identity.toByteArray(StandardCharsets.UTF_8)), IDENTITY_PATH)
+            return
+        }
         val interrupted = stopping
         val body = exchange.requestBody.use { it.readBytes() }
         val query = parseQuery(exchange.requestURI.rawQuery)
@@ -319,5 +359,10 @@ internal class FakeServer(
     private companion object {
         private const val SHUTDOWN_SECONDS = 5L
         private const val TOKEN_HEADER = "X-Token"
+        private const val BIND_ATTEMPTS = 5
+        private const val PROBE_TIMEOUT_MS = 5_000
+
+        /** Internal route that answers this fake's random identity; never recorded or counted. */
+        private const val IDENTITY_PATH = "/__fake-monobank/identity"
     }
 }

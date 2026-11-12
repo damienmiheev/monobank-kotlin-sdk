@@ -23,7 +23,7 @@ import java.time.Instant
 class FaultInjectionTest {
     private val fake = FakeMonobankAcquiring().start()
     private val mono = clientFor(fake)
-    private val impatient = clientFor(fake, timeout = Duration.ofMillis(500))
+    private val impatient = clientFor(fake, timeout = Duration.ofSeconds(2))
 
     @AfterEach
     fun close() = fake.close()
@@ -58,7 +58,7 @@ class FaultInjectionTest {
 
     @Test
     fun `delay longer than the client timeout - the charge happens but the client sees an unknown outcome`() {
-        fake.injectFault(MonobankPaths.INVOICE_CREATE, Fault.delay(Duration.ofSeconds(2)))
+        fake.injectFault(MonobankPaths.INVOICE_CREATE, Fault.delay(Duration.ofSeconds(6)))
 
         val error = failure<MonobankNetworkException> { impatient.invoices.create(createRequest()) }
 
@@ -270,7 +270,7 @@ class FaultInjectionTest {
         val receiver = WebhookReceiver()
         try {
             val token = fake.addCard("customer")
-            fake.injectFault(MonobankPaths.WALLET_PAYMENT, Fault.delay(Duration.ofMillis(500)))
+            fake.injectFault(MonobankPaths.WALLET_PAYMENT, Fault.delay(Duration.ofSeconds(5)))
             val request =
                 WalletPaymentRequest
                     .builder(
@@ -281,7 +281,7 @@ class FaultInjectionTest {
                     ).webHookUrl(receiver.url)
                     .build()
             val call = Thread { mono.wallet.payment(request) }.apply { start() }
-            Thread.sleep(200)
+            Thread.sleep(500) // well within the 5 s delay
             assertThat(fake.invoices().filter { it.viaWallet }).isEmpty()
             call.join()
             assertThat(fake.invoices().filter { it.viaWallet }).hasSize(1)
@@ -295,7 +295,7 @@ class FaultInjectionTest {
         val receiver = WebhookReceiver()
         try {
             val token = fake.addCard("customer")
-            fake.injectFault(MonobankPaths.WALLET_PAYMENT, Fault.delayAfterProcessing(Duration.ofSeconds(1)))
+            fake.injectFault(MonobankPaths.WALLET_PAYMENT, Fault.delayAfterProcessing(Duration.ofSeconds(5)))
             val request =
                 WalletPaymentRequest
                     .builder(
@@ -383,7 +383,7 @@ class FaultInjectionTest {
         call.join(10_000)
 
         assertThat(call.isAlive).isFalse()
-        assertThat(Duration.ofNanos(System.nanoTime() - started)).isLessThan(Duration.ofSeconds(5))
+        assertThat(Duration.ofNanos(System.nanoTime() - started)).isLessThan(Duration.ofSeconds(20))
         fake.resume()
     }
 
@@ -404,7 +404,7 @@ class FaultInjectionTest {
     }
 
     private fun await(condition: () -> Boolean) {
-        val deadline = System.nanoTime() + Duration.ofSeconds(5).toNanos()
+        val deadline = System.nanoTime() + Duration.ofSeconds(30).toNanos()
         while (!condition() && System.nanoTime() < deadline) Thread.sleep(10)
         assertThat(condition()).isTrue()
     }

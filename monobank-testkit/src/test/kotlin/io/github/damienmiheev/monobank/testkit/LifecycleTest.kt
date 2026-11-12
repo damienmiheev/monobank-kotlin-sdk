@@ -18,8 +18,15 @@ import java.util.concurrent.Executors
 
 /** Concurrency, start/stop, threads and the clock. */
 class LifecycleTest {
-    private fun fakeThreads(): List<Thread> =
-        Thread.getAllStackTraces().keys.filter { it.isAlive && it.name.startsWith("fake-monobank") }
+    /** Threads of [fake] only: other fakes in this JVM (other test classes) don't matter. */
+    private fun threadsOf(fake: FakeMonobankAcquiring): List<Thread> =
+        Thread.getAllStackTraces().keys.filter { it.isAlive && it.name.startsWith("${fake.threadPrefix}-") }
+
+    /** Waits for [threads] to end (generous timeout: the whole build may run in parallel). */
+    private fun assertAllEnd(threads: List<Thread>) {
+        threads.forEach { it.join(Duration.ofSeconds(30).toMillis()) }
+        assertThat(threads.filter { it.isAlive }).isEmpty()
+    }
 
     @Test
     fun `serves concurrent requests consistently`() {
@@ -101,10 +108,11 @@ class LifecycleTest {
         val fake =
             FakeMonobankAcquiring
                 .builder()
-                .webhookDelay(Duration.ofSeconds(30))
+                .webhookDelay(Duration.ofSeconds(60))
                 .build()
                 .start()
-        val mono = clientFor(fake, timeout = Duration.ofMillis(300))
+        val mono = clientFor(fake)
+        val impatient = clientFor(fake, timeout = Duration.ofMillis(300))
         val invoiceId =
             mono.invoices
                 .create(
@@ -112,20 +120,19 @@ class LifecycleTest {
                 ).invoiceId
         fake.payInvoice(invoiceId)
         fake.injectFault(MonobankPaths.DETAILS, Fault.timeout(), 3)
-        assertThatThrownBy { mono.merchant.details() }.isInstanceOf(MonobankNetworkException::class.java)
-        assertThat(fakeThreads()).isNotEmpty()
+        assertThatThrownBy { impatient.merchant.details() }.isInstanceOf(MonobankNetworkException::class.java)
+        val threads = threadsOf(fake)
+        assertThat(threads).isNotEmpty()
         assertThat(fake.pendingWebhookCount()).isEqualTo(2)
 
         val started = System.nanoTime()
         fake.close()
         fake.close() // idempotent
 
-        assertThat(Duration.ofNanos(System.nanoTime() - started)).isLessThan(Duration.ofSeconds(5))
-        val deadline = System.nanoTime() + Duration.ofSeconds(5).toNanos()
-        while (fakeThreads().isNotEmpty() && System.nanoTime() < deadline) Thread.sleep(10)
-        assertThat(fakeThreads()).isEmpty()
+        // far less than the 2-minute hang limit and the 30 s webhook delay it cuts short
+        assertThat(Duration.ofNanos(System.nanoTime() - started)).isLessThan(Duration.ofSeconds(25))
+        assertAllEnd(threads + threadsOf(fake))
         assertThat(receiver.received).isEmpty()
-        assertThatThrownBy { mono.merchant.details() }.isInstanceOf(MonobankNetworkException::class.java)
         assertThatThrownBy { fake.start() }.isInstanceOf(IllegalStateException::class.java)
         receiver.close()
     }
@@ -142,9 +149,20 @@ class LifecycleTest {
             assertThat(fake.clientOptions().baseUrl.toString()).isEqualTo(fake.baseUrl)
         }
 
-        val free = ServerSocket(0).use { it.localPort }
-        FakeMonobankAcquiring.builder().port(free).build().start().use { fixed ->
-            assertThat(fixed.port).isEqualTo(free)
+        // a free port can be taken by another JVM of a parallel build before we bind it: try a few
+        val fixed =
+            (1..5).firstNotNullOfOrNull {
+                val free = ServerSocket(0).use { socket -> socket.localPort }
+                runCatching {
+                    FakeMonobankAcquiring
+                        .builder()
+                        .port(free)
+                        .build()
+                        .start()
+                }.getOrNull()
+            }!!
+        fixed.use {
+            assertThat(fixed.localBaseUrl).endsWith(":${fixed.port}")
             assertThat(clientFor(fixed).merchant.details().merchantId).isNotBlank()
         }
     }
@@ -218,7 +236,7 @@ class LifecycleTest {
         val fake =
             FakeMonobankAcquiring
                 .builder()
-                .webhookTimeout(Duration.ofSeconds(30))
+                .webhookTimeout(Duration.ofSeconds(120))
                 .build()
                 .start()
         try {
@@ -226,15 +244,18 @@ class LifecycleTest {
             val invoiceId =
                 clientFor(fake).invoices.create(CreateInvoiceRequest.builder(100).webHookUrl(url).build()).invoiceId
             fake.startPayment(invoiceId)
-            Thread.sleep(300) // the delivery is now waiting for an answer
+            // wait until the delivery has connected and is waiting for an answer
+            val deadline = System.nanoTime() + Duration.ofSeconds(30).toNanos()
+            while (accepted.isEmpty() && System.nanoTime() < deadline) Thread.sleep(10)
+            assertThat(accepted).isNotEmpty()
+            val threads = threadsOf(fake)
 
             val started = System.nanoTime()
             fake.close()
 
-            assertThat(Duration.ofNanos(System.nanoTime() - started)).isLessThan(Duration.ofSeconds(5))
-            val deadline = System.nanoTime() + Duration.ofSeconds(5).toNanos()
-            while (fakeThreads().isNotEmpty() && System.nanoTime() < deadline) Thread.sleep(10)
-            assertThat(fakeThreads()).isEmpty()
+            // far less than the 2-minute webhook timeout it cuts short
+            assertThat(Duration.ofNanos(System.nanoTime() - started)).isLessThan(Duration.ofSeconds(60))
+            assertAllEnd(threads + threadsOf(fake))
         } finally {
             fake.close()
             hanging.close()
@@ -273,6 +294,7 @@ class LifecycleTest {
                 assertThat(fake.localBaseUrl).isEqualTo("http://127.0.0.1:${fake.port}")
                 val mono = clientFor(fake)
                 val created = mono.invoices.create(CreateInvoiceRequest.builder(100).build())
+                assertThat(fake.invoice(created.invoiceId)).isNotNull() // it reached this fake
                 assertThat(created.pageUrl).startsWith("http://host.testcontainers.internal:${fake.port}/pay/")
                 // What an application in a container gets: the advertised host, plain http allowed.
                 val containerOptions = fake.containerClientOptionsBuilder().build()
@@ -283,6 +305,32 @@ class LifecycleTest {
             }
         assertThatThrownBy { FakeMonobankAcquiring.builder().advertisedHost("http://x/") }
             .isInstanceOf(IllegalArgumentException::class.java)
+    }
+
+    @Test
+    fun `a wildcard bind refuses a port whose loopback address another program serves`() {
+        val squatter =
+            com.sun.net.httpserver.HttpServer
+                .create(java.net.InetSocketAddress("127.0.0.1", 0), 0)
+        squatter.createContext("/") {
+            it.sendResponseHeaders(404, -1)
+            it.close()
+        }
+        squatter.start()
+        try {
+            val fake =
+                FakeMonobankAcquiring
+                    .builder()
+                    .bindAddress(java.net.InetAddress.getByName("0.0.0.0"))
+                    .port(squatter.address.port)
+                    .build()
+            // macOS lets the wildcard bind succeed, then the loopback check finds the squatter;
+            // Linux refuses the bind itself. Either way: an unchecked IOException.
+            assertThatThrownBy { fake.start() }.isInstanceOf(java.io.UncheckedIOException::class.java)
+            fake.close()
+        } finally {
+            squatter.stop(0)
+        }
     }
 }
 

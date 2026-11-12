@@ -68,7 +68,7 @@ class WebhookTest {
         assertThat(last.isOlderThan(parse(received.first()))).isFalse()
         assertThat(received.last().text).isEqualTo(fake.invoice(invoiceId)!!.statusJson)
 
-        val recorded = fake.awaitWebhooks(2, Duration.ofSeconds(5))
+        val recorded = fake.awaitWebhooks(2, Duration.ofSeconds(30))
         assertThat(recorded.map { it.status }).containsExactly("processing", "success")
         assertThat(recorded).allSatisfy {
             assertThat(it.outcome).isEqualTo(WebhookOutcome.DELIVERED)
@@ -164,7 +164,7 @@ class WebhookTest {
                         CreateInvoiceRequest.builder(100).webHookUrl(receiver.url).build(),
                     ).invoiceId
             quiet.payInvoice(invoiceId)
-            assertThat(quiet.awaitWebhooks(1, Duration.ofSeconds(5)).single().status).isEqualTo("success")
+            assertThat(quiet.awaitWebhooks(1, Duration.ofSeconds(30)).single().status).isEqualTo("success")
         }
     }
 
@@ -201,7 +201,7 @@ class WebhookTest {
 
         fake.payInvoice(invoiceId)
 
-        val recorded = fake.awaitWebhooks(2, Duration.ofSeconds(5))
+        val recorded = fake.awaitWebhooks(2, Duration.ofSeconds(30))
         assertThat(recorded.map { it.outcome }).containsExactly(WebhookOutcome.DROPPED, WebhookOutcome.DELIVERED)
         assertThat(recorded.first().attempts).isEqualTo(0)
         assertThat(recorded.first().xSign).isNull()
@@ -220,7 +220,7 @@ class WebhookTest {
         assertThat(received.map { parse(it).status })
             .containsExactly(InvoiceStatus.PROCESSING, InvoiceStatus.PROCESSING, InvoiceStatus.SUCCESS)
         assertThat(
-            fake.awaitWebhooks(3, Duration.ofSeconds(5)).map { it.duplicate },
+            fake.awaitWebhooks(3, Duration.ofSeconds(30)).map { it.duplicate },
         ).containsExactly(false, true, false)
     }
 
@@ -256,7 +256,7 @@ class WebhookTest {
         ).isEqualTo(VerificationResult.INVALID_SIGNATURE)
         assertThatThrownBy { parse(received[0]) }.isInstanceOf(MonobankSignatureException::class.java)
         assertThat(mono.webhooks.verify(received[1].xSign, received[1].body)).isTrue()
-        assertThat(fake.awaitWebhooks(2, Duration.ofSeconds(5)).map { it.signatureValid }).containsExactly(false, true)
+        assertThat(fake.awaitWebhooks(2, Duration.ofSeconds(30)).map { it.signatureValid }).containsExactly(false, true)
     }
 
     @Test
@@ -265,14 +265,14 @@ class WebhookTest {
         val invoiceId = create()
         fake.startPayment(invoiceId)
 
-        val first = fake.awaitWebhooks(1, Duration.ofSeconds(5)).single()
+        val first = fake.awaitWebhooks(1, Duration.ofSeconds(30)).single()
         assertThat(first.outcome).isEqualTo(WebhookOutcome.DELIVERED)
         assertThat(first.attempts).isEqualTo(3)
         assertThat(receiver.received).hasSize(3)
 
         receiver.answerNext(500, 500, 500)
         fake.payInvoice(invoiceId)
-        val second = fake.awaitWebhooks(2, Duration.ofSeconds(5))[1]
+        val second = fake.awaitWebhooks(2, Duration.ofSeconds(30))[1]
         assertThat(second.outcome).isEqualTo(WebhookOutcome.FAILED)
         assertThat(second.attempts).isEqualTo(3)
         assertThat(second.responseStatus).isEqualTo(500)
@@ -286,7 +286,7 @@ class WebhookTest {
 
         fake.startPayment(invoiceId)
 
-        val webhook = fake.awaitWebhooks(1, Duration.ofSeconds(5)).single()
+        val webhook = fake.awaitWebhooks(1, Duration.ofSeconds(30)).single()
         assertThat(webhook.outcome).isEqualTo(WebhookOutcome.FAILED)
         assertThat(webhook.responseStatus).isNull()
         assertThat(webhook.attempts).isEqualTo(3)

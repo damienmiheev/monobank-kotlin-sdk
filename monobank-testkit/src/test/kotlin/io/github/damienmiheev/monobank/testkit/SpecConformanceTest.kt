@@ -174,7 +174,7 @@ class SpecConformanceTest {
         call("POST", MonobankPaths.INVOICE_CANCEL, """{"invoiceId":"$failed"}""")
 
         // webhook bodies have the invoice/status shape
-        val webhooks = fake.awaitWebhooks(invoiceId, 4, Duration.ofSeconds(5))
+        val webhooks = fake.awaitWebhooks(invoiceId, 4, Duration.ofSeconds(30))
         webhooks.forEach { conforms("GET ${MonobankPaths.INVOICE_STATUS}", json.readTree(it.body)) }
     }
 

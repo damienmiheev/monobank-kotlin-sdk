@@ -124,7 +124,7 @@ class JavaPluginFlowTest {
         fake.payInvoice(created.getInvoiceId());
 
         // 3. three signed webhooks: processing, success, and the card webhook
-        List<RecordedWebhook> sent = fake.awaitWebhooks(3, Duration.ofSeconds(5));
+        List<RecordedWebhook> sent = fake.awaitWebhooks(3, Duration.ofSeconds(30));
         assertThat(sent).allMatch(w -> w.getOutcome() == WebhookOutcome.DELIVERED);
         assertThat(verified).hasSize(3);
         assertThat(rejected).isEmpty();
@@ -168,7 +168,7 @@ class JavaPluginFlowTest {
         assertThat(item.getAmount()).isEqualTo(2_500L);
 
         // the refund's webhook carries the cancelList entry too
-        fake.awaitWebhooks(6, Duration.ofSeconds(5));
+        fake.awaitWebhooks(6, Duration.ofSeconds(30));
         assertThat(verified.get(verified.size() - 1).cancelFor("kb-refund-1")).isNotNull();
 
         // reconcile path: both payments appear in the statement with our references
@@ -207,7 +207,7 @@ class JavaPluginFlowTest {
         FakeInvoice invoice = fake.payInvoice(invoiceId, CustomerPayment.declined("6", "Do not honor"));
 
         assertThat(invoice.getStatus()).isEqualTo("failure");
-        List<RecordedWebhook> sent = fake.awaitWebhooks(2, Duration.ofSeconds(5));
+        List<RecordedWebhook> sent = fake.awaitWebhooks(2, Duration.ofSeconds(30));
         assertThat(sent.get(0).getResponseStatus()).isEqualTo(400);
         assertThat(sent.get(0).getOutcome()).isEqualTo(WebhookOutcome.FAILED);
         assertThat(rejected).containsOnly("INVALID_SIGNATURE");

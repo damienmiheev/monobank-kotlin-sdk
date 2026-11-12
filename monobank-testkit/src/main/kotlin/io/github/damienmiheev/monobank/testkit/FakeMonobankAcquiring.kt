@@ -24,6 +24,7 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.RejectedExecutionException
 import java.util.concurrent.ScheduledThreadPoolExecutor
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.function.Predicate
 
 /**
@@ -197,8 +198,10 @@ public class FakeMonobankAcquiring private constructor(
     /** The fake's clock: invoice validity, holds and every reported date follow it. */
     public val clock: TestClock = builder.clock
 
+    /** Prefix of every thread this fake starts, e.g. `fake-monobank-3-http-1` (unique per fake). */
+    internal val threadPrefix: String = "fake-monobank-${INSTANCES.incrementAndGet()}"
     private val stopped = CountDownLatch(1)
-    private val timer = ScheduledThreadPoolExecutor(1, NamedThreadFactory("fake-monobank-timer"))
+    private val timer = ScheduledThreadPoolExecutor(1, NamedThreadFactory("$threadPrefix-timer"))
     private val webhooks =
         WebhookDispatcher(
             clock = clock,
@@ -211,6 +214,7 @@ public class FakeMonobankAcquiring private constructor(
             mode = builder.webhookDelivery,
             delay = builder.webhookDelay,
             stopped = stopped,
+            threadPrefix = threadPrefix,
         )
     private val bank =
         Bank(
@@ -284,6 +288,7 @@ public class FakeMonobankAcquiring private constructor(
             clock = clock,
             hangLimit = builder.hangLimit,
             bindAddress = bindAddress,
+            threadPrefix = threadPrefix,
         )
     private val requestedPort = builder.port
     private val lifecycle = Any()
@@ -324,7 +329,9 @@ public class FakeMonobankAcquiring private constructor(
      *
      * @return this fake, for chaining.
      * @throws IllegalStateException when it was already started or closed.
-     * @throws UncheckedIOException when the port cannot be bound (e.g. a fixed port in use).
+     * @throws UncheckedIOException when the port cannot be bound (e.g. a fixed port in use), or, with a
+     *   wildcard [Builder.bindAddress], when 127.0.0.1 on that port reaches another program (random ports are
+     *   retried a few times).
      */
     public fun start(): FakeMonobankAcquiring =
         apply {
@@ -963,6 +970,7 @@ public class FakeMonobankAcquiring private constructor(
         public const val DEFAULT_TOKEN: String = "fake-monobank-token"
 
         private const val WAKE_UP_MARGIN_MS = 20L
+        private val INSTANCES = AtomicInteger()
         private const val SHUTDOWN_SECONDS = 5L
 
         /** Starts configuring a fake. */

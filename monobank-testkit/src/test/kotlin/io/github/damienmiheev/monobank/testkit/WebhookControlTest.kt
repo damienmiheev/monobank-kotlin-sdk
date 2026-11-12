@@ -21,7 +21,7 @@ class WebhookControlTest {
             .build()
             .start()
     private val mono = clientFor(fake)
-    private val timeout = Duration.ofSeconds(5)
+    private val timeout = Duration.ofSeconds(30)
 
     @AfterEach
     fun close() {
@@ -139,11 +139,12 @@ class WebhookControlTest {
 
     @Test
     fun `switching to manual holds back scheduled webhooks, reset discards them`() {
-        fake.setWebhookDelay(Duration.ofMillis(300))
+        // the delay is long enough that the switch below always comes first, and the sleeps outlast it
+        fake.setWebhookDelay(Duration.ofSeconds(2))
         val held = create()
         fake.payInvoice(held)
         fake.setWebhookDelivery(WebhookDelivery.MANUAL)
-        Thread.sleep(600)
+        Thread.sleep(3000) // the scheduled deliveries have run and found manual mode
         assertThat(receiver.received).isEmpty()
         assertThat(fake.deliverWebhooksInReverseOrder().map { it.status }).containsExactly("success", "processing")
 
@@ -151,7 +152,7 @@ class WebhookControlTest {
         val discarded = create()
         fake.payInvoice(discarded)
         fake.reset()
-        Thread.sleep(600)
+        Thread.sleep(3000) // the scheduled deliveries have run and found nothing
         assertThat(receiver.received).hasSize(2)
         assertThat(fake.sentWebhooks()).isEmpty()
     }

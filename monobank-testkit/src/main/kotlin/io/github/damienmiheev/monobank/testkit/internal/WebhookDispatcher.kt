@@ -70,6 +70,7 @@ internal class WebhookDispatcher(
     mode: WebhookDelivery,
     delay: Duration,
     private val stopped: CountDownLatch,
+    threadPrefix: String,
 ) : AutoCloseable {
     private class Rule(
         val action: RuleAction,
@@ -84,7 +85,7 @@ internal class WebhookDispatcher(
     private val recorded = ArrayList<RecordedWebhook>()
     private val rules = ArrayList<Rule>()
     private val inFlight: MutableSet<HttpURLConnection> = Collections.synchronizedSet(HashSet())
-    private val executor = ScheduledThreadPoolExecutor(1, NamedThreadFactory("fake-monobank-webhooks"))
+    private val executor = ScheduledThreadPoolExecutor(1, NamedThreadFactory("$threadPrefix-webhooks"))
     private val captured = ThreadLocal<MutableList<WebhookEvent>?>()
     private var mode: WebhookDelivery = mode
     private var delay: Duration = delay
