@@ -1,6 +1,11 @@
 package io.github.damienmiheev.monobank.acquiring.merchant
 
 import io.github.damienmiheev.monobank.acquiring.internal.AcquiringHttp
+import io.github.damienmiheev.monobank.core.MonobankSerializationException
+import io.github.damienmiheev.monobank.core.RequestOutcome
+import io.github.damienmiheev.monobank.core.http.ApiRequest
+import io.github.damienmiheev.monobank.core.http.HttpMethod
+import io.github.damienmiheev.monobank.core.json.MonobankJson
 import java.time.Instant
 
 /**
@@ -38,15 +43,62 @@ public class MerchantApi internal constructor(
         from: Instant,
         to: Instant? = null,
         code: String? = null,
-    ): List<StatementItem> {
-        if (to != null) require(!to.isBefore(from)) { "to must not be before from" }
-        val query =
-            listOf(
-                "from" to from.epochSecond.toString(),
-                "to" to to?.epochSecond?.toString(),
-                "code" to code,
+    ): List<StatementItem> =
+        http
+            .get(
+                "/api/merchant/statement",
+                StatementWire::class.java,
+                query = statementQuery(from, to, code),
+            ).list
+            .orEmpty()
+
+    /**
+     * Like [statement], but reads the answer entry by entry: entries the SDK cannot read (for
+     * example after monobank changes a field's type) are returned in [StatementEntries.unreadable]
+     * with their raw JSON instead of failing the whole call. Use it for reconciliation and reports.
+     *
+     * `GET /api/merchant/statement`. Safe to retry.
+     */
+    @JvmOverloads
+    public fun statementEntries(
+        from: Instant,
+        to: Instant? = null,
+        code: String? = null,
+    ): StatementEntries {
+        val response =
+            http.execute(
+                ApiRequest(
+                    HttpMethod.GET,
+                    "/api/merchant/statement",
+                    statementQuery(from, to, code),
+                    idempotent = true,
+                ),
             )
-        return http.get("/api/merchant/statement", StatementWire::class.java, query = query).list.orEmpty()
+        val list = MonobankJson.readTree(response.body).path("list")
+        if (list.isMissingNode || list.isNull) return StatementEntries(emptyList(), emptyList())
+        if (!list.isArray) {
+            throw MonobankSerializationException(
+                "monobank statement: 'list' is not an array",
+                null,
+                RequestOutcome.UNKNOWN,
+            )
+        }
+        val items = mutableListOf<StatementItem>()
+        val unreadable = mutableListOf<UnreadableStatementEntry>()
+        for (node in list) {
+            try {
+                items += MonobankJson.read(MonobankJson.mapper.writeValueAsBytes(node), StatementItem::class.java)
+            } catch (e: MonobankSerializationException) {
+                unreadable +=
+                    UnreadableStatementEntry(
+                        rawJson = node.toString(),
+                        invoiceId = node.path("invoiceId").takeIf { it.isTextual }?.asText(),
+                        reference = node.path("reference").takeIf { it.isTextual }?.asText(),
+                        error = e.message.orEmpty(),
+                    )
+            }
+        }
+        return StatementEntries(items, unreadable)
     }
 
     /**
@@ -66,9 +118,13 @@ public class MerchantApi internal constructor(
      * minutes after your call (3-D Secure, customer on the payment page) and monobank's clock may
      * differ from yours. Use `from = attemptedAt - 5 minutes` and `to = null` (now), and when
      * nothing is found, call again later (e.g. after the invoice lifetime) before treating the
-     * attempt as failed. Keep the window as short as that allows: one entry the SDK cannot read
-     * fails the whole call. Refunds cannot be reconciled here (statement refunds carry no
+     * attempt as failed. Refunds cannot be reconciled here (statement refunds carry no
      * `extRef`); use `invoices.status(invoiceId).cancelFor(extRef)`.
+     *
+     * Entries are read one by one, so an entry the SDK cannot read does not hide the others. If
+     * such an entry has this [reference], the payment exists but can't be read: the call throws
+     * `MonobankSerializationException` (outcome UNKNOWN) rather than reporting "not found", and
+     * the entry's `invoiceId` is in the message so you can call `invoices.status` with it.
      *
      * `GET /api/merchant/statement`. Safe to retry.
      */
@@ -80,7 +136,30 @@ public class MerchantApi internal constructor(
         code: String? = null,
     ): List<StatementItem> {
         require(reference.isNotEmpty()) { "reference must not be empty" }
-        return statement(from, to, code).filter { it.reference == reference }
+        val entries = statementEntries(from, to, code)
+        val unreadableMatch = entries.unreadable.firstOrNull { it.reference == reference }
+        if (unreadableMatch != null) {
+            throw MonobankSerializationException(
+                "A statement entry with this reference could not be read (invoiceId=${unreadableMatch.invoiceId}): " +
+                    unreadableMatch.error,
+                null,
+                RequestOutcome.UNKNOWN,
+            )
+        }
+        return entries.items.filter { it.reference == reference }
+    }
+
+    private fun statementQuery(
+        from: Instant,
+        to: Instant?,
+        code: String?,
+    ): List<Pair<String, String?>> {
+        if (to != null) require(!to.isBefore(from)) { "to must not be before from" }
+        return listOf(
+            "from" to from.epochSecond.toString(),
+            "to" to to?.epochSecond?.toString(),
+            "code" to code,
+        )
     }
 
     /**

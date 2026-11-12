@@ -147,6 +147,39 @@ public data class StatementSplitReceiver
         @param:JsonProperty("agentFee") public val agentFee: Long?,
     )
 
+/**
+ * A statement read entry by entry ([MerchantApi.statementEntries]).
+ *
+ * @property items Entries the SDK could read, newest first.
+ * @property unreadable Entries it could not read, with their raw JSON. Usually empty; non-empty
+ *   means monobank changed something the SDK does not understand yet. Log it and upgrade.
+ */
+public class StatementEntries internal constructor(
+    public val items: List<StatementItem>,
+    public val unreadable: List<UnreadableStatementEntry>,
+) {
+    override fun toString(): String = "StatementEntries(items=${items.size}, unreadable=${unreadable.size})"
+}
+
+/**
+ * A statement entry the SDK could not read.
+ *
+ * @property rawJson The entry exactly as monobank sent it. It contains no card token, but it can
+ *   contain personal data (masked card number, destination text): do not log it blindly.
+ * @property invoiceId The entry's `invoiceId`, if it could be read as text.
+ * @property reference The entry's `reference`, if it could be read as text.
+ * @property error Why it could not be read (field path and error type; never field values).
+ */
+public class UnreadableStatementEntry internal constructor(
+    public val rawJson: String,
+    public val invoiceId: String?,
+    public val reference: String?,
+    public val error: String,
+) {
+    override fun toString(): String =
+        "UnreadableStatementEntry(invoiceId=$invoiceId, reference=$reference, error=$error)"
+}
+
 /** Wire answer `{"list": [...]}` of `merchant/statement`. */
 internal class StatementWire
     @JsonCreator

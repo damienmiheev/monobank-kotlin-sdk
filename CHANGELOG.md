@@ -19,6 +19,9 @@ see the README's migration section.
 - `RequestOutcome` on every exception: whether a failed request may have been performed.
 - Retries that are safe for payments, `Retry-After` support, timeouts, custom `HttpClient`.
 - `MinorUnits` money conversion without rounding.
+- `merchant.statementEntries(...)`: reads the statement entry by entry and returns unreadable
+  entries raw; `findByReference` uses it and never reports an unreadable matching payment as missing.
+- `MonobankClientOptions.maxResponseBytes` (default 20 MB).
 
 ### Changed (from app.spilki 0.0.x)
 - Packages renamed from `app.spilki.monobank.acquiring` to `io.github.damienmiheev.monobank.acquiring`.

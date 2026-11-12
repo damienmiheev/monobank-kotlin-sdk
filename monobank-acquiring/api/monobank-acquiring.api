@@ -1012,6 +1012,10 @@ public final class io/github/damienmiheev/monobank/acquiring/merchant/MerchantAp
 	public final fun statement (Ljava/time/Instant;Ljava/time/Instant;)Ljava/util/List;
 	public final fun statement (Ljava/time/Instant;Ljava/time/Instant;Ljava/lang/String;)Ljava/util/List;
 	public static synthetic fun statement$default (Lio/github/damienmiheev/monobank/acquiring/merchant/MerchantApi;Ljava/time/Instant;Ljava/time/Instant;Ljava/lang/String;ILjava/lang/Object;)Ljava/util/List;
+	public final fun statementEntries (Ljava/time/Instant;)Lio/github/damienmiheev/monobank/acquiring/merchant/StatementEntries;
+	public final fun statementEntries (Ljava/time/Instant;Ljava/time/Instant;)Lio/github/damienmiheev/monobank/acquiring/merchant/StatementEntries;
+	public final fun statementEntries (Ljava/time/Instant;Ljava/time/Instant;Ljava/lang/String;)Lio/github/damienmiheev/monobank/acquiring/merchant/StatementEntries;
+	public static synthetic fun statementEntries$default (Lio/github/damienmiheev/monobank/acquiring/merchant/MerchantApi;Ljava/time/Instant;Ljava/time/Instant;Ljava/lang/String;ILjava/lang/Object;)Lio/github/damienmiheev/monobank/acquiring/merchant/StatementEntries;
 	public final fun submerchants ()Ljava/util/List;
 }
 
@@ -1067,6 +1071,12 @@ public final class io/github/damienmiheev/monobank/acquiring/merchant/StatementC
 	public final fun getMaskedPan ()Ljava/lang/String;
 	public final fun getRrn ()Ljava/lang/String;
 	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/damienmiheev/monobank/acquiring/merchant/StatementEntries {
+	public final fun getItems ()Ljava/util/List;
+	public final fun getUnreadable ()Ljava/util/List;
 	public fun toString ()Ljava/lang/String;
 }
 
@@ -1137,6 +1147,14 @@ public final class io/github/damienmiheev/monobank/acquiring/merchant/Submerchan
 	public final fun getIban ()Ljava/lang/String;
 	public final fun getOwner ()Ljava/lang/String;
 	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/damienmiheev/monobank/acquiring/merchant/UnreadableStatementEntry {
+	public final fun getError ()Ljava/lang/String;
+	public final fun getInvoiceId ()Ljava/lang/String;
+	public final fun getRawJson ()Ljava/lang/String;
+	public final fun getReference ()Ljava/lang/String;
 	public fun toString ()Ljava/lang/String;
 }
 
