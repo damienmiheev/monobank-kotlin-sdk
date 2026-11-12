@@ -130,7 +130,7 @@ class WebhookTest {
                 .build(),
         )
         val refund = parse(receiver.await(3)[2])
-        assertThat(refund.status).isEqualTo(InvoiceStatus.SUCCESS)
+        assertThat(refund.status).isEqualTo(InvoiceStatus.REVERSED)
         assertThat(refund.finalAmount).isEqualTo(3200)
         assertThat(refund.cancelFor("r-1")!!.status).isEqualTo(OperationStatus.SUCCESS)
 

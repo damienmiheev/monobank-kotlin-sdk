@@ -84,6 +84,7 @@ public final class io/github/damienmiheev/monobank/testkit/FakeMerchant {
 	public final fun refundExternally (Ljava/lang/String;J)Lio/github/damienmiheev/monobank/testkit/FakeInvoice;
 	public final fun rotateKey ()Ljava/lang/String;
 	public final fun sendSignedWebhook (Ljava/lang/String;Ljava/lang/String;)Lio/github/damienmiheev/monobank/testkit/RecordedWebhook;
+	public final fun settleFinalize (Ljava/lang/String;)Lio/github/damienmiheev/monobank/testkit/FakeInvoice;
 	public final fun settleRefund (Ljava/lang/String;Ljava/lang/String;Z)Lio/github/damienmiheev/monobank/testkit/FakeInvoice;
 	public final fun startPayment (Ljava/lang/String;)Lio/github/damienmiheev/monobank/testkit/FakeInvoice;
 	public final fun startPayment (Ljava/lang/String;Lio/github/damienmiheev/monobank/testkit/CustomerPayment;)Lio/github/damienmiheev/monobank/testkit/FakeInvoice;
@@ -156,6 +157,7 @@ public final class io/github/damienmiheev/monobank/testkit/FakeMonobankAcquiring
 	public final fun setRefundSettlement (Lio/github/damienmiheev/monobank/testkit/RefundSettlement;)V
 	public final fun setWebhookDelay (Ljava/time/Duration;)V
 	public final fun setWebhookDelivery (Lio/github/damienmiheev/monobank/testkit/WebhookDelivery;)V
+	public final fun settleFinalize (Ljava/lang/String;)Lio/github/damienmiheev/monobank/testkit/FakeInvoice;
 	public final fun settleRefund (Ljava/lang/String;Ljava/lang/String;Z)Lio/github/damienmiheev/monobank/testkit/FakeInvoice;
 	public final fun start ()Lio/github/damienmiheev/monobank/testkit/FakeMonobankAcquiring;
 	public final fun startPayment (Ljava/lang/String;)Lio/github/damienmiheev/monobank/testkit/FakeInvoice;
@@ -171,6 +173,7 @@ public final class io/github/damienmiheev/monobank/testkit/FakeMonobankAcquiring
 	public final fun build ()Lio/github/damienmiheev/monobank/testkit/FakeMonobankAcquiring;
 	public final fun clock (Lio/github/damienmiheev/monobank/testkit/TestClock;)Lio/github/damienmiheev/monobank/testkit/FakeMonobankAcquiring$Builder;
 	public final fun feePercent (Ljava/math/BigDecimal;)Lio/github/damienmiheev/monobank/testkit/FakeMonobankAcquiring$Builder;
+	public final fun finalizeSettlementDelay (Ljava/time/Duration;)Lio/github/damienmiheev/monobank/testkit/FakeMonobankAcquiring$Builder;
 	public final fun fiscalization (Z)Lio/github/damienmiheev/monobank/testkit/FakeMonobankAcquiring$Builder;
 	public final fun hangLimit (Ljava/time/Duration;)Lio/github/damienmiheev/monobank/testkit/FakeMonobankAcquiring$Builder;
 	public final fun merchant (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lio/github/damienmiheev/monobank/testkit/FakeMonobankAcquiring$Builder;

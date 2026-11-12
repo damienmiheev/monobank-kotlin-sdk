@@ -269,7 +269,17 @@ class FakeRoutesTest {
         val finalized = mono.invoices.finalize(FinalizeInvoiceRequest.of(invoiceId, 7_000))
 
         assertThat(finalized.status).isEqualTo(OperationStatus.SUCCESS)
-        val status = mono.invoices.status(invoiceId)
+        // a partial capture settles: processing (finalAmount already captured), then success
+        var status = mono.invoices.status(invoiceId)
+        assertThat(status.status).isEqualTo(InvoiceStatus.PROCESSING)
+        assertThat(status.finalAmount).isEqualTo(7_000)
+        val notFinished =
+            apiError { mono.invoices.cancel(CancelInvoiceRequest.builder(invoiceId).amount(1_000).build()) }
+        assertThat(notFinished.statusCode).isEqualTo(404)
+        assertThat(notFinished.errorCode).isEqualTo("1004")
+        assertThat(notFinished.errorText).isEqualTo("order not finished")
+        clock.advance(Duration.ofSeconds(2)) // the default settlement delay, on the fake clock
+        status = mono.invoices.status(invoiceId)
         assertThat(status.status).isEqualTo(InvoiceStatus.SUCCESS)
         assertThat(status.finalAmount).isEqualTo(7_000)
         assertThat(apiError { mono.invoices.finalize(FinalizeInvoiceRequest.of(invoiceId, 1)) }.errorCode)
@@ -323,7 +333,8 @@ class FakeRoutesTest {
         assertThat(first.status).isEqualTo(OperationStatus.PROCESSING)
         assertThat(first.createdDate).isNotNull()
         var status = mono.invoices.status(invoiceId)
-        assertThat(status.status).isEqualTo(InvoiceStatus.SUCCESS)
+        // any successful refund makes the invoice reversed; finalAmount keeps the rest
+        assertThat(status.status).isEqualTo(InvoiceStatus.REVERSED)
         assertThat(status.finalAmount).isEqualTo(7_000)
         val refund = status.cancelFor("r-1")!!
         assertThat(refund.status).isEqualTo(OperationStatus.SUCCESS)

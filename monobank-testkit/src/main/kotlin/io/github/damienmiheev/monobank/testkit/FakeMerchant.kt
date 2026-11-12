@@ -208,6 +208,14 @@ public class FakeMerchant internal constructor(
             invoice.snapshot(merchantId)
         }
 
+    /** Settles a partial capture now. See [FakeMonobankAcquiring.settleFinalize]. */
+    public fun settleFinalize(invoiceId: String): FakeInvoice =
+        bank.locked {
+            val invoice = state.require(invoiceId)
+            state.settleFinalize(invoice)
+            invoice.snapshot(merchantId)
+        }
+
     /** A refund made outside the API. See [FakeMonobankAcquiring.refundExternally]. */
     public fun refundExternally(
         invoiceId: String,

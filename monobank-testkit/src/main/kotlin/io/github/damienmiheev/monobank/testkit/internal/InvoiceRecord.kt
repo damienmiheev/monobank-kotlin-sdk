@@ -111,6 +111,12 @@ internal class InvoiceRecord(
     /** The status before the invoice became `reversed` (`hold` for a released or lapsed hold). */
     var reversedFrom: String? = null
 
+    /** A partial capture is settling (`processing` after `invoice/finalize`). */
+    var finalizing: Boolean = false
+
+    /** When an automatic settlement of [finalizing] is due. */
+    var settleAt: Instant? = null
+
     /** The basket the money stands for: the created one, replaced by the items of a finalize. */
     var basket: List<BasketLine> = order.basket
     val cancels: MutableList<CancelRecord> = mutableListOf()

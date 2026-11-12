@@ -26,6 +26,7 @@ class FinalizeItemsMatchingTest {
             .builder()
             .fiscalization(true)
             .splitPayments(true)
+            .finalizeSettlementDelay(null)
             .build()
             .start()
     private val mono = clientFor(fake)
@@ -107,11 +108,13 @@ class FinalizeItemsMatchingTest {
     }
 
     @Test
-    fun `a partial capture with a fractional qty of the same line works (fractional qty unverified)`() {
+    fun `a partial capture with a fractional qty of the same line works (verified live)`() {
         val hold = create(PaymentType.HOLD)
 
         finalize(hold, 150, item(qty = "0.75"))
 
+        assertThat(mono.invoices.status(hold).status).isEqualTo(InvoiceStatus.PROCESSING)
+        fake.settleFinalize(hold)
         val status = mono.invoices.status(hold)
         assertThat(status.status).isEqualTo(InvoiceStatus.SUCCESS)
         assertThat(status.finalAmount).isEqualTo(150)
@@ -148,6 +151,7 @@ class FinalizeItemsMatchingTest {
     fun `after a partial capture, refunds match the finalized basket`() {
         val hold = create(PaymentType.HOLD)
         finalize(hold, 150, item(qty = "0.75"))
+        fake.settleFinalize(hold)
 
         assertThat(error { refund(hold, 100, item(qty = "1", sum = 100)) }.errorText)
             .startsWith("refund basket contains item not found in invoice")

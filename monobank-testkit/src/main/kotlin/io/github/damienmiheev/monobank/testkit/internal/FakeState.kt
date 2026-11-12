@@ -23,6 +23,8 @@ internal class FakeSettings(
     val sendProcessingWebhooks: Boolean,
     val validateBasketTotal: Boolean,
     @Volatile var refundSettlement: RefundSettlement,
+    /** How long a partially finalized invoice stays `processing`; `null`: until settled by hand. */
+    val finalizeSettlementDelay: Duration?,
 )
 
 /** The merchant behind a set of tokens. */
@@ -46,6 +48,8 @@ internal class Bank(
     val settings: FakeSettings,
     val ids: Ids,
     val webhookSink: (WebhookEvent) -> Unit,
+    /** Asks for [locked] to run again after a real-time delay, so due changes happen without a request. */
+    val wakeUp: (Duration) -> Unit,
 ) {
     private val lock = ReentrantLock()
     val merchants: MutableList<MerchantState> = ArrayList()
@@ -150,6 +154,11 @@ internal class MerchantState(
                 reverse(invoice)
                 invoice.touch(holdUntil)
                 emit(invoice)
+            } else {
+                val settleAt = invoice.settleAt
+                if (invoice.status == Status.PROCESSING && settleAt != null && !now.isBefore(settleAt)) {
+                    settleFinalize(invoice)
+                }
             }
         }
     }
@@ -204,8 +213,8 @@ internal class MerchantState(
         invoice: InvoiceRecord,
         payment: CustomerPayment,
     ) {
-        check(invoice.status == Status.PROCESSING) {
-            "invoice ${invoice.invoiceId} is ${invoice.status}, not processing"
+        check(invoice.status == Status.PROCESSING && !invoice.finalizing) {
+            "invoice ${invoice.invoiceId} is ${invoice.status}, not a payment in progress"
         }
         val now = now()
         if (!payment.approved) {
@@ -251,7 +260,7 @@ internal class MerchantState(
 
     /** `created`/`processing` → `expired`, without a webhook. */
     fun expire(invoice: InvoiceRecord) {
-        check(invoice.status == Status.CREATED || invoice.status == Status.PROCESSING) {
+        check(invoice.status == Status.CREATED || (invoice.status == Status.PROCESSING && !invoice.finalizing)) {
             "invoice ${invoice.invoiceId} is ${invoice.status}; only created or processing invoices expire"
         }
         invoice.status = Status.EXPIRED
@@ -275,10 +284,34 @@ internal class MerchantState(
             matchItems(invoice.basket, items, amount, ItemTexts.FINALIZE)
             invoice.basket = items
         }
-        invoice.status = Status.SUCCESS
         invoice.finalAmount = amount
         invoice.fee = fee(amount, settings.feePercent)
         invoice.holdUntil = null
+        val now = now()
+        if (amount < invoice.amount) {
+            // Verified live: a partial capture stays `processing` (finalAmount already set) before `success`.
+            invoice.status = Status.PROCESSING
+            invoice.finalizing = true
+            val delay = settings.finalizeSettlementDelay
+            if (delay != null) {
+                invoice.settleAt = now.plus(delay)
+                bank.wakeUp(delay)
+            }
+        } else {
+            invoice.status = Status.SUCCESS
+        }
+        invoice.touch(now)
+        emit(invoice)
+    }
+
+    /** Completes a partial capture: `processing` → `success`, with a webhook. */
+    fun settleFinalize(invoice: InvoiceRecord) {
+        check(invoice.status == Status.PROCESSING && invoice.finalizing) {
+            "invoice ${invoice.invoiceId} is not waiting for a partial capture to settle"
+        }
+        invoice.status = Status.SUCCESS
+        invoice.finalizing = false
+        invoice.settleAt = null
         invoice.touch(now())
         emit(invoice)
     }
@@ -292,28 +325,14 @@ internal class MerchantState(
     ): CancelRecord {
         val refundAmount =
             when (invoice.status) {
-                Status.HOLD -> {
-                    holdReleaseAmount(invoice, amount)
-                }
+                Status.HOLD -> holdReleaseAmount(invoice, amount)
 
-                Status.SUCCESS -> {
-                    val refundable = invoice.refundable()
-                    val requested = amount ?: refundable
-                    if (requested <= 0 || requested > refundable) throw wrongCancelAmount()
-                    // Inferred from the finalize rule: a partial refund needs the refunded items.
-                    val partial = requested < (invoice.finalAmount ?: 0)
-                    if (info.needsBasket && partial && items.isEmpty()) throw noBasketForPartialAmount()
-                    if (info.needsBasket && partial) matchItems(invoice.basket, items, requested, ItemTexts.REFUND)
-                    requested
-                }
+                Status.SUCCESS, Status.REVERSED -> paymentRefundAmount(invoice, amount, items, info.needsBasket)
 
-                Status.REVERSED -> {
-                    throw wrongCancelAmount()
-                }
+                // Verified live: a partial capture that is still settling cannot be refunded yet.
+                Status.PROCESSING -> throw if (invoice.finalizing) orderNotFinished() else cancelNotAvailable()
 
-                else -> {
-                    throw ApiError(500, "CANCEL_NOT_AVAILABLE", "cancel is not available")
-                }
+                else -> throw cancelNotAvailable()
             }
         val now = now()
         val cancel =
@@ -342,7 +361,12 @@ internal class MerchantState(
         invoice: InvoiceRecord,
         amount: Long,
     ) {
-        check(invoice.status == Status.SUCCESS) { "only a successful payment can be refunded" }
+        check(
+            invoice.status == Status.SUCCESS ||
+                (invoice.status == Status.REVERSED && invoice.reversedFrom == Status.SUCCESS),
+        ) {
+            "only a successful payment can be refunded"
+        }
         check(amount in 1..invoice.refundable()) { "amount must be between 1 and ${invoice.refundable()}" }
         val now = now()
         invoice.cancels.add(
@@ -360,17 +384,13 @@ internal class MerchantState(
         if (invoice.status == Status.HOLD) {
             reverse(invoice)
         } else {
+            // Verified live: any successful refund, even a partial one, makes the invoice `reversed`;
+            // finalAmount keeps what is left.
             val remaining = maxOf(0, (invoice.finalAmount ?: 0) - amount)
+            if (invoice.status == Status.SUCCESS) invoice.reversedFrom = Status.SUCCESS
+            invoice.status = Status.REVERSED
             invoice.finalAmount = remaining
-            if (remaining == 0L && invoice.status == Status.SUCCESS) reverse(invoice)
         }
-    }
-
-    private fun reverse(invoice: InvoiceRecord) {
-        invoice.reversedFrom = invoice.status
-        invoice.status = Status.REVERSED
-        invoice.finalAmount = 0
-        invoice.holdUntil = null
     }
 
     companion object {
@@ -445,4 +465,37 @@ private fun matchItems(
         if (item.qty > line.qty) throw ApiError(400, "1001", texts.tooMany + item.key)
     }
     if (items.sumOf { it.total() } != amount) throw ApiError(400, "1001", texts.wrongTotal)
+}
+
+private fun orderNotFinished() = ApiError(404, "1004", "order not finished")
+
+private fun cancelNotAvailable() = ApiError(500, "CANCEL_NOT_AVAILABLE", "cancel is not available")
+
+/**
+ * The amount of a refund of a paid invoice. A partially refunded payment is `reversed` but can be
+ * refunded further; a released or lapsed hold cannot.
+ */
+private fun paymentRefundAmount(
+    invoice: InvoiceRecord,
+    amount: Long?,
+    items: List<BasketLine>,
+    needsBasket: Boolean,
+): Long {
+    if (invoice.status == Status.REVERSED && invoice.reversedFrom != Status.SUCCESS) throw wrongCancelAmount()
+    val refundable = invoice.refundable()
+    val requested = amount ?: refundable
+    if (requested <= 0 || requested > refundable) throw wrongCancelAmount()
+    // Inferred from the finalize rule: a partial refund needs the refunded items.
+    val partial = requested < (invoice.finalAmount ?: 0)
+    if (needsBasket && partial && items.isEmpty()) throw noBasketForPartialAmount()
+    if (needsBasket && partial) matchItems(invoice.basket, items, requested, ItemTexts.REFUND)
+    return requested
+}
+
+/** The invoice becomes `reversed`, remembering what it was. */
+private fun reverse(invoice: InvoiceRecord) {
+    invoice.reversedFrom = invoice.status
+    invoice.status = Status.REVERSED
+    invoice.finalAmount = 0
+    invoice.holdUntil = null
 }

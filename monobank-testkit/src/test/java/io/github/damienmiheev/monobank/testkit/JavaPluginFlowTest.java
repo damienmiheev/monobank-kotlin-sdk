@@ -160,7 +160,7 @@ class JavaPluginFlowTest {
 
         // 6. status: the refund settled, finalAmount lowered
         InvoiceStatusResponse status = mono.getInvoices().status(renewal.getInvoiceId());
-        assertThat(status.getStatus()).isEqualTo(InvoiceStatus.SUCCESS);
+        assertThat(status.getStatus()).isEqualTo(InvoiceStatus.REVERSED); // any refund reverses, verified live
         assertThat(status.getFinalAmount()).isEqualTo(7_500L);
         CancelListItem item = status.cancelFor("kb-refund-1");
         assertThat(item).isNotNull();

@@ -9,6 +9,7 @@ import io.github.damienmiheev.monobank.testkit.internal.HostedPages
 import io.github.damienmiheev.monobank.testkit.internal.Ids
 import io.github.damienmiheev.monobank.testkit.internal.MerchantInfo
 import io.github.damienmiheev.monobank.testkit.internal.MerchantState
+import io.github.damienmiheev.monobank.testkit.internal.NamedThreadFactory
 import io.github.damienmiheev.monobank.testkit.internal.RuleAction
 import io.github.damienmiheev.monobank.testkit.internal.WebhookDispatcher
 import io.github.damienmiheev.monobank.testkit.internal.WebhookSettings
@@ -20,6 +21,9 @@ import java.security.SecureRandom
 import java.time.Duration
 import java.util.Random
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.RejectedExecutionException
+import java.util.concurrent.ScheduledThreadPoolExecutor
+import java.util.concurrent.TimeUnit
 import java.util.function.Predicate
 
 /**
@@ -55,6 +59,17 @@ import java.util.function.Predicate
  * - `modifiedDate` only increases. Amounts are minor units (kopiyky). Unpaid invoices expire after
  *   `validity` (default 24 h, clamped to 30 days). Holds work only in UAH and lapse after 9 days.
  *   `finalAmount` drops with refunds. Only payments that reached `processing` appear in the statement.
+ *
+ * ### Verified against monobank's test merchant (fiscal receipts and split payments on)
+ * - Any successful refund, partial or full, makes the invoice `reversed`; `finalAmount` keeps what is
+ *   left (e.g. 100 after refunding 50 of 150), `cancelList` shows the refund, and a webhook is sent.
+ *   A `reversed` invoice with money left can be refunded further.
+ * - A partial `invoice/finalize` answers `success`, but the invoice stays `processing` (with
+ *   `finalAmount` already the captured amount) before it becomes `success` (more than 30 s live; here
+ *   [Builder.finalizeSettlementDelay], 2 s by default, or [settleFinalize]); webhooks: `processing`,
+ *   then `success`. Meanwhile `invoice/cancel` answers 404 `1004` "order not finished". A full finalize
+ *   becomes `success` at once (not observed live).
+ * - Fractional item `qty` is accepted in finalize and refund `items` (0.75 × 200 = 150, 0.25 × 200 = 50).
  *
  * ### Where the fake invents behaviour (monobank does not document it)
  * - `wallet/payment` holds are accepted in any currency (monobank documents no limit there);
@@ -100,7 +115,8 @@ import java.util.function.Predicate
  *   ("... item exceeds the hold: ..."), and qty × sum over the items must equal the amount ("wrong amount
  *   for finalization"). A partial `invoice/cancel` with `items` is checked the same way against the paid
  *   (or finalized) basket ("refund basket contains item not found in invoice: ...", "wrong amount for
- *   refund"; all inferred). Fractional `qty` (0.75 × 200 = 150) is accepted; unverified.
+ *   refund"; all inferred). Fractional `qty` is accepted (verified, see above).
+ * - The settling window after a partial finalize is applied to every merchant, not only fiscal or split ones.
  *
  * ### Faults and webhook control
  * [injectFault] (delay before or after processing, answer after webhooks, timeout, dropped
@@ -174,6 +190,7 @@ public class FakeMonobankAcquiring private constructor(
     public val clock: TestClock = builder.clock
 
     private val stopped = CountDownLatch(1)
+    private val timer = ScheduledThreadPoolExecutor(1, NamedThreadFactory("fake-monobank-timer"))
     private val webhooks =
         WebhookDispatcher(
             clock = clock,
@@ -195,9 +212,11 @@ public class FakeMonobankAcquiring private constructor(
                 sendProcessingWebhooks = builder.sendProcessingWebhooks,
                 validateBasketTotal = builder.validateBasketTotal,
                 refundSettlement = builder.refundSettlement,
+                finalizeSettlementDelay = builder.finalizeSettlementDelay,
             ),
             Ids(builder.seed?.let { Random(it) } ?: SecureRandom()),
             webhooks::enqueue,
+            ::wakeUp,
         )
     private val merchantList: List<FakeMerchant>
     private val bindAddress: InetAddress = builder.bindAddress
@@ -269,6 +288,18 @@ public class FakeMonobankAcquiring private constructor(
 
     @Volatile
     private var closed = false
+
+    private fun wakeUp(delay: Duration) {
+        if (closed) return
+        try {
+            // A little after the delay, so the fake clock (real time + offset) has passed it.
+            timer.schedule({ applyDueChanges() }, delay.toMillis() + WAKE_UP_MARGIN_MS, TimeUnit.MILLISECONDS)
+        } catch (
+            @Suppress("SwallowedException") e: RejectedExecutionException,
+        ) {
+            // closing
+        }
+    }
 
     /** The merchant that accepts [token]. @throws IllegalArgumentException when no merchant does. */
     public fun merchant(token: String): FakeMerchant =
@@ -375,8 +406,14 @@ public class FakeMonobankAcquiring private constructor(
             closed = true
         }
         stopped.countDown()
+        timer.shutdownNow()
         server.stop()
         webhooks.close()
+        try {
+            timer.awaitTermination(SHUTDOWN_SECONDS, TimeUnit.SECONDS)
+        } catch (e: InterruptedException) {
+            Thread.currentThread().interrupt()
+        }
     }
 
     /**
@@ -456,6 +493,14 @@ public class FakeMonobankAcquiring private constructor(
         invoiceId: String,
         amount: Long,
     ): FakeInvoice = owner(invoiceId).refundExternally(invoiceId, amount)
+
+    /**
+     * Settles a partial capture now: the invoice goes from `processing` to `success`, with a webhook
+     * (see [Builder.finalizeSettlementDelay]).
+     *
+     * @throws IllegalStateException when the invoice is not settling a partial capture.
+     */
+    public fun settleFinalize(invoiceId: String): FakeInvoice = owner(invoiceId).settleFinalize(invoiceId)
 
     /** Queues the outcome of the default merchant's next `wallet/payment`; without one, a charge succeeds. */
     public fun enqueueWalletPaymentOutcome(outcome: WalletPaymentOutcome) {
@@ -755,6 +800,19 @@ public class FakeMonobankAcquiring private constructor(
         internal var validateBasketTotal: Boolean = true
         internal var feePercent: BigDecimal = BigDecimal("1.3")
         internal var hangLimit: Duration = Duration.ofMinutes(2)
+        internal var finalizeSettlementDelay: Duration? = Duration.ofSeconds(2)
+
+        /**
+         * How long a partially finalized invoice stays `processing` before it becomes `success` (default
+         * 2 s, measured on the fake clock; monobank took more than 30 s live). `null` keeps it `processing`
+         * until [FakeMonobankAcquiring.settleFinalize]. While it settles, `invoice/cancel` answers
+         * 404 `1004` "order not finished", as monobank does.
+         */
+        public fun finalizeSettlementDelay(delay: Duration?): Builder =
+            apply {
+                require(delay == null || !delay.isNegative) { "delay must not be negative" }
+                finalizeSettlementDelay = delay
+            }
 
         /**
          * Accepted `X-Token` values of the default merchant (default [DEFAULT_TOKEN]); they are aliases
@@ -895,6 +953,9 @@ public class FakeMonobankAcquiring private constructor(
     public companion object {
         /** The token a default fake accepts. */
         public const val DEFAULT_TOKEN: String = "fake-monobank-token"
+
+        private const val WAKE_UP_MARGIN_MS = 20L
+        private const val SHUTDOWN_SECONDS = 5L
 
         /** Starts configuring a fake. */
         @JvmStatic
