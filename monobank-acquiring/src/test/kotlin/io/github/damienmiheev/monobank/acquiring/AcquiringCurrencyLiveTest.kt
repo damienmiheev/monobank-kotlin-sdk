@@ -112,7 +112,8 @@ class AcquiringCurrencyLiveTest {
         log(
             "$label: status=${status.statusRaw} amount=${status.amount} ccy=${status.ccy} " +
                 "finalAmount=${status.finalAmount} card country=${status.paymentInfo?.country} " +
-                "bank=${status.paymentInfo?.bank} system=${status.paymentInfo?.paymentSystemRaw} fee=${status.paymentInfo?.fee}",
+                "bank=${status.paymentInfo?.bank} system=${status.paymentInfo?.paymentSystemRaw} " +
+                "fee=${status.paymentInfo?.fee}",
         )
         return answer.invoiceId.takeIf { status.status == InvoiceStatus.SUCCESS }
     }
