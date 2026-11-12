@@ -93,4 +93,11 @@ for file in "$dir"/ruleset-*.json; do
   fi
 done
 
+# Classic branch protection (from before the rulesets) would add its own required checks and
+# reviews, which the admin cannot bypass. The rulesets above replace it, so remove it last.
+if api "repos/$repo/branches/main/protection" --silent 2>/dev/null; then
+  api -X DELETE "repos/$repo/branches/main/protection" --silent
+  echo "removed classic branch protection on main (the rulesets replace it)"
+fi
+
 echo "Done. Review: https://github.com/$repo/settings/rules"
