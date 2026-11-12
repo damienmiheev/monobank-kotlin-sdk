@@ -178,8 +178,18 @@ class AcquiringWalletRefundLiveTest {
                 .firstOrNull()
                 ?.id
         val line = FiscalizationItem.builder(name, BigDecimal.ONE, 100, code).splitReceiverId(receiver).build()
+
+        fun uahLine(
+            qty: String,
+            sum: Long,
+        ) = FiscalizationItem.builder(name, BigDecimal(qty), sum, code).splitReceiverId(receiver).build()
         val attempts =
             listOf<Pair<String, (CancelInvoiceRequest.Builder) -> CancelInvoiceRequest.Builder>>(
+                "full: amount 5048, items qty 1 x sum 5048" to { it.amount(5048).items(listOf(uahLine("1", 5048))) },
+                "full: amount 5048, items qty 50.48 x sum 100" to {
+                    it.amount(5048).items(listOf(uahLine("50.48", 100)))
+                },
+                "full: no amount, items qty 1 x sum 5048" to { it.items(listOf(uahLine("1", 5048))) },
                 "full: no amount, no items" to { it },
                 "full: no amount, items = original line (qty 1 x sum 100)" to { it.items(listOf(line)) },
                 "full: amount 5048, items = original line" to { it.amount(5048).items(listOf(line)) },
