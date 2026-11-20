@@ -5,6 +5,8 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.1.0] — 2026-11-20
+
 ### Added
 - `WebhookVerifier.refreshPublicKey()`: re-reads monobank's webhook key, as `check` does after a
   mismatch, within the same limits (once per `minRefreshInterval`, `failureBackoff`, one fetch at a

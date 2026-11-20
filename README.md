@@ -38,7 +38,7 @@ Gradle (Kotlin DSL):
 
 ```kotlin
 dependencies {
-    implementation(platform("io.github.damienmiheev:monobank-bom:1.0.0"))
+    implementation(platform("io.github.damienmiheev:monobank-bom:1.1.0"))
     implementation("io.github.damienmiheev:monobank-acquiring")
     testImplementation("io.github.damienmiheev:monobank-testkit")
 }
@@ -52,7 +52,7 @@ Maven:
     <dependency>
       <groupId>io.github.damienmiheev</groupId>
       <artifactId>monobank-bom</artifactId>
-      <version>1.0.0</version>
+      <version>1.1.0</version>
       <type>pom</type>
       <scope>import</scope>
     </dependency>
@@ -314,9 +314,9 @@ and `api.` levels are gone (e.g. `model.invoice.CreateInvoiceRequest` → `invoi
 `model.common.InvoiceStatus` → `common.InvoiceStatus`, `webhook.WebhookParser` stays `webhook.WebhookParser`),
 and exceptions moved to `io.github.damienmiheev.monobank.core`.
 
-| 0.0.x | 1.0.0 |
+| 0.0.x | 1.x |
 |---|---|
-| `implementation("app.spilki:monobank-acquiring-sdk:0.0.3")` | `implementation("io.github.damienmiheev:monobank-acquiring:1.0.0")` |
+| `implementation("app.spilki:monobank-acquiring-sdk:0.0.3")` | `implementation("io.github.damienmiheev:monobank-acquiring:1.1.0")` |
 | `MonobankAcquiring(MonobankAcquiringConfig(token = t))` | `MonobankAcquiring(AcquiringConfig.builder(t).build())` or `MonobankAcquiring.create(t)` |
 | `MonobankAcquiringConfig(baseUrl, connectTimeoutMs, readTimeoutMs, cmsName, cmsVersion)` | `AcquiringConfig.builder(t).cmsName(..).cmsVersion(..).options(MonobankClientOptions.builder().baseUrl(..).connectTimeout(Duration).requestTimeout(Duration).build())` |
 | `CreateInvoiceRequest(amount = 4200, ccy = 980, ...)` | `CreateInvoiceRequest.builder(4200).ccy(980)...build()` |
