@@ -423,7 +423,11 @@ class WebhookKeyLoadingTest : AcquiringTestSupport() {
         down.set(true)
         val results = ConcurrentHashMap<String, PublicKeyRefresh>()
 
-        fun caller(name: String) = Thread({ results[name] = verifier.refreshPublicKey() }, name).apply { start() }
+        fun caller(name: String) =
+            Thread({ results[name] = verifier.refreshPublicKey() }, name).apply {
+                isDaemon = true // a failed run leaves no thread parked on a latch
+                start()
+            }
 
         val aFirstGate = clock.holdNext("A")
         val a = caller("A")
