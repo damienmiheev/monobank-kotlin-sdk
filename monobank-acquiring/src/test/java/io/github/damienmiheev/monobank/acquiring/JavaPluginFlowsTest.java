@@ -199,6 +199,8 @@ class JavaPluginFlowsTest {
         InvoiceStatusResponse parsed = verifier.verifyAndParse(xSign, body);
         assertThat(parsed.getStatus()).isEqualTo(InvoiceStatus.SUCCESS);
         assertThat(verifier.currentPublicKey()).isEqualTo(keyFromApi);
+        assertThat(verifier.refreshPublicKey().getKey()).isEqualTo(keyFromApi);
+        assertThat(verifier.refreshPublicKey().isUnavailable()).isFalse();
         assertThatThrownBy(() -> verifier.verifyAndParse(xSign, "{}".getBytes(StandardCharsets.UTF_8)))
                 .isInstanceOf(MonobankSignatureException.class);
 

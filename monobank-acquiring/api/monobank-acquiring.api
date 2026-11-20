@@ -1848,6 +1848,12 @@ public final class io/github/damienmiheev/monobank/acquiring/wallet/WalletPaymen
 	public final fun googlePay (Ljava/lang/String;JI)Lio/github/damienmiheev/monobank/acquiring/wallet/WalletPaymentRequest$Builder;
 }
 
+public final class io/github/damienmiheev/monobank/acquiring/webhook/PublicKeyRefresh {
+	public final fun getKey ()Ljava/lang/String;
+	public final fun isUnavailable ()Z
+	public fun toString ()Ljava/lang/String;
+}
+
 public final class io/github/damienmiheev/monobank/acquiring/webhook/VerificationResult : java/lang/Enum {
 	public static final field INVALID_SIGNATURE Lio/github/damienmiheev/monobank/acquiring/webhook/VerificationResult;
 	public static final field KEY_UNAVAILABLE Lio/github/damienmiheev/monobank/acquiring/webhook/VerificationResult;
@@ -1879,6 +1885,7 @@ public final class io/github/damienmiheev/monobank/acquiring/webhook/WebhookVeri
 	public final fun check (Ljava/lang/String;[B)Lio/github/damienmiheev/monobank/acquiring/webhook/VerificationResult;
 	public final fun currentPublicKey ()Ljava/lang/String;
 	public static final fun ofPublicKey (Ljava/lang/String;)Lio/github/damienmiheev/monobank/acquiring/webhook/WebhookVerifier;
+	public final fun refreshPublicKey ()Lio/github/damienmiheev/monobank/acquiring/webhook/PublicKeyRefresh;
 	public final fun verify (Ljava/lang/String;[B)Z
 	public final fun verifyAndParse (Ljava/lang/String;[B)Lio/github/damienmiheev/monobank/acquiring/invoice/InvoiceStatusResponse;
 	public final fun verifyOrThrow (Ljava/lang/String;[B)V

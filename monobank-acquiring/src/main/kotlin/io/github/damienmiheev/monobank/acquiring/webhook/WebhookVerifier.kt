@@ -49,6 +49,25 @@ public enum class VerificationResult {
     KEY_UNAVAILABLE,
 }
 
+/** Result of [WebhookVerifier.refreshPublicKey]. */
+public class PublicKeyRefresh internal constructor(
+    /**
+     * The key in use after the attempt, as the [WebhookKeyProvider] returned it (trimmed): the re-read
+     * key, or the one already loaded when it was not re-read. `null` only when no key was ever loaded.
+     */
+    public val key: String?,
+    /**
+     * `true` when the key could not be re-read now: the fetch failed, the verifier is in
+     * `failureBackoff` after a failed fetch, or the fetch this call waited on (another caller's)
+     * failed, did not finish within `maxWaitForKey`, or the wait was interrupted. [key] may then be an
+     * old one. Treat it like [VerificationResult.KEY_UNAVAILABLE]:
+     * answer with HTTP 5xx so monobank delivers the webhook again, rather than rejecting it.
+     */
+    public val isUnavailable: Boolean,
+) {
+    override fun toString(): String = "PublicKeyRefresh(loaded=${key != null}, unavailable=$isUnavailable)"
+}
+
 /**
  * Verifies the `X-Sign` header of acquiring webhooks: an ECDSA (P-256, SHA-256) signature over
  * the raw request body, base64-encoded DER.
@@ -58,10 +77,13 @@ public enum class VerificationResult {
  * Key handling, built so a slow or failing key endpoint never stalls your request threads:
  * - The key is loaded on first use and cached. When a signature does not match, the key is
  *   re-fetched, because monobank may have rotated it, at most once per `minRefreshInterval`.
+ *   [refreshPublicKey] asks for the same re-fetch without a failed check.
  * - Only one thread fetches at a time. Other threads use the cached key, or wait at most
- *   `maxWaitForKey` for the fetch and otherwise get [VerificationResult.KEY_UNAVAILABLE].
+ *   `maxWaitForKey` for the fetch and otherwise get [VerificationResult.KEY_UNAVAILABLE] (from
+ *   [refreshPublicKey]: the loaded key, marked [PublicKeyRefresh.isUnavailable]).
  * - After a failed fetch, no new fetch is tried for `failureBackoff`; in that window callers get
- *   [VerificationResult.KEY_UNAVAILABLE] (or `null` from [currentPublicKey]) at once.
+ *   [VerificationResult.KEY_UNAVAILABLE] (or `null` from [currentPublicKey] when no key is loaded,
+ *   [PublicKeyRefresh.isUnavailable] from [refreshPublicKey]) at once.
  * - After a rotation, the previous key is still accepted for `previousKeyGrace` (default
  *   10 minutes), so webhooks signed just before the rotation verify; after that it is rejected.
  *
@@ -151,6 +173,28 @@ public class WebhookVerifier private constructor(
      */
     public fun currentPublicKey(): String? = (keys ?: refresh(initial = true, seen = null).keys)?.currentRaw
 
+    /**
+     * Re-reads the webhook public key from the [WebhookKeyProvider], as [check] does after a
+     * mismatch, and returns the key in use afterwards.
+     *
+     * For an application that checks signatures with a key it got from this verifier (for example
+     * one that forwards webhooks to another service) and saw a mismatch: monobank may have rotated
+     * its key, and [check] here would only notice when a webhook fails *here*.
+     *
+     * The same limits as [check] apply, so calling it often is cheap and never floods monobank:
+     * - at most one fetch per `minRefreshInterval` after a successful one: a sooner call returns the
+     *   loaded key, not unavailable;
+     * - no fetch during `failureBackoff` after a failed one: [PublicKeyRefresh.isUnavailable];
+     * - one fetch at a time: other callers wait at most `maxWaitForKey` for it and get its key, or
+     *   when it fails or the wait times out the loaded key with [PublicKeyRefresh.isUnavailable];
+     * - after a rotation, [check] still accepts the previous key for `previousKeyGrace`, counted
+     *   from when the new key was first loaded (re-reading the same key does not restart it).
+     */
+    public fun refreshPublicKey(): PublicKeyRefresh {
+        val refreshed = refresh(initial = false, seen = keys)
+        return PublicKeyRefresh(refreshed.keys?.currentRaw, isUnavailable = refreshed.fetchFailed)
+    }
+
     /** `true` only when [check] is [VerificationResult.VALID]. */
     public fun verify(
         xSign: String?,
@@ -234,8 +278,9 @@ public class WebhookVerifier private constructor(
         try {
             // Re-check: another thread may have finished a fetch between the gate and the claim.
             gate(initial, seen)?.let { early ->
-                // Waiters get the same keys, not "unavailable".
-                mine.complete(early.keys)
+                // Waiters get the same answer: the keys when no fetch is needed, "unavailable" (null) in the
+                // failure back-off, so they don't take an old key for a fresh one.
+                mine.complete(if (early.fetchFailed) null else early.keys)
                 return early
             }
             val cached = keys
@@ -258,9 +303,21 @@ public class WebhookVerifier private constructor(
         val last = lastAttempt ?: return null
         val since = elapsedSince(last.at)
         return when {
-            last.failed && since < failureBackoff -> Refresh(cached, fetchFailed = true)
-            !last.failed && !initial && since < minRefreshInterval -> Refresh(cached, fetchFailed = false)
-            else -> null
+            last.failed && since < failureBackoff -> {
+                Refresh(cached, fetchFailed = true)
+            }
+
+            // `cached != null`: a key loaded by another thread after `cached` was read is not skipped as null.
+            !last.failed && !initial && cached != null && since < minRefreshInterval -> {
+                Refresh(
+                    cached,
+                    fetchFailed = false,
+                )
+            }
+
+            else -> {
+                null
+            }
         }
     }
 

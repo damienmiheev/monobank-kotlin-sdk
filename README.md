@@ -237,7 +237,9 @@ are **never** retried after an unknown outcome.
    (`newState.isNewerThan(stored)`). The card token arrives in `walletData` (status `created`),
    possibly in a separate webhook. For several merchants, build one verifier per merchant with
    `WebhookVerifier(WebhookKeyProvider { ... })` or `WebhookVerifier.ofPublicKey(storedKey)`;
-   `currentPublicKey()` returns the key in use.
+   `currentPublicKey()` returns the key in use. An application that checks signatures with that key
+   itself (a forwarder) calls `refreshPublicKey()` after a mismatch, as monobank may have rotated it,
+   and answers 5xx when the result `isUnavailable`.
 3. **Charge a saved card**: `mono.wallet.payment(WalletPaymentRequest.builder(cardToken, amount, CurrencyCodes.UAH, InitiationKind.MERCHANT).build())`.
    If `isThreeDsRequired`, send the customer to `tdsUrl`; the result comes by webhook or status.
    Charge in UAH, and on fiscal or split merchants use a one-hryvnia or one-kopiyka basket line (see above) if you
