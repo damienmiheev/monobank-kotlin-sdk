@@ -52,6 +52,8 @@ class AcquiringLiveTest {
         val key = mono.merchant.publicKey().key
         WebhookVerifier.ofPublicKey(key)
         assertThat(mono.webhooks.currentPublicKey()).isEqualTo(key)
+        // Within minRefreshInterval of the first load: the loaded key, no second fetch.
+        assertThat(mono.webhooks.refreshPublicKey().key).isEqualTo(key)
         assertThat(WebhookParser.parse("""{"invoiceId":"i","status":"created","amount":1,"ccy":980}""").invoiceId)
             .isEqualTo("i")
     }

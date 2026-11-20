@@ -5,6 +5,18 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- `WebhookVerifier.refreshPublicKey()`: re-reads monobank's webhook key, as `check` does after a
+  mismatch, within the same limits (once per `minRefreshInterval`, `failureBackoff`, one fetch at a
+  time). It returns `PublicKeyRefresh`: the key in use and `isUnavailable` when it could not be re-read
+  (answer 5xx then, as for `KEY_UNAVAILABLE`). For an application that checks signatures with a key it
+  got from `currentPublicKey()`, so a rotation is picked up even when no webhook fails in the verifier.
+
+### Fixed
+- `WebhookVerifier.check`: a call that waited on another thread's key fetch, which stopped because a
+  fetch had just failed, could treat the old key as fresh and answer `INVALID_SIGNATURE` instead of
+  `KEY_UNAVAILABLE`, so monobank would not deliver that webhook again.
+
 ## [1.0.0] — 2026-11-13
 
 First release under `io.github.damienmiheev`. It replaces `app.spilki:monobank-acquiring-sdk` 0.0.x;
